@@ -260,6 +260,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         workOrders = workOrders,
                         parts = spareParts,
                         pmItems = preventiveMaintenance,
+                        notifications = notifications,
                         onReports = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Reports },
                         onGovernance = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Audit },
                         onOpenTab = { selectedTab = it; if (it != BottomTab.More) moreRoute = null },
@@ -700,6 +701,7 @@ private fun DashboardScreen(
     workOrders: List<WorkOrderEntity>,
     parts: List<SparePartEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
+    notifications: List<MaintenanceNotificationEntity>,
     onReports: () -> Unit,
     onGovernance: () -> Unit,
     onOpenTab: (BottomTab) -> Unit,
@@ -773,12 +775,18 @@ private fun DashboardScreen(
         val warningAssets = assets.filter { it.status != "Running" }.take(4)
         val lowStockParts = parts.filter { it.onHandQty <= it.minQty }.take(4)
         val duePm = pmItems.filter { DateStrings.isDueOrOverdue(it.nextDueAt) }.take(4)
+        val openNotifications = notifications.filter {
+            (it.status == "New" || it.status == "Screened") && (it.priority == "Critical" || it.priority == "High")
+        }.take(4)
 
         if (warningAssets.isEmpty() && lowStockParts.isEmpty() && duePm.isEmpty() &&
-            pendingApprovals.isEmpty() && expiringWarranty.isEmpty()
+            pendingApprovals.isEmpty() && expiringWarranty.isEmpty() && openNotifications.isEmpty()
         ) {
             item { CalmCard() }
         } else {
+            items(openNotifications, key = { "nt-${it.id}" }) { ntf ->
+                AlertRow(Icons.Filled.NotificationsActive, AccentRed, "${ntf.number} • ${ntf.title}", "بلاغ ${notificationStatusLabel(ntf.status)} • ${ntf.priority}", onClick = { onOpenMore(MoreRoute.Notifications) })
+            }
             items(pendingApprovals.take(4), key = { "ap-${it.id}" }) { wo ->
                 AlertRow(Icons.Filled.FactCheck, AccentPurple, wo.title, "بانتظار اعتماد المشرف", onClick = { onOpenTab(BottomTab.WorkOrders) })
             }
