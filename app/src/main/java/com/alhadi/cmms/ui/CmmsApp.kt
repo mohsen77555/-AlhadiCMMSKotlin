@@ -2889,6 +2889,19 @@ private fun CapaScreen(
                 Text("إجراءات لمعالجة الأعطال ومنع تكرارها.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item {
+                val today = DateStrings.today()
+                val open = items.count { it.status == "Open" }
+                val inProg = items.count { it.status == "In Progress" }
+                val overdue = items.count { it.status != "Closed" && it.dueAt < today }
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MetricColumn("مفتوح", open.toString(), AccentBlue)
+                        MetricColumn("قيد التنفيذ", inProg.toString(), AccentOrange)
+                        MetricColumn("متأخر", overdue.toString(), if (overdue > 0) AccentRed else AccentGreen)
+                    }
+                }
+            }
+            item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2965,6 +2978,9 @@ private fun CapaCard(
             if (asset != null) InfoRow("الأصل", "${asset.code} • ${asset.name}")
             InfoRow("المسؤول", capa.assignedTo)
             InfoRow("الاستحقاق", capa.dueAt)
+            if (capa.status != "Closed" && capa.dueAt < DateStrings.today()) {
+                Text("متأخر عن تاريخ الاستحقاق", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            }
             if (capa.status != "Closed") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     if (capa.status == "Open") {
