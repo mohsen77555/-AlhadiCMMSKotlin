@@ -2062,6 +2062,22 @@ private fun WorkOrdersScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (workOrders.isNotEmpty()) {
+                item {
+                    val seg = listOf(
+                        ChartSegment("مفتوح", workOrders.count { it.status == "Open" }, AccentBlue),
+                        ChartSegment("قيد التنفيذ", workOrders.count { it.status == "In Progress" }, AccentOrange),
+                        ChartSegment("مكتمل فنياً", workOrders.count { it.status == "Technically Completed" }, AccentTeal),
+                        ChartSegment("مغلق", workOrders.count { it.status == "Closed" }, AccentGreen)
+                    )
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = workOrders.size.toString(), centerLabel = "أمر")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
             item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث بالعنوان أو الأصل…") }
             item {
                 Row(
@@ -2891,16 +2907,24 @@ private fun InventoryScreen(
             if (filtered.isEmpty()) {
                 item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
             }
-            items(filtered, key = { it.id }) { part ->
-                SparePartCard(
-                    part = part,
-                    canReceive = canReceive,
-                    canManage = canManage,
-                    onIssue = onIssue,
-                    onReceive = onReceive,
-                    onEdit = { editing = part; showForm = true },
-                    onDelete = { deleteTarget = part }
-                )
+            filtered.groupBy { it.equipmentGroup.ifBlank { "عام" } }.forEach { (group, groupParts) ->
+                item(key = "grp-$group") {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(modifier = Modifier.size(7.dp).background(AccentPurple, CircleShape))
+                        LtrText("$group (${groupParts.size})", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                items(groupParts, key = { it.id }) { part ->
+                    SparePartCard(
+                        part = part,
+                        canReceive = canReceive,
+                        canManage = canManage,
+                        onIssue = onIssue,
+                        onReceive = onReceive,
+                        onEdit = { editing = part; showForm = true },
+                        onDelete = { deleteTarget = part }
+                    )
+                }
             }
             item {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -3441,6 +3465,21 @@ private fun MetersScreen(
             item {
                 SectionHeader("نقاط القياس")
                 Text("تابع أداء الأصول وسجّل القراءات.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (points.isNotEmpty()) {
+                item {
+                    val over = points.count { it.upperLimit != null && it.lastReading > it.upperLimit }
+                    val seg = listOf(
+                        ChartSegment("ضمن الحد", points.size - over, AccentGreen),
+                        ChartSegment("متجاوزة الحد", over, AccentRed)
+                    )
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = points.size.toString(), centerLabel = "نقطة")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             }
             if (canManage) {
                 item { AddButton("نقطة قياس جديدة") { editing = null; showForm = true } }
