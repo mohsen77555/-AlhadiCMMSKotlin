@@ -1619,6 +1619,21 @@ private fun AssetDetailScreen(
         item { SectionHeader("أوامر العمل المرتبطة (${workOrders.size})") }
         if (workOrders.isEmpty()) {
             item { EmptyState("لا توجد أوامر عمل لهذا الأصل") }
+        } else {
+            item {
+                val seg = listOf(
+                    ChartSegment("مفتوح", workOrders.count { it.status == "Open" }, AccentBlue),
+                    ChartSegment("قيد التنفيذ", workOrders.count { it.status == "In Progress" }, AccentOrange),
+                    ChartSegment("مكتمل فنياً", workOrders.count { it.status == "Technically Completed" }, AccentTeal),
+                    ChartSegment("مغلق", workOrders.count { it.status == "Closed" }, AccentGreen)
+                )
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = workOrders.size.toString(), centerLabel = "أمر")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
         }
         items(workOrders, key = { "wo-${it.id}" }) { wo ->
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -3243,6 +3258,15 @@ private fun ReportCard(title: String, lines: List<String>) {
 
 @Composable
 private fun AuditScreen(innerPadding: PaddingValues, auditLog: List<AuditLogEntity>) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val filtered = remember(query, auditLog) {
+        if (query.isBlank()) auditLog else auditLog.filter {
+            val q = query.lowercase(Locale.getDefault())
+            it.details.lowercase(Locale.getDefault()).contains(q) ||
+                it.performedBy.lowercase(Locale.getDefault()).contains(q) ||
+                it.action.lowercase(Locale.getDefault()).contains(q)
+        }
+    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -3254,10 +3278,14 @@ private fun AuditScreen(innerPadding: PaddingValues, auditLog: List<AuditLogEnti
             SectionHeader("سجل التدقيق")
             Text("تتبّع كامل لكل إجراء: من فعل ماذا ومتى.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (auditLog.isEmpty()) {
-            item { EmptyState("لا توجد سجلات بعد", Icons.Filled.History) }
+        item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث في السجل (إجراء/مستخدم/تفاصيل)…") }
+        item {
+            Text("عرض ${filtered.size} من ${auditLog.size} سجل", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        items(auditLog, key = { it.id }) { log -> AuditLogCard(log) }
+        if (filtered.isEmpty()) {
+            item { EmptyState("لا توجد سجلات مطابقة", Icons.Filled.History) }
+        }
+        items(filtered, key = { it.id }) { log -> AuditLogCard(log) }
     }
 }
 
