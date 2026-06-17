@@ -129,6 +129,7 @@ import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
+import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.ui.theme.AccentBlue
@@ -195,6 +196,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
     val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
+    val workOrderConfirmations by viewModel.workOrderConfirmations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -276,6 +278,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         assets = assets,
                         assetMap = assetMap,
                         operations = workOrderOperations,
+                        confirmations = workOrderConfirmations,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveWorkOrder,
@@ -284,7 +287,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onApprove = viewModel::setWorkOrderApproval,
                         onSaveOperation = viewModel::saveOperation,
                         onSetOperationStatus = viewModel::setOperationStatus,
-                        onDeleteOperation = viewModel::deleteOperation
+                        onDeleteOperation = viewModel::deleteOperation,
+                        onConfirmOperation = viewModel::addConfirmation
                     )
 
                     BottomTab.Supervision -> PreventiveMaintenanceScreen(
@@ -1867,6 +1871,7 @@ private fun WorkOrdersScreen(
     assets: List<AssetEntity>,
     assetMap: Map<Long, AssetEntity>,
     operations: List<WorkOrderOperationEntity>,
+    confirmations: List<WorkOrderConfirmationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (WorkOrderEntity) -> Unit,
@@ -1875,7 +1880,8 @@ private fun WorkOrdersScreen(
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
     onSaveOperation: (WorkOrderOperationEntity) -> Unit,
     onSetOperationStatus: (WorkOrderOperationEntity, String) -> Unit,
-    onDeleteOperation: (WorkOrderOperationEntity) -> Unit
+    onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
+    onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit
 ) {
     val statusFilters = listOf("All", "Open", "In Progress", "Closed")
     val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
@@ -1960,12 +1966,14 @@ private fun WorkOrdersScreen(
                     workOrder = workOrder,
                     asset = assetMap[workOrder.assetId],
                     operations = operations.filter { it.orderId == workOrder.id },
+                    confirmations = confirmations.filter { it.orderId == workOrder.id },
                     canManage = canManage,
                     onUpdateStatus = onUpdateStatus,
                     onApprove = onApprove,
                     onSaveOperation = onSaveOperation,
                     onSetOperationStatus = onSetOperationStatus,
                     onDeleteOperation = onDeleteOperation,
+                    onConfirmOperation = onConfirmOperation,
                     onEdit = { editing = workOrder; showForm = true },
                     onDelete = { deleteTarget = workOrder }
                 )
@@ -1997,12 +2005,14 @@ private fun WorkOrderCard(
     workOrder: WorkOrderEntity,
     asset: AssetEntity?,
     operations: List<WorkOrderOperationEntity>,
+    confirmations: List<WorkOrderConfirmationEntity>,
     canManage: Boolean,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
     onSaveOperation: (WorkOrderOperationEntity) -> Unit,
     onSetOperationStatus: (WorkOrderOperationEntity, String) -> Unit,
     onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
+    onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -2011,6 +2021,7 @@ private fun WorkOrderCard(
     val blocked = workOrder.isBlockedByApproval()
     var showOperations by remember { mutableStateOf(false) }
     var showAddOp by remember { mutableStateOf(false) }
+    var confirmTarget by remember { mutableStateOf<WorkOrderOperationEntity?>(null) }
     val confirmedOps = operations.count { it.status == "Confirmed" }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -2074,12 +2085,25 @@ private fun WorkOrderCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        confirmations.filter { it.operationId == op.id }.forEach { c ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp), tint = AccentGreen)
+                                Text(
+                                    "${c.technician} • ${c.workDate} • ${c.actualWork}س" + if (c.finalConfirmation) " • نهائي" else "",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (c.actionTaken.isNotBlank()) {
+                                Text("الإجراء: ${c.actionTaken}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                         if (canManage && op.status != "Confirmed") {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                                 if (op.status == "Open") {
                                     OutlinedButton(onClick = { onSetOperationStatus(op, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء", style = MaterialTheme.typography.labelMedium) }
                                 }
-                                Button(onClick = { onSetOperationStatus(op, "Confirmed") }, modifier = Modifier.weight(1f)) { Text("تأكيد", style = MaterialTheme.typography.labelMedium) }
+                                Button(onClick = { confirmTarget = op }, modifier = Modifier.weight(1f)) { Text("تأكيد", style = MaterialTheme.typography.labelMedium) }
                                 IconButton(onClick = { onDeleteOperation(op) }) {
                                     Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
                                 }
@@ -2132,6 +2156,14 @@ private fun WorkOrderCard(
             nextNumber = "%04d".format(((operations.mapNotNull { it.operationNumber.toIntOrNull() }.maxOrNull() ?: 0) + 10)),
             onDismiss = { showAddOp = false },
             onSave = { onSaveOperation(it); showAddOp = false }
+        )
+    }
+    confirmTarget?.let { op ->
+        ConfirmationFormSheet(
+            operation = op,
+            isFailureOrder = workOrder.isFailure,
+            onDismiss = { confirmTarget = null },
+            onSave = { onConfirmOperation(it, op); confirmTarget = null }
         )
     }
 }

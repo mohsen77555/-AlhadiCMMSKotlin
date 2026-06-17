@@ -17,6 +17,7 @@ import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
+import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.util.DateStrings
@@ -40,6 +41,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val checklistDao = database.pmChecklistDao()
     private val notificationDao = database.maintenanceNotificationDao()
     private val operationDao = database.workOrderOperationDao()
+    private val confirmationDao = database.workOrderConfirmationDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -60,6 +62,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val pmChecklist: Flow<List<PmChecklistItemEntity>> = checklistDao.observeItems()
     val notifications: Flow<List<MaintenanceNotificationEntity>> = notificationDao.observeNotifications()
     val workOrderOperations: Flow<List<WorkOrderOperationEntity>> = operationDao.observeOperations()
+    val workOrderConfirmations: Flow<List<WorkOrderConfirmationEntity>> = confirmationDao.observeConfirmations()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -101,6 +104,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                confirmationDao.deleteAll()
                 operationDao.deleteAll()
                 notificationDao.deleteAll()
                 checklistDao.deleteAll()
@@ -259,6 +263,10 @@ class CmmsRepository(private val database: AppDatabase) {
                 WorkOrderOperationEntity(5, 2, "0020", "فحص عزل المحرك", "Electrical", 1.0, 0.0, true, "In Progress")
             )
 
+            val confirmations = listOf(
+                WorkOrderConfirmationEntity(1, 2, 4, "Electrical Technician", today, 1.0, "فحص الحمل الزائد واستبدال الكونتاكتور", "Contactor failure", "Electrical wear", "تم استبدال الكونتاكتور واختبار التشغيل", 2.0, true, today)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
@@ -269,6 +277,7 @@ class CmmsRepository(private val database: AppDatabase) {
             checklistDao.insertAll(checklist)
             notificationDao.insertAll(notifications)
             operationDao.insertAll(operations)
+            confirmationDao.insertAll(confirmations)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -778,5 +787,46 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteOperation(operation: WorkOrderOperationEntity, actor: String = "System") {
         operationDao.deleteById(operation.id)
         recordAudit("Delete", "Operation", "حذف عملية ${operation.operationNumber}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Operation confirmations (تأكيدات)
+    // ---------------------------------------------------------------------
+
+    /**
+     * Records a confirmation against an operation and keeps the operation consistent:
+     * accumulates actual hours and, on a final confirmation, closes the operation.
+     */
+    suspend fun addConfirmation(
+        confirmation: WorkOrderConfirmationEntity,
+        operation: WorkOrderOperationEntity,
+        actor: String = "System"
+    ) {
+        database.withTransaction {
+            confirmationDao.insert(
+                confirmation.copy(
+                    technician = confirmation.technician.ifBlank { actor },
+                    workDate = confirmation.workDate.ifBlank { DateStrings.today() },
+                    createdAt = DateStrings.now()
+                )
+            )
+            operationDao.insert(
+                operation.copy(
+                    actualHours = operation.actualHours + confirmation.actualWork,
+                    status = if (confirmation.finalConfirmation) "Confirmed" else "In Progress"
+                )
+            )
+            recordAudit(
+                if (confirmation.finalConfirmation) "Confirm" else "PartialConfirm",
+                "Operation",
+                "تأكيد عملية ${operation.operationNumber} (${confirmation.actualWork}س)",
+                actor
+            )
+        }
+    }
+
+    suspend fun deleteConfirmation(confirmation: WorkOrderConfirmationEntity, actor: String = "System") {
+        confirmationDao.deleteById(confirmation.id)
+        recordAudit("Delete", "Confirmation", "حذف تأكيد عملية #${confirmation.operationId}", actor)
     }
 }

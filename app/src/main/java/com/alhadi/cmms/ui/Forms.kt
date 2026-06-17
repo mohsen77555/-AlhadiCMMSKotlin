@@ -51,6 +51,7 @@ import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
+import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.util.DateStrings
@@ -819,6 +820,61 @@ internal fun MovementFormSheet(
         SaveButton(!needsLocation || locId != null) {
             val name = locations.firstOrNull { it.id == locId }?.name ?: ""
             onSave(type, if (needsLocation) locId else null, if (needsLocation) name else "", notes.trim())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Operation confirmation form (تأكيد)
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun ConfirmationFormSheet(
+    operation: WorkOrderOperationEntity,
+    isFailureOrder: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (WorkOrderConfirmationEntity) -> Unit
+) {
+    val remaining = (operation.plannedHours - operation.actualHours).let { if (it > 0) it else operation.plannedHours }
+    var actualWork by remember { mutableStateOf(remaining.toString()) }
+    var activityText by remember { mutableStateOf("") }
+    var damageFound by remember { mutableStateOf("") }
+    var causeFound by remember { mutableStateOf("") }
+    var actionTaken by remember { mutableStateOf("") }
+    var downtime by remember { mutableStateOf("0") }
+    var finalConfirmation by remember { mutableStateOf(true) }
+
+    FormSheet("تأكيد العملية ${operation.operationNumber}", onDismiss) {
+        LabeledField("الساعات الفعلية", actualWork, { actualWork = it }, numeric = true)
+        LabeledField("وصف العمل المنفذ", activityText, { activityText = it }, singleLine = false)
+        if (isFailureOrder) {
+            LabeledField("العطل المكتشف", damageFound, { damageFound = it })
+            LabeledField("السبب", causeFound, { causeFound = it })
+            LabeledField("زمن التوقف (ساعات)", downtime, { downtime = it }, numeric = true)
+        }
+        LabeledField("الإجراء المتخذ", actionTaken, { actionTaken = it }, singleLine = false)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("تأكيد نهائي (يُغلق العملية)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = finalConfirmation, onCheckedChange = { finalConfirmation = it })
+        }
+        SaveButton(actualWork.toDoubleOrNull() != null) {
+            onSave(
+                WorkOrderConfirmationEntity(
+                    id = 0,
+                    orderId = operation.orderId,
+                    operationId = operation.id,
+                    technician = "",
+                    workDate = "",
+                    actualWork = actualWork.toDoubleOrNull() ?: 0.0,
+                    activityText = activityText.trim(),
+                    damageFound = damageFound.trim(),
+                    causeFound = causeFound.trim(),
+                    actionTaken = actionTaken.trim(),
+                    downtime = downtime.toDoubleOrNull() ?: 0.0,
+                    finalConfirmation = finalConfirmation,
+                    createdAt = ""
+                )
+            )
         }
     }
 }
