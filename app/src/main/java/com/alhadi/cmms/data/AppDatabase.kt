@@ -112,7 +112,12 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "alhadi_cmms.db"
                 )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    // Real maintenance data must survive app upgrades: apply explicit migrations.
+                    // A missing upgrade path now fails loudly (forcing a migration) instead of
+                    // silently wiping the user's records.
+                    .addMigrations(*DbMigrations.ALL)
+                    // Only a downgrade (installing an older build over a newer DB) resets data.
+                    .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance
