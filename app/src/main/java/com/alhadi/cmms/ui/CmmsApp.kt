@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
@@ -2526,6 +2527,7 @@ private fun MetersScreen(
                 items(assetPoints, key = { it.id }) { point ->
                     MeterCard(
                         point = point,
+                        recentReadings = readings.filter { it.pointId == point.id }.take(6),
                         canManage = canManage,
                         onAddReading = { readingTarget = point },
                         onEdit = { editing = point; showForm = true },
@@ -2574,23 +2576,39 @@ private fun MetersScreen(
 @Composable
 private fun MeterCard(
     point: MeasuringPointEntity,
+    recentReadings: List<MeasurementReadingEntity>,
     canManage: Boolean,
     onAddReading: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val overLimit = point.upperLimit != null && point.lastReading > point.upperLimit
+    // recentReadings come newest-first; the previous reading is index 1.
+    val previous = recentReadings.getOrNull(1)?.value
+    val delta = previous?.let { point.lastReading - it }
     ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(point.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "${point.lastReading} ${point.unit}",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (overLimit) StatusStopped else MaterialTheme.colorScheme.primary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "${point.lastReading} ${point.unit}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (overLimit) StatusStopped else MaterialTheme.colorScheme.primary
+                        )
+                        if (delta != null && delta != 0.0) {
+                            val up = delta > 0
+                            Icon(
+                                if (up) Icons.Filled.TrendingUp else Icons.Filled.TrendingDown,
+                                contentDescription = null,
+                                tint = if (up) AccentGreen else AccentRed,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            LtrText("${if (up) "+" else ""}${"%.1f".format(delta)}", style = MaterialTheme.typography.labelMedium, color = if (up) AccentGreen else AccentRed)
+                        }
+                    }
                 }
                 StatusBadge(if (point.isCounter) "عداد" else "قراءة", statusTone("info"))
             }
@@ -2598,6 +2616,13 @@ private fun MeterCard(
                 InfoRow("الحد الأعلى", "${point.upperLimit} ${point.unit}")
             }
             InfoRow("آخر تحديث", point.lastReadingAt)
+            if (recentReadings.size >= 2) {
+                LtrText(
+                    "آخر القراءات: " + recentReadings.take(6).joinToString(" ← ") { "${it.value}" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             if (overLimit) {
                 Text("تجاوز الحد الأعلى!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
             }
