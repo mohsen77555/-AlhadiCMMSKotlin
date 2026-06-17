@@ -247,7 +247,7 @@ private fun AssetDropdownOptional(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(

@@ -305,8 +305,12 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         confirmations = workOrderConfirmations,
                         photos = workOrderPhotos,
                         permits = workPermits,
+                        parts = spareParts,
+                        transactions = transactions,
+                        bom = assetBom,
                         canManage = canManage,
                         defaultAssignee = actorName,
+                        onIssueMaterial = viewModel::issuePartToWorkOrder,
                         onSave = viewModel::saveWorkOrder,
                         onDelete = viewModel::deleteWorkOrder,
                         onUpdateStatus = viewModel::updateWorkOrderStatus,
@@ -2032,8 +2036,12 @@ private fun WorkOrdersScreen(
     confirmations: List<WorkOrderConfirmationEntity>,
     photos: List<WorkOrderPhotoEntity>,
     permits: List<WorkPermitEntity>,
+    parts: List<SparePartEntity>,
+    transactions: List<InventoryTransactionEntity>,
+    bom: List<AssetBomItemEntity>,
     canManage: Boolean,
     defaultAssignee: String,
+    onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
     onSave: (WorkOrderEntity) -> Unit,
     onDelete: (WorkOrderEntity) -> Unit,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
@@ -2048,6 +2056,7 @@ private fun WorkOrdersScreen(
     onSetPermitStatus: (WorkPermitEntity, Boolean) -> Unit,
     onDeletePermit: (WorkPermitEntity) -> Unit
 ) {
+    val partMap = remember(parts) { parts.associateBy { it.id } }
     val statusFilters = listOf("All", "Open", "In Progress", "Technically Completed", "Closed")
     val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
@@ -2150,6 +2159,11 @@ private fun WorkOrdersScreen(
                     confirmations = confirmations.filter { it.orderId == workOrder.id },
                     photos = photos.filter { it.orderId == workOrder.id },
                     permits = permits.filter { it.orderId == workOrder.id },
+                    materials = transactions.filter { it.workOrderId == workOrder.id },
+                    catalog = parts,
+                    bomPartIds = bom.filter { it.assetId == workOrder.assetId }.map { it.partId }.toSet(),
+                    partMap = partMap,
+                    onIssueMaterial = onIssueMaterial,
                     canManage = canManage,
                     onUpdateStatus = onUpdateStatus,
                     onApprove = onApprove,
@@ -2196,6 +2210,11 @@ private fun WorkOrderCard(
     confirmations: List<WorkOrderConfirmationEntity>,
     photos: List<WorkOrderPhotoEntity>,
     permits: List<WorkPermitEntity>,
+    materials: List<InventoryTransactionEntity>,
+    catalog: List<SparePartEntity>,
+    bomPartIds: Set<Long>,
+    partMap: Map<Long, SparePartEntity>,
+    onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
     canManage: Boolean,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
@@ -2213,6 +2232,8 @@ private fun WorkOrderCard(
 ) {
     val context = LocalContext.current
     val today = DateStrings.today()
+    var showMaterialPicker by remember { mutableStateOf(false) }
+    var materialTarget by remember { mutableStateOf<SparePartEntity?>(null) }
     val pending = workOrder.approvalStatus == "Pending"
     val rejected = workOrder.approvalStatus == "Rejected"
     val blocked = workOrder.isBlockedByApproval()
@@ -2323,6 +2344,34 @@ private fun WorkOrderCard(
                         Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("إضافة عملية")
+                    }
+                }
+            }
+
+            run {
+                val materialsCost = materials.sumOf { (partMap[it.partId]?.lastPrice ?: 0.0) * it.quantity }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentPurple)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("المواد المستهلكة (${materials.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (materialsCost > 0) Text(money(materialsCost), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = AccentPurple)
+                }
+                materials.forEach { tx ->
+                    val p = partMap[tx.partId]
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("×${tx.quantity}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = AccentPurple)
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(p?.partNumber ?: "Part #${tx.partId}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            Text(p?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                if (canManage && workOrder.status != "Closed") {
+                    OutlinedButton(onClick = { showMaterialPicker = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("صرف قطعة للأمر")
                     }
                 }
             }
@@ -2499,6 +2548,60 @@ private fun WorkOrderCard(
             onDismiss = { showAddPermit = false },
             onSave = { onSavePermit(it); showAddPermit = false }
         )
+    }
+    if (showMaterialPicker) {
+        MaterialPickerSheet(
+            catalog = catalog,
+            bomPartIds = bomPartIds,
+            onDismiss = { showMaterialPicker = false },
+            onPick = { materialTarget = it; showMaterialPicker = false }
+        )
+    }
+    materialTarget?.let { part ->
+        QuantityDialog(
+            title = "صرف ${part.partNumber} لأمر العمل",
+            label = "الكمية (المتوفر ${part.onHandQty})",
+            maxValue = part.onHandQty,
+            onConfirm = { qty -> onIssueMaterial(workOrder, part, qty); materialTarget = null },
+            onDismiss = { materialTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun MaterialPickerSheet(
+    catalog: List<SparePartEntity>,
+    bomPartIds: Set<Long>,
+    onDismiss: () -> Unit,
+    onPick: (SparePartEntity) -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(query, catalog, bomPartIds) {
+        val q = query.lowercase(Locale.getDefault())
+        catalog
+            .filter { it.onHandQty > 0 && (q.isBlank() || it.partNumber.lowercase(Locale.getDefault()).contains(q) || it.name.lowercase(Locale.getDefault()).contains(q)) }
+            .sortedByDescending { it.id in bomPartIds }
+    }
+    FormSheet("اختر قطعة للصرف", onDismiss) {
+        SearchField(query = query, onChange = { query = it }, placeholder = "بحث في القطع…")
+        if (filtered.isEmpty()) {
+            Text("لا توجد قطع متوفرة مطابقة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        filtered.take(30).forEach { part ->
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().clickable { onPick(part) },
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(part.partNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(part.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (part.id in bomPartIds) StatusBadge("ضمن BOM", statusTone("info"))
+                    StatusBadge("متوفر ${part.onHandQty}", statusTone("running"))
+                }
+            }
+        }
     }
 }
 
@@ -2951,7 +3054,9 @@ private fun InventoryScreen(
             if (transactions.isEmpty()) {
                 item { EmptyState("لا توجد حركات مخزون") }
             }
-            items(transactions, key = { it.id }) { transaction -> TransactionCard(transaction = transaction) }
+            items(transactions, key = { it.id }) { transaction ->
+                TransactionCard(transaction = transaction, partNumber = parts.firstOrNull { it.id == transaction.partId }?.partNumber)
+            }
         }
     }
 
@@ -3064,7 +3169,7 @@ private fun QuantityDialog(
 }
 
 @Composable
-private fun TransactionCard(transaction: InventoryTransactionEntity) {
+private fun TransactionCard(transaction: InventoryTransactionEntity, partNumber: String?) {
     val isIssue = transaction.transactionType == "Issue"
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -3087,8 +3192,11 @@ private fun TransactionCard(transaction: InventoryTransactionEntity) {
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleSmall
                 )
-                LtrText("Part #${transaction.partId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LtrText(partNumber ?: "Part #${transaction.partId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("${transaction.createdAt} • ${transaction.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (transaction.workOrderId != null) {
+                StatusBadge("أمر #${transaction.workOrderId}", statusTone("info"))
             }
         }
     }

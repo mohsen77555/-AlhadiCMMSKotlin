@@ -423,6 +423,32 @@ class CmmsRepository(private val database: AppDatabase) {
         }
     }
 
+    /**
+     * Issues a spare part against a specific work order: decrements stock, records a transaction
+     * linked to the order, and rolls the consumed value into the order's parts cost (MAT-ORD-007).
+     */
+    suspend fun issuePartToWorkOrder(order: WorkOrderEntity, part: SparePartEntity, quantity: Int, actor: String = "System") {
+        if (quantity > part.onHandQty) {
+            throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${part.onHandQty})")
+        }
+        database.withTransaction {
+            sparePartDao.adjustStock(part.id, -quantity)
+            transactionDao.insert(
+                InventoryTransactionEntity(
+                    partId = part.id,
+                    workOrderId = order.id,
+                    transactionType = "Issue",
+                    quantity = quantity,
+                    createdAt = DateStrings.today(),
+                    createdBy = actor,
+                    note = "صرف لأمر العمل: ${order.title}"
+                )
+            )
+            workOrderDao.insertWorkOrder(order.copy(partsCost = order.partsCost + quantity * part.lastPrice))
+            recordAudit("Issue", "Inventory", "صرف $quantity من ${part.partNumber} لأمر العمل #${order.id}", actor)
+        }
+    }
+
     suspend fun receivePart(part: SparePartEntity, quantity: Int = 1, actor: String = "System") {
         database.withTransaction {
             sparePartDao.adjustStock(part.id, quantity)

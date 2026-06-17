@@ -232,6 +232,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         repository.receivePart(part, quantity = quantity, actor = actor())
     }
 
+    fun issuePartToWorkOrder(order: WorkOrderEntity, part: SparePartEntity, quantity: Int) =
+        launchAction("تم صرف المادة لأمر العمل") { repository.issuePartToWorkOrder(order, part, quantity, actor()) }
+
     fun addTechnician() = launchAction("تمت إضافة فني تجريبي") {
         repository.addTechnician(actor())
     }
