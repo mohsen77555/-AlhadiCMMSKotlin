@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Maintenance bars logo on a transparent background, centered in the safe zone. -->
+    <path android:fillColor="#FFFFFF" android:pathData="M36,40h10v34h-10z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M50,32h10v42h-10z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M64,46h10v28h-10z" />
+    <path android:fillColor="#D1FAE5" android:pathData="M34,76h44v5h-44z" />
+</vector>
