@@ -1,0 +1,21 @@
+<resources>
+
+    <!-- Launch (splash) theme. Applied while the app starts, then handed over
+         to the main theme via postSplashScreenTheme. -->
+    <style name="Theme.AlhadiCMMS" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/brand_teal</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/brand_teal</item>
+        <item name="postSplashScreenTheme">@style/Theme.AlhadiCMMS.Main</item>
+    </style>
+
+    <!-- Main application theme. Compose draws the actual UI; this controls the
+         window background and system bar behaviour before Compose composes. -->
+    <style name="Theme.AlhadiCMMS.Main" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:statusBarColor">#FFFFFF</item>
+    </style>
+
+</resources>
