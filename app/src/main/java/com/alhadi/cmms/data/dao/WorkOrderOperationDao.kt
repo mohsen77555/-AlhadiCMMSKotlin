@@ -12,6 +12,12 @@ interface WorkOrderOperationDao {
     @Query("SELECT * FROM work_order_operations ORDER BY orderId, operationNumber, id")
     fun observeOperations(): Flow<List<WorkOrderOperationEntity>>
 
+    @Query("SELECT COUNT(*) FROM work_order_operations WHERE orderId = :orderId")
+    suspend fun countForOrder(orderId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM work_order_operations WHERE orderId = :orderId AND requiresConfirmation = 1 AND status != 'Confirmed'")
+    suspend fun countUnconfirmedRequired(orderId: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(operation: WorkOrderOperationEntity): Long
 

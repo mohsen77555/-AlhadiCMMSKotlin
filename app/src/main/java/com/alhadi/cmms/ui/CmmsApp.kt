@@ -1515,18 +1515,17 @@ private fun AssetDetailScreen(
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(wo.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                        StatusBadge(wo.status, statusTone(wo.status))
+                        StatusBadge(workOrderStatusLabel(wo.status), statusTone(wo.status))
                     }
                     Text("الاستحقاق: ${wo.dueAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (wo.approvalStatus == "Pending") {
                         StatusBadge("بانتظار الاعتماد", statusTone("overdue"))
                     }
                     if (canManage && wo.status != "Closed" && !wo.isBlockedByApproval()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            if (wo.status == "Open") {
-                                OutlinedButton(onClick = { onUpdateWorkOrderStatus(wo, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
-                            }
-                            Button(onClick = { onUpdateWorkOrderStatus(wo, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
+                        when (wo.status) {
+                            "Open" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "In Progress") }, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
+                            "In Progress" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "Technically Completed") }, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
+                            "Technically Completed" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "Closed") }, modifier = Modifier.fillMaxWidth()) { Text("إغلاق نهائي") }
                         }
                     }
                 }
@@ -1708,6 +1707,14 @@ private fun notificationStatusLabel(status: String): String = when (status) {
     "Approved" -> "معتمد"
     "Rejected" -> "مرفوض"
     "OrderCreated" -> "تحوّل لأمر"
+    "Closed" -> "مغلق"
+    else -> status
+}
+
+private fun workOrderStatusLabel(status: String): String = when (status) {
+    "Open" -> "مفتوح"
+    "In Progress" -> "قيد التنفيذ"
+    "Technically Completed" -> "مكتمل فنياً"
     "Closed" -> "مغلق"
     else -> status
 }
@@ -1897,7 +1904,7 @@ private fun WorkOrdersScreen(
     onAddPhoto: (Long, String) -> Unit,
     onDeletePhoto: (WorkOrderPhotoEntity) -> Unit
 ) {
-    val statusFilters = listOf("All", "Open", "In Progress", "Closed")
+    val statusFilters = listOf("All", "Open", "In Progress", "Technically Completed", "Closed")
     val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
     var selectedPriority by rememberSaveable { mutableStateOf("All") }
@@ -1938,7 +1945,7 @@ private fun WorkOrdersScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     statusFilters.forEach { filter ->
-                        FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter }, label = { Text(filter) })
+                        FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter }, label = { Text(if (filter == "All") "الكل" else workOrderStatusLabel(filter)) })
                     }
                 }
             }
@@ -2061,7 +2068,7 @@ private fun WorkOrderCard(
                     Text(workOrder.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     LtrText(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${workOrder.assetId}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(workOrder.status, statusTone(workOrder.status))
+                StatusBadge(workOrderStatusLabel(workOrder.status), statusTone(workOrder.status))
             }
             Text(workOrder.description, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -2217,16 +2224,25 @@ private fun WorkOrderCard(
                     color = MaterialTheme.colorScheme.error
                 )
             } else {
+                val allConfirmed = operations.isNotEmpty() && operations.none { it.requiresConfirmation && it.status != "Confirmed" }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    if (workOrder.status == "Open") {
-                        OutlinedButton(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
-                    }
-                    if (workOrder.status != "Closed") {
-                        Button(onClick = { onUpdateStatus(workOrder, "Closed") }, enabled = hasEvidence, modifier = Modifier.weight(1f)) { Text("إغلاق") }
+                    when (workOrder.status) {
+                        "Open" -> {
+                            Button(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
+                        }
+                        "In Progress" -> {
+                            Button(onClick = { onUpdateStatus(workOrder, "Technically Completed") }, enabled = allConfirmed, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
+                        }
+                        "Technically Completed" -> {
+                            Button(onClick = { onUpdateStatus(workOrder, "Closed") }, enabled = hasEvidence, modifier = Modifier.fillMaxWidth()) { Text("إغلاق نهائي") }
+                        }
                     }
                 }
-                if (workOrder.status != "Closed" && !hasEvidence) {
-                    Text("الإغلاق يتطلّب التقاط صورة دليل تنفيذ بالكاميرا.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
+                if (workOrder.status == "In Progress" && !allConfirmed) {
+                    Text("الإكمال الفني يتطلّب تأكيد كل العمليات المطلوبة.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
+                }
+                if (workOrder.status == "Technically Completed" && !hasEvidence) {
+                    Text("الإغلاق النهائي يتطلّب التقاط صورة دليل تنفيذ بالكاميرا.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
                 }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)

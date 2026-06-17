@@ -332,7 +332,16 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun updateWorkOrderStatus(id: Long, status: String, actor: String = "System") {
-        // Governance: a work order cannot be closed without photo evidence of the work.
+        // Governance: no technical completion before every required operation is confirmed (TC-001).
+        if (status == "Technically Completed") {
+            if (operationDao.countForOrder(id) == 0) {
+                throw IllegalStateException("لا يمكن الإكمال الفني بدون عمليات على أمر العمل")
+            }
+            if (operationDao.countUnconfirmedRequired(id) > 0) {
+                throw IllegalStateException("أكمل تأكيد كل العمليات المطلوبة قبل الإكمال الفني")
+            }
+        }
+        // Governance: a work order cannot be closed without photo evidence of the work (EXE-006).
         if (status == "Closed" && photoDao.countForOrder(id) == 0) {
             throw IllegalStateException("التقط صورة دليل تنفيذ بالكاميرا قبل إغلاق أمر العمل")
         }
