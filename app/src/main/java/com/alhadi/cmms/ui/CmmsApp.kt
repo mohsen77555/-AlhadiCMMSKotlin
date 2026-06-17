@@ -772,6 +772,19 @@ private fun DashboardScreen(
     val downtime = failures.sumOf { it.downtimeHours }
     val windowHours = (assets.size.coerceAtLeast(1)) * 30.0 * 24.0
     val availability = ((windowHours - downtime) / windowHours * 100.0).coerceIn(0.0, 100.0)
+    val woOpen = workOrders.count { it.status == "Open" }
+    val woProgress = workOrders.count { it.status == "In Progress" }
+    val woTech = workOrders.count { it.status == "Technically Completed" }
+    val woClosed = workOrders.count { it.status == "Closed" }
+    val statusSegments = listOf(
+        ChartSegment("مفتوح", woOpen, AccentBlue),
+        ChartSegment("قيد التنفيذ", woProgress, AccentOrange),
+        ChartSegment("مكتمل فنياً", woTech, AccentTeal),
+        ChartSegment("مغلق", woClosed, AccentGreen)
+    )
+    val laborCost = workOrders.sumOf { it.laborCost() }
+    val partsCostTotal = workOrders.sumOf { it.partsCost }
+    val maxCost = listOf(laborCost, partsCostTotal, 1.0).max()
 
     LazyColumn(
         modifier = Modifier
@@ -800,12 +813,29 @@ private fun DashboardScreen(
 
         item {
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SectionHeader("نظرة عامة على الأداء")
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        MetricColumn("التوفّر", "${"%.0f".format(availability)}%", AccentGreen)
-                        MetricColumn("زمن التوقف", "${"%.0f".format(downtime)}س", AccentOrange)
-                        MetricColumn("التكلفة", money(totalCost), AccentBlue)
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionHeader("توزيع أوامر العمل")
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(
+                            segments = statusSegments,
+                            centerValue = workOrders.size.toString(),
+                            centerLabel = "أمر عمل"
+                        )
+                        ChartLegend(statusSegments, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    RingGauge(percent = availability.toFloat(), color = AccentGreen, centerLabel = "التوفّر")
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SectionHeader("الأداء والتكاليف")
+                        BarMeter("تكلفة العمالة", (laborCost / maxCost).toFloat(), AccentBlue, money(laborCost))
+                        BarMeter("تكلفة قطع الغيار", (partsCostTotal / maxCost).toFloat(), AccentPurple, money(partsCostTotal))
+                        InfoRow("زمن التوقف", "${"%.0f".format(downtime)} ساعة")
                     }
                 }
             }
@@ -2868,6 +2898,34 @@ private fun ReportsScreen(
                     Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("مشاركة")
+                }
+            }
+        }
+        item {
+            val seg = listOf(
+                ChartSegment("مفتوح", workOrders.count { it.status == "Open" }, AccentBlue),
+                ChartSegment("قيد التنفيذ", workOrders.count { it.status == "In Progress" }, AccentOrange),
+                ChartSegment("مكتمل فنياً", workOrders.count { it.status == "Technically Completed" }, AccentTeal),
+                ChartSegment("مغلق", closed, AccentGreen)
+            )
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    DonutChart(segments = seg, centerValue = workOrders.size.toString(), centerLabel = "أمر عمل")
+                    ChartLegend(seg, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        item {
+            val maxC = listOf(laborCost, partsCost, openCost, 1.0).max()
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    RingGauge(percent = availability.toFloat(), color = AccentGreen, centerLabel = "التوفّر")
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SectionHeader("التكاليف")
+                        BarMeter("عمالة", (laborCost / maxC).toFloat(), AccentBlue, money(laborCost))
+                        BarMeter("قطع غيار", (partsCost / maxC).toFloat(), AccentPurple, money(partsCost))
+                        BarMeter("تقديرية مفتوحة", (openCost / maxC).toFloat(), AccentOrange, money(openCost))
+                    }
                 }
             }
         }
