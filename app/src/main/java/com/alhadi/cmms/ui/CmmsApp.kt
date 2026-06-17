@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountTree
@@ -129,6 +130,7 @@ import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
+import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.ui.theme.AccentBlue
 import com.alhadi.cmms.ui.theme.AccentBrown
 import com.alhadi.cmms.ui.theme.AccentGreen
@@ -192,6 +194,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val assetMovements by viewModel.assetMovements.collectAsStateWithLifecycle()
     val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
+    val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -272,12 +275,16 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         workOrders = workOrders,
                         assets = assets,
                         assetMap = assetMap,
+                        operations = workOrderOperations,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveWorkOrder,
                         onDelete = viewModel::deleteWorkOrder,
                         onUpdateStatus = viewModel::updateWorkOrderStatus,
-                        onApprove = viewModel::setWorkOrderApproval
+                        onApprove = viewModel::setWorkOrderApproval,
+                        onSaveOperation = viewModel::saveOperation,
+                        onSetOperationStatus = viewModel::setOperationStatus,
+                        onDeleteOperation = viewModel::deleteOperation
                     )
 
                     BottomTab.Supervision -> PreventiveMaintenanceScreen(
@@ -1859,12 +1866,16 @@ private fun WorkOrdersScreen(
     workOrders: List<WorkOrderEntity>,
     assets: List<AssetEntity>,
     assetMap: Map<Long, AssetEntity>,
+    operations: List<WorkOrderOperationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (WorkOrderEntity) -> Unit,
     onDelete: (WorkOrderEntity) -> Unit,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
-    onApprove: (WorkOrderEntity, Boolean) -> Unit
+    onApprove: (WorkOrderEntity, Boolean) -> Unit,
+    onSaveOperation: (WorkOrderOperationEntity) -> Unit,
+    onSetOperationStatus: (WorkOrderOperationEntity, String) -> Unit,
+    onDeleteOperation: (WorkOrderOperationEntity) -> Unit
 ) {
     val statusFilters = listOf("All", "Open", "In Progress", "Closed")
     val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
@@ -1948,9 +1959,13 @@ private fun WorkOrdersScreen(
                 WorkOrderCard(
                     workOrder = workOrder,
                     asset = assetMap[workOrder.assetId],
+                    operations = operations.filter { it.orderId == workOrder.id },
                     canManage = canManage,
                     onUpdateStatus = onUpdateStatus,
                     onApprove = onApprove,
+                    onSaveOperation = onSaveOperation,
+                    onSetOperationStatus = onSetOperationStatus,
+                    onDeleteOperation = onDeleteOperation,
                     onEdit = { editing = workOrder; showForm = true },
                     onDelete = { deleteTarget = workOrder }
                 )
@@ -1981,15 +1996,22 @@ private fun WorkOrdersScreen(
 private fun WorkOrderCard(
     workOrder: WorkOrderEntity,
     asset: AssetEntity?,
+    operations: List<WorkOrderOperationEntity>,
     canManage: Boolean,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
+    onSaveOperation: (WorkOrderOperationEntity) -> Unit,
+    onSetOperationStatus: (WorkOrderOperationEntity, String) -> Unit,
+    onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val pending = workOrder.approvalStatus == "Pending"
     val rejected = workOrder.approvalStatus == "Rejected"
     val blocked = workOrder.isBlockedByApproval()
+    var showOperations by remember { mutableStateOf(false) }
+    var showAddOp by remember { mutableStateOf(false) }
+    val confirmedOps = operations.count { it.status == "Confirmed" }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -2016,6 +2038,64 @@ private fun WorkOrderCard(
             InfoRow("تاريخ الإنشاء", workOrder.createdAt)
             InfoRow("تاريخ الاستحقاق", workOrder.dueAt)
             InfoRow("التكلفة التقديرية", "%.2f".format(workOrder.estimatedCost))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showOperations = !showOperations },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentBlue)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("العمليات ($confirmedOps/${operations.size} مؤكدة)", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                Icon(if (showOperations) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null)
+            }
+            if (showOperations) {
+                if (operations.isEmpty()) {
+                    Text("لا توجد عمليات. أضِف خطوات التنفيذ.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                operations.forEach { op ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            LtrText(op.operationNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(op.description, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            StatusBadge(
+                                when (op.status) { "Confirmed" -> "مؤكد"; "In Progress" -> "جارٍ"; else -> "مفتوح" },
+                                statusTone(when (op.status) { "Confirmed" -> "running"; "In Progress" -> "scheduled"; else -> "info" })
+                            )
+                        }
+                        Text(
+                            "مركز العمل: ${op.workCenter.ifBlank { "—" }} • مخطط ${op.plannedHours}س" + if (op.actualHours > 0) " • فعلي ${op.actualHours}س" else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (canManage && op.status != "Confirmed") {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                if (op.status == "Open") {
+                                    OutlinedButton(onClick = { onSetOperationStatus(op, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء", style = MaterialTheme.typography.labelMedium) }
+                                }
+                                Button(onClick = { onSetOperationStatus(op, "Confirmed") }, modifier = Modifier.weight(1f)) { Text("تأكيد", style = MaterialTheme.typography.labelMedium) }
+                                IconButton(onClick = { onDeleteOperation(op) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (canManage) {
+                    OutlinedButton(onClick = { showAddOp = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة عملية")
+                    }
+                }
+            }
+
             if (canManage && (pending || rejected)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     if (pending) {
@@ -2044,6 +2124,15 @@ private fun WorkOrderCard(
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
+    }
+
+    if (showAddOp) {
+        OperationFormSheet(
+            orderId = workOrder.id,
+            nextNumber = "%04d".format(((operations.mapNotNull { it.operationNumber.toIntOrNull() }.maxOrNull() ?: 0) + 10)),
+            onDismiss = { showAddOp = false },
+            onSave = { onSaveOperation(it); showAddOp = false }
+        )
     }
 }
 

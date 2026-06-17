@@ -21,6 +21,7 @@ import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
+import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.util.DateStrings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -127,6 +128,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val notifications: StateFlow<List<MaintenanceNotificationEntity>> = repository.notifications
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val workOrderOperations: StateFlow<List<WorkOrderOperationEntity>> = repository.workOrderOperations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -276,6 +280,10 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         repository.createOrderFromNotification(notification, assignedTo = actor(), dueAt = DateStrings.daysFromToday(3), actor = actor())
     }
     fun deleteNotification(notification: MaintenanceNotificationEntity) = launchAction("تم حذف البلاغ") { repository.deleteNotification(notification, actor()) }
+
+    fun saveOperation(operation: WorkOrderOperationEntity) = launchAction("تم حفظ العملية") { repository.saveOperation(operation, actor()) }
+    fun setOperationStatus(operation: WorkOrderOperationEntity, status: String) = launchAction("تم تحديث العملية") { repository.setOperationStatus(operation, status, actor()) }
+    fun deleteOperation(operation: WorkOrderOperationEntity) = launchAction("تم حذف العملية") { repository.deleteOperation(operation, actor()) }
 
     // ----- CAPA -----
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }

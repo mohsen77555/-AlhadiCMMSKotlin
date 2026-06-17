@@ -18,6 +18,7 @@ import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
+import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.util.DateStrings
 import kotlinx.coroutines.flow.Flow
 
@@ -38,6 +39,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val movementDao = database.assetMovementDao()
     private val checklistDao = database.pmChecklistDao()
     private val notificationDao = database.maintenanceNotificationDao()
+    private val operationDao = database.workOrderOperationDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -57,6 +59,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val assetMovements: Flow<List<AssetMovementEntity>> = movementDao.observeMovements()
     val pmChecklist: Flow<List<PmChecklistItemEntity>> = checklistDao.observeItems()
     val notifications: Flow<List<MaintenanceNotificationEntity>> = notificationDao.observeNotifications()
+    val workOrderOperations: Flow<List<WorkOrderOperationEntity>> = operationDao.observeOperations()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -98,6 +101,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                operationDao.deleteAll()
                 notificationDao.deleteAll()
                 checklistDao.deleteAll()
                 movementDao.deleteAll()
@@ -247,6 +251,14 @@ class CmmsRepository(private val database: AppDatabase) {
                 MaintenanceNotificationEntity(3, "NTF-0003", "Inspection", "ملاحظة أثناء جولة الفحص", "صوت خفيف من ناقل السلسلة، يُنصح بالفحص.", 2, "Medium", "Noise", "", "Electrical Technician", today, "", "Screened", null)
             )
 
+            val operations = listOf(
+                WorkOrderOperationEntity(1, 1, "0010", "عزل الطاقة وتأمين المعدة", "Mechanical", 0.5, 0.0, true, "Open"),
+                WorkOrderOperationEntity(2, 1, "0020", "فحص المحامل والسيور", "Mechanical", 1.5, 0.0, true, "Open"),
+                WorkOrderOperationEntity(3, 1, "0030", "إعادة التشغيل والاختبار", "Mechanical", 0.5, 0.0, true, "Open"),
+                WorkOrderOperationEntity(4, 2, "0010", "فحص الحمل الزائد والكونتاكتور", "Electrical", 1.0, 1.0, true, "Confirmed"),
+                WorkOrderOperationEntity(5, 2, "0020", "فحص عزل المحرك", "Electrical", 1.0, 0.0, true, "In Progress")
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
@@ -256,6 +268,7 @@ class CmmsRepository(private val database: AppDatabase) {
             movementDao.insertAll(movements)
             checklistDao.insertAll(checklist)
             notificationDao.insertAll(notifications)
+            operationDao.insertAll(operations)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -743,5 +756,27 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteNotification(notification: MaintenanceNotificationEntity, actor: String = "System") {
         notificationDao.deleteById(notification.id)
         recordAudit("Delete", "Notification", "حذف بلاغ: ${notification.title}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Work order operations (steps within an order)
+    // ---------------------------------------------------------------------
+
+    suspend fun saveOperation(operation: WorkOrderOperationEntity, actor: String = "System") {
+        val isNew = operation.id == 0L
+        operationDao.insert(operation)
+        recordAudit(if (isNew) "Create" else "Update", "Operation", "${if (isNew) "إضافة" else "تعديل"} عملية ${operation.operationNumber}: ${operation.description}", actor)
+    }
+
+    suspend fun setOperationStatus(operation: WorkOrderOperationEntity, status: String, actor: String = "System") {
+        // Confirming with no recorded actual hours falls back to the planned estimate.
+        val actual = if (status == "Confirmed" && operation.actualHours == 0.0) operation.plannedHours else operation.actualHours
+        operationDao.insert(operation.copy(status = status, actualHours = actual))
+        recordAudit("Status", "Operation", "عملية ${operation.operationNumber} → $status", actor)
+    }
+
+    suspend fun deleteOperation(operation: WorkOrderOperationEntity, actor: String = "System") {
+        operationDao.deleteById(operation.id)
+        recordAudit("Delete", "Operation", "حذف عملية ${operation.operationNumber}", actor)
     }
 }

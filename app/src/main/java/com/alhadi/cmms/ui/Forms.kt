@@ -52,6 +52,7 @@ import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
+import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.util.DateStrings
 
 // ---------------------------------------------------------------------------
@@ -818,6 +819,45 @@ internal fun MovementFormSheet(
         SaveButton(!needsLocation || locId != null) {
             val name = locations.firstOrNull { it.id == locId }?.name ?: ""
             onSave(type, if (needsLocation) locId else null, if (needsLocation) name else "", notes.trim())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Work order operation form (عملية)
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun OperationFormSheet(
+    orderId: Long,
+    nextNumber: String,
+    onDismiss: () -> Unit,
+    onSave: (WorkOrderOperationEntity) -> Unit
+) {
+    var operationNumber by remember { mutableStateOf(nextNumber) }
+    var description by remember { mutableStateOf("") }
+    var workCenter by remember { mutableStateOf("Mechanical") }
+    var plannedHours by remember { mutableStateOf("1") }
+
+    FormSheet("إضافة عملية", onDismiss) {
+        LabeledField("رقم العملية", operationNumber, { operationNumber = it })
+        LabeledField("الوصف", description, { description = it }, singleLine = false)
+        OptionDropdown("مركز العمل", listOf("Mechanical", "Electrical", "Instrumentation", "Civil", "External"), workCenter) { workCenter = it }
+        LabeledField("الساعات المخططة", plannedHours, { plannedHours = it }, numeric = true)
+        SaveButton(description.isNotBlank()) {
+            onSave(
+                WorkOrderOperationEntity(
+                    id = 0,
+                    orderId = orderId,
+                    operationNumber = operationNumber.trim().ifBlank { nextNumber },
+                    description = description.trim(),
+                    workCenter = workCenter,
+                    plannedHours = plannedHours.toDoubleOrNull() ?: 0.0,
+                    actualHours = 0.0,
+                    requiresConfirmation = true,
+                    status = "Open"
+                )
+            )
         }
     }
 }
