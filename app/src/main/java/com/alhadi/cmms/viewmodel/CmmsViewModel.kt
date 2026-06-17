@@ -19,6 +19,8 @@ import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.TaskListEntity
+import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
@@ -139,6 +141,12 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val workOrderPhotos: StateFlow<List<WorkOrderPhotoEntity>> = repository.workOrderPhotos
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val taskLists: StateFlow<List<TaskListEntity>> = repository.taskLists
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val taskListOperations: StateFlow<List<TaskListOperationEntity>> = repository.taskListOperations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -299,6 +307,12 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
 
     fun addWorkOrderPhoto(orderId: Long, path: String) = launchAction("تم إرفاق صورة الدليل") { repository.addWorkOrderPhoto(orderId, path, actor()) }
     fun deleteWorkOrderPhoto(photo: WorkOrderPhotoEntity) = launchAction("تم حذف الصورة") { repository.deleteWorkOrderPhoto(photo, actor()) }
+
+    fun saveTaskList(taskList: TaskListEntity) = launchAction("تم حفظ القالب") { repository.saveTaskList(taskList, actor()) }
+    fun deleteTaskList(taskList: TaskListEntity) = launchAction("تم حذف القالب") { repository.deleteTaskList(taskList, actor()) }
+    fun saveTaskListOperation(operation: TaskListOperationEntity) = launchAction("تم حفظ عملية القالب") { repository.saveTaskListOperation(operation, actor()) }
+    fun deleteTaskListOperation(operation: TaskListOperationEntity) = launchAction("تم حذف عملية القالب") { repository.deleteTaskListOperation(operation, actor()) }
+    fun generateWorkOrderFromPm(pm: PreventiveMaintenanceEntity) = launchAction("تم توليد أمر عمل من الخطة") { repository.generateWorkOrderFromPm(pm, actor()) }
 
     // ----- CAPA -----
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }

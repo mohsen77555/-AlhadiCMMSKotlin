@@ -16,6 +16,8 @@ import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.TaskListEntity
+import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
@@ -44,6 +46,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val operationDao = database.workOrderOperationDao()
     private val confirmationDao = database.workOrderConfirmationDao()
     private val photoDao = database.workOrderPhotoDao()
+    private val taskListDao = database.taskListDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -66,6 +69,8 @@ class CmmsRepository(private val database: AppDatabase) {
     val workOrderOperations: Flow<List<WorkOrderOperationEntity>> = operationDao.observeOperations()
     val workOrderConfirmations: Flow<List<WorkOrderConfirmationEntity>> = confirmationDao.observeConfirmations()
     val workOrderPhotos: Flow<List<WorkOrderPhotoEntity>> = photoDao.observePhotos()
+    val taskLists: Flow<List<TaskListEntity>> = taskListDao.observeTaskLists()
+    val taskListOperations: Flow<List<TaskListOperationEntity>> = taskListDao.observeTaskListOperations()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -107,6 +112,8 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                taskListDao.deleteAllOperations()
+                taskListDao.deleteAllTaskLists()
                 photoDao.deleteAll()
                 confirmationDao.deleteAll()
                 operationDao.deleteAll()
@@ -166,7 +173,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
             val preventiveMaintenance = listOf(
                 PreventiveMaintenanceEntity(1, 1, "Inspect buckets and belt tension", 30, DateStrings.daysFromToday(-35), DateStrings.daysFromToday(-5), "Due", 90),
-                PreventiveMaintenanceEntity(2, 7, "Rollermill weekly inspection", 7, DateStrings.daysFromToday(-6), DateStrings.daysFromToday(1), "Scheduled", 45),
+                PreventiveMaintenanceEntity(2, 7, "Rollermill weekly inspection", 7, DateStrings.daysFromToday(-6), DateStrings.daysFromToday(1), "Scheduled", 45, taskListId = 1),
                 PreventiveMaintenanceEntity(3, 8, "Plansifter sieve and frame inspection", 14, DateStrings.daysFromToday(-18), DateStrings.daysFromToday(-4), "Due", 60),
                 PreventiveMaintenanceEntity(4, 10, "Compressor oil and air filter check", 30, DateStrings.daysFromToday(-22), DateStrings.daysFromToday(8), "Scheduled", 50),
                 PreventiveMaintenanceEntity(5, 12, "Scale calibration verification", 90, DateStrings.daysFromToday(-70), DateStrings.daysFromToday(20), "Scheduled", 120)
@@ -271,6 +278,15 @@ class CmmsRepository(private val database: AppDatabase) {
                 WorkOrderConfirmationEntity(1, 2, 4, "Electrical Technician", today, 1.0, "فحص الحمل الزائد واستبدال الكونتاكتور", "Contactor failure", "Electrical wear", "تم استبدال الكونتاكتور واختبار التشغيل", 2.0, true, today)
             )
 
+            val taskLists = listOf(
+                TaskListEntity(1, "فحص أسبوعي للمطاحن", "قالب فحص دوري لمطاحن الأسطوانات", "Mechanical")
+            )
+            val taskListOps = listOf(
+                TaskListOperationEntity(1, 1, "0010", "تنظيف وتفقّد الأسطوانات", "Mechanical", 0.5),
+                TaskListOperationEntity(2, 1, "0020", "فحص المحامل والتشحيم", "Mechanical", 1.0),
+                TaskListOperationEntity(3, 1, "0030", "فحص شدّ السيور وضبطها", "Mechanical", 0.5)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
@@ -282,6 +298,8 @@ class CmmsRepository(private val database: AppDatabase) {
             notificationDao.insertAll(notifications)
             operationDao.insertAll(operations)
             confirmationDao.insertAll(confirmations)
+            taskListDao.insertTaskLists(taskLists)
+            taskListDao.insertOperations(taskListOps)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -861,5 +879,72 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteWorkOrderPhoto(photo: WorkOrderPhotoEntity, actor: String = "System") {
         photoDao.deleteById(photo.id)
         recordAudit("Delete", "WorkOrder", "حذف صورة دليل لأمر العمل #${photo.orderId}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Task lists (قوالب العمل) + generation of orders from PM plans
+    // ---------------------------------------------------------------------
+
+    suspend fun saveTaskList(taskList: TaskListEntity, actor: String = "System") {
+        val isNew = taskList.id == 0L
+        taskListDao.insertTaskList(taskList)
+        recordAudit(if (isNew) "Create" else "Update", "TaskList", "${if (isNew) "إضافة" else "تعديل"} قالب عمل: ${taskList.name}", actor)
+    }
+
+    suspend fun deleteTaskList(taskList: TaskListEntity, actor: String = "System") {
+        taskListDao.deleteOperationsForList(taskList.id)
+        taskListDao.deleteTaskListById(taskList.id)
+        recordAudit("Delete", "TaskList", "حذف قالب عمل: ${taskList.name}", actor)
+    }
+
+    suspend fun saveTaskListOperation(operation: TaskListOperationEntity, actor: String = "System") {
+        val isNew = operation.id == 0L
+        taskListDao.insertOperation(operation)
+        recordAudit(if (isNew) "Create" else "Update", "TaskList", "${if (isNew) "إضافة" else "تعديل"} عملية قالب ${operation.operationNumber}", actor)
+    }
+
+    suspend fun deleteTaskListOperation(operation: TaskListOperationEntity, actor: String = "System") {
+        taskListDao.deleteOperationById(operation.id)
+        recordAudit("Delete", "TaskList", "حذف عملية قالب ${operation.operationNumber}", actor)
+    }
+
+    /**
+     * Generates a work order from a preventive-maintenance plan, copying the linked
+     * task list's template operations into the new order (TLIST-006 / SCH-007).
+     */
+    suspend fun generateWorkOrderFromPm(pm: PreventiveMaintenanceEntity, actor: String = "System") {
+        database.withTransaction {
+            val today = DateStrings.today()
+            val orderId = workOrderDao.insertWorkOrder(
+                WorkOrderEntity(
+                    assetId = pm.assetId,
+                    title = "صيانة دورية: ${pm.title}",
+                    description = "مُولّد تلقائياً من الخطة الوقائية",
+                    priority = "Medium",
+                    status = "Open",
+                    assignedTo = actor,
+                    createdAt = today,
+                    dueAt = pm.nextDueAt,
+                    estimatedCost = 0.0
+                )
+            )
+            val template = pm.taskListId?.let { taskListDao.operationsForList(it) } ?: emptyList()
+            if (template.isNotEmpty()) {
+                operationDao.insertAll(
+                    template.map {
+                        WorkOrderOperationEntity(
+                            orderId = orderId,
+                            operationNumber = it.operationNumber,
+                            description = it.description,
+                            workCenter = it.workCenter,
+                            plannedHours = it.plannedHours,
+                            requiresConfirmation = true,
+                            status = "Open"
+                        )
+                    }
+                )
+            }
+            recordAudit("Generate", "WorkOrder", "توليد أمر عمل من الصيانة الدورية: ${pm.title} (${template.size} عملية)", actor)
+        }
     }
 }

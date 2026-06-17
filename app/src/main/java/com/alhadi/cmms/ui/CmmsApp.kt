@@ -133,6 +133,8 @@ import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.TaskListEntity
+import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
@@ -172,7 +174,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters, Locations, Capa, Failures }
+private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures }
 
 private data class ScreenMeta(
     val title: String,
@@ -205,6 +207,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
     val workOrderConfirmations by viewModel.workOrderConfirmations.collectAsStateWithLifecycle()
     val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
+    val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
+    val taskListOperations by viewModel.taskListOperations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -309,12 +313,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         assetMap = assetMap,
                         canManage = canManage,
                         checklist = pmChecklist,
+                        taskLists = taskLists,
                         onSave = viewModel::savePreventiveMaintenance,
                         onDelete = viewModel::deletePreventiveMaintenance,
                         onDone = viewModel::markPreventiveMaintenanceDone,
                         onSaveChecklistItem = viewModel::saveChecklistItem,
                         onSetChecklistResult = viewModel::setChecklistResult,
-                        onDeleteChecklistItem = viewModel::deleteChecklistItem
+                        onDeleteChecklistItem = viewModel::deleteChecklistItem,
+                        onGenerateOrder = viewModel::generateWorkOrderFromPm
                     )
 
                     BottomTab.Assets -> AssetsScreen(
@@ -434,12 +440,24 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             assetMap = assetMap,
                             canManage = canManage,
                             checklist = pmChecklist,
+                            taskLists = taskLists,
                             onSave = viewModel::savePreventiveMaintenance,
                             onDelete = viewModel::deletePreventiveMaintenance,
                             onDone = viewModel::markPreventiveMaintenanceDone,
                             onSaveChecklistItem = viewModel::saveChecklistItem,
                             onSetChecklistResult = viewModel::setChecklistResult,
-                            onDeleteChecklistItem = viewModel::deleteChecklistItem
+                            onDeleteChecklistItem = viewModel::deleteChecklistItem,
+                            onGenerateOrder = viewModel::generateWorkOrderFromPm
+                        )
+                        MoreRoute.TaskLists -> TaskListsScreen(
+                            innerPadding = innerPadding,
+                            taskLists = taskLists,
+                            operations = taskListOperations,
+                            canManage = canManage,
+                            onSaveTaskList = viewModel::saveTaskList,
+                            onDeleteTaskList = viewModel::deleteTaskList,
+                            onSaveOperation = viewModel::saveTaskListOperation,
+                            onDeleteOperation = viewModel::deleteTaskListOperation
                         )
                     }
                 }
@@ -462,6 +480,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
         MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
         MoreRoute.PreventiveMaintenance -> ScreenMeta("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal)
+        MoreRoute.TaskLists -> ScreenMeta("قوالب العمل", "قوالب العمليات للخطط الوقائية", Icons.AutoMirrored.Filled.List, AccentBlue)
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
         MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
@@ -957,20 +976,20 @@ private fun MoreGrid(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.TaskLists) }
                 ModuleCard("العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Meters) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
-                ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
                 ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
-                Spacer(modifier = Modifier.weight(1f))
             }
         }
         if (isAdmin) {
@@ -2279,16 +2298,19 @@ private fun PreventiveMaintenanceScreen(
     assetMap: Map<Long, AssetEntity>,
     canManage: Boolean,
     checklist: List<PmChecklistItemEntity>,
+    taskLists: List<TaskListEntity>,
     onSave: (PreventiveMaintenanceEntity) -> Unit,
     onDelete: (PreventiveMaintenanceEntity) -> Unit,
     onDone: (PreventiveMaintenanceEntity) -> Unit,
     onSaveChecklistItem: (PmChecklistItemEntity) -> Unit,
     onSetChecklistResult: (PmChecklistItemEntity, String) -> Unit,
-    onDeleteChecklistItem: (PmChecklistItemEntity) -> Unit
+    onDeleteChecklistItem: (PmChecklistItemEntity) -> Unit,
+    onGenerateOrder: (PreventiveMaintenanceEntity) -> Unit
 ) {
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<PreventiveMaintenanceEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<PreventiveMaintenanceEntity?>(null) }
+    val taskListMap = taskLists.associateBy { it.id }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -2314,7 +2336,9 @@ private fun PreventiveMaintenanceScreen(
                     asset = assetMap[item.assetId],
                     canManage = canManage,
                     checklist = checklist.filter { it.pmId == item.id },
+                    taskListName = item.taskListId?.let { taskListMap[it]?.name },
                     onDone = onDone,
+                    onGenerateOrder = onGenerateOrder,
                     onEdit = { editing = item; showForm = true },
                     onDelete = { deleteTarget = item },
                     onSaveChecklistItem = onSaveChecklistItem,
@@ -2326,7 +2350,7 @@ private fun PreventiveMaintenanceScreen(
     }
 
     if (showForm) {
-        PmFormSheet(initial = editing, assets = assets, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+        PmFormSheet(initial = editing, assets = assets, taskLists = taskLists, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
@@ -2344,7 +2368,9 @@ private fun PreventiveMaintenanceCard(
     asset: AssetEntity?,
     canManage: Boolean,
     checklist: List<PmChecklistItemEntity>,
+    taskListName: String?,
     onDone: (PreventiveMaintenanceEntity) -> Unit,
+    onGenerateOrder: (PreventiveMaintenanceEntity) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSaveChecklistItem: (PmChecklistItemEntity) -> Unit,
@@ -2372,6 +2398,7 @@ private fun PreventiveMaintenanceCard(
             InfoRow("آخر تنفيذ", item.lastDoneAt)
             InfoRow("التنفيذ القادم", item.nextDueAt)
             InfoRow("المدة المقدرة", "${item.estimatedDurationMinutes} دقيقة")
+            if (taskListName != null) InfoRow("قالب العمل", taskListName)
 
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { showChecklist = !showChecklist },
@@ -2424,6 +2451,13 @@ private fun PreventiveMaintenanceCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("تم التنفيذ")
             }
+            if (canManage) {
+                OutlinedButton(onClick = { onGenerateOrder(item) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (taskListName != null) "توليد أمر عمل من القالب" else "توليد أمر عمل")
+                }
+            }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
@@ -2434,6 +2468,131 @@ private fun PreventiveMaintenanceCard(
             nextOrder = (checklist.maxOfOrNull { it.orderIndex } ?: 0) + 1,
             onDismiss = { showAddItem = false },
             onSave = { onSaveChecklistItem(it); showAddItem = false }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task lists (قوالب العمل)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun TaskListsScreen(
+    innerPadding: PaddingValues,
+    taskLists: List<TaskListEntity>,
+    operations: List<TaskListOperationEntity>,
+    canManage: Boolean,
+    onSaveTaskList: (TaskListEntity) -> Unit,
+    onDeleteTaskList: (TaskListEntity) -> Unit,
+    onSaveOperation: (TaskListOperationEntity) -> Unit,
+    onDeleteOperation: (TaskListOperationEntity) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<TaskListEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<TaskListEntity?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("قوالب العمل")
+                Text("قوالب عمليات قابلة لإعادة الاستخدام، تُنسخ إلى أمر العمل عند توليده من خطة وقائية.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("قالب عمل جديد") { editing = null; showForm = true } }
+            }
+            if (taskLists.isEmpty()) {
+                item { EmptyState("لا توجد قوالب عمل", Icons.AutoMirrored.Filled.List) }
+            }
+            items(taskLists, key = { it.id }) { tl ->
+                TaskListCard(
+                    taskList = tl,
+                    operations = operations.filter { it.taskListId == tl.id },
+                    canManage = canManage,
+                    onSaveOperation = onSaveOperation,
+                    onDeleteOperation = onDeleteOperation,
+                    onEdit = { editing = tl; showForm = true },
+                    onDelete = { deleteTarget = tl }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        TaskListFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSaveTaskList(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف القالب",
+            text = "هل تريد حذف \"${target.name}\" وكل عملياته؟",
+            onConfirm = { onDeleteTaskList(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun TaskListCard(
+    taskList: TaskListEntity,
+    operations: List<TaskListOperationEntity>,
+    canManage: Boolean,
+    onSaveOperation: (TaskListOperationEntity) -> Unit,
+    onDeleteOperation: (TaskListOperationEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showAddOp by remember { mutableStateOf(false) }
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBubble(Icons.AutoMirrored.Filled.List, AccentBlue, AccentBlue.copy(alpha = 0.14f), 40)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(taskList.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    if (taskList.description.isNotBlank()) Text(taskList.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge("${operations.size} عملية", statusTone("info"))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            operations.forEach { op ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LtrText(op.operationNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(op.description, style = MaterialTheme.typography.bodyMedium)
+                        Text("${op.workCenter.ifBlank { "—" }} • ${op.plannedHours}س", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (canManage) {
+                        IconButton(onClick = { onDeleteOperation(op) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+            if (operations.isEmpty()) {
+                Text("لا توجد عمليات في هذا القالب.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                OutlinedButton(onClick = { showAddOp = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("إضافة عملية للقالب")
+                }
+                EditDeleteRow(onEdit, onDelete)
+            }
+        }
+    }
+
+    if (showAddOp) {
+        TaskListOperationFormSheet(
+            taskListId = taskList.id,
+            defaultWorkCenter = taskList.defaultWorkCenter,
+            nextNumber = "%04d".format(((operations.mapNotNull { it.operationNumber.toIntOrNull() }.maxOrNull() ?: 0) + 10)),
+            onDismiss = { showAddOp = false },
+            onSave = { onSaveOperation(it); showAddOp = false }
         )
     }
 }

@@ -50,6 +50,8 @@ import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.TaskListEntity
+import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
@@ -524,6 +526,7 @@ internal fun WorkOrderFormSheet(
 internal fun PmFormSheet(
     initial: PreventiveMaintenanceEntity?,
     assets: List<AssetEntity>,
+    taskLists: List<TaskListEntity>,
     onDismiss: () -> Unit,
     onSave: (PreventiveMaintenanceEntity) -> Unit
 ) {
@@ -531,12 +534,16 @@ internal fun PmFormSheet(
     var assetId by remember { mutableStateOf(initial?.assetId ?: assets.firstOrNull()?.id ?: 0L) }
     var frequency by remember { mutableStateOf((initial?.frequencyDays ?: 30).toString()) }
     var duration by remember { mutableStateOf((initial?.estimatedDurationMinutes ?: 60).toString()) }
+    var taskListId by remember { mutableStateOf(initial?.taskListId) }
 
     FormSheet(if (initial == null) "إضافة صيانة دورية" else "تعديل الصيانة الدورية", onDismiss) {
         LabeledField("عنوان المهمة", title, { title = it })
         AssetDropdown(assets, assetId) { assetId = it }
         LabeledField("التكرار (أيام)", frequency, { frequency = it }, numeric = true)
         LabeledField("المدة المقدرة (دقائق)", duration, { duration = it }, numeric = true)
+        if (taskLists.isNotEmpty()) {
+            TaskListDropdown(taskLists, taskListId) { taskListId = it }
+        }
         SaveButton(title.isNotBlank() && assetId != 0L) {
             val today = DateStrings.today()
             val freq = frequency.toIntOrNull() ?: 30
@@ -549,7 +556,93 @@ internal fun PmFormSheet(
                     lastDoneAt = initial?.lastDoneAt ?: today,
                     nextDueAt = initial?.nextDueAt ?: DateStrings.daysFromToday(freq),
                     status = initial?.status ?: "Scheduled",
-                    estimatedDurationMinutes = duration.toIntOrNull() ?: 60
+                    estimatedDurationMinutes = duration.toIntOrNull() ?: 60,
+                    taskListId = taskListId
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun TaskListDropdown(taskLists: List<TaskListEntity>, selectedId: Long?, onSelect: (Long?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val selected = taskLists.firstOrNull { it.id == selectedId }
+    Column {
+        Text("قالب العمل (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Box {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(selected?.name ?: "بدون", modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
+                taskLists.forEach { tl ->
+                    DropdownMenuItem(text = { Text(tl.name) }, onClick = { onSelect(tl.id); open = false })
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task list forms (قوالب العمل)
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun TaskListFormSheet(
+    initial: TaskListEntity?,
+    onDismiss: () -> Unit,
+    onSave: (TaskListEntity) -> Unit
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var workCenter by remember { mutableStateOf(initial?.defaultWorkCenter ?: "Mechanical") }
+
+    FormSheet(if (initial == null) "قالب عمل جديد" else "تعديل القالب", onDismiss) {
+        LabeledField("اسم القالب", name, { name = it })
+        LabeledField("الوصف", description, { description = it }, singleLine = false)
+        OptionDropdown("مركز العمل الافتراضي", listOf("Mechanical", "Electrical", "Instrumentation", "Civil", "External"), workCenter) { workCenter = it }
+        SaveButton(name.isNotBlank()) {
+            onSave(
+                TaskListEntity(
+                    id = initial?.id ?: 0,
+                    name = name.trim(),
+                    description = description.trim(),
+                    defaultWorkCenter = workCenter
+                )
+            )
+        }
+    }
+}
+
+@Composable
+internal fun TaskListOperationFormSheet(
+    taskListId: Long,
+    defaultWorkCenter: String,
+    nextNumber: String,
+    onDismiss: () -> Unit,
+    onSave: (TaskListOperationEntity) -> Unit
+) {
+    var operationNumber by remember { mutableStateOf(nextNumber) }
+    var description by remember { mutableStateOf("") }
+    var workCenter by remember { mutableStateOf(defaultWorkCenter.ifBlank { "Mechanical" }) }
+    var plannedHours by remember { mutableStateOf("1") }
+
+    FormSheet("إضافة عملية للقالب", onDismiss) {
+        LabeledField("رقم العملية", operationNumber, { operationNumber = it })
+        LabeledField("الوصف", description, { description = it }, singleLine = false)
+        OptionDropdown("مركز العمل", listOf("Mechanical", "Electrical", "Instrumentation", "Civil", "External"), workCenter) { workCenter = it }
+        LabeledField("الساعات المخططة", plannedHours, { plannedHours = it }, numeric = true)
+        SaveButton(description.isNotBlank()) {
+            onSave(
+                TaskListOperationEntity(
+                    id = 0,
+                    taskListId = taskListId,
+                    operationNumber = operationNumber.trim().ifBlank { nextNumber },
+                    description = description.trim(),
+                    workCenter = workCenter,
+                    plannedHours = plannedHours.toDoubleOrNull() ?: 0.0
                 )
             )
         }

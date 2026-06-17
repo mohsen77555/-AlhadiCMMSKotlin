@@ -18,6 +18,7 @@ import com.alhadi.cmms.data.dao.MeasurementDao
 import com.alhadi.cmms.data.dao.PmChecklistDao
 import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
 import com.alhadi.cmms.data.dao.SparePartDao
+import com.alhadi.cmms.data.dao.TaskListDao
 import com.alhadi.cmms.data.dao.UserDao
 import com.alhadi.cmms.data.dao.WorkOrderConfirmationDao
 import com.alhadi.cmms.data.dao.WorkOrderDao
@@ -38,6 +39,8 @@ import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.TaskListEntity
+import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
@@ -65,9 +68,11 @@ import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
         MaintenanceNotificationEntity::class,
         WorkOrderOperationEntity::class,
         WorkOrderConfirmationEntity::class,
-        WorkOrderPhotoEntity::class
+        WorkOrderPhotoEntity::class,
+        TaskListEntity::class,
+        TaskListOperationEntity::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -90,6 +95,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workOrderOperationDao(): WorkOrderOperationDao
     abstract fun workOrderConfirmationDao(): WorkOrderConfirmationDao
     abstract fun workOrderPhotoDao(): WorkOrderPhotoDao
+    abstract fun taskListDao(): TaskListDao
 
     companion object {
         @Volatile
