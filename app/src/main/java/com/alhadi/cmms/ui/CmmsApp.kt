@@ -1209,6 +1209,26 @@ private fun AssetsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (query.isBlank() && assets.isNotEmpty()) {
+                item {
+                    val running = assets.count { it.status == "Running" }
+                    val stopped = assets.count { it.status == "Stopped" || it.status == "Retired" }
+                    val warning = assets.count { it.status == "Warning" || it.status == "Under Maintenance" }
+                    val other = assets.size - running - stopped - warning
+                    val seg = listOf(
+                        ChartSegment("تعمل", running, AccentGreen),
+                        ChartSegment("تحذير/صيانة", warning, AccentOrange),
+                        ChartSegment("متوقفة/متقاعدة", stopped, AccentRed),
+                        ChartSegment("أخرى", other.coerceAtLeast(0), AccentNavy)
+                    )
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = assets.size.toString(), centerLabel = "أصل")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
             item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill") }
             if (canManage) {
                 item { AddButton("أصل جديد") { editing = null; showForm = true } }
@@ -2701,11 +2721,19 @@ private fun InventoryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
+                val healthy = (parts.size - lowStockCount).coerceAtLeast(0)
+                val healthPct = if (parts.isEmpty()) 100f else healthy.toFloat() / parts.size * 100f
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        MetricColumn("أصناف", parts.size.toString(), AccentBlue)
-                        MetricColumn("منخفض", lowStockCount.toString(), if (lowStockCount > 0) AccentRed else AccentGreen)
-                        MetricColumn("قيمة المخزون", money(totalValue), AccentTeal)
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        RingGauge(percent = healthPct, color = if (lowStockCount > 0) AccentOrange else AccentGreen, centerLabel = "متوفر")
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SectionHeader("حالة المخزون")
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                MetricColumn("أصناف", parts.size.toString(), AccentBlue)
+                                MetricColumn("منخفض", lowStockCount.toString(), if (lowStockCount > 0) AccentRed else AccentGreen)
+                            }
+                            InfoRow("قيمة المخزون", money(totalValue))
+                        }
                     }
                 }
             }
@@ -3697,6 +3725,9 @@ private fun FailureAnalysisScreen(
         val d = failures.map { it.downtimeHours }.filter { it > 0.0 }
         if (d.isEmpty()) 0.0 else d.average()
     }
+    val palette = listOf(AccentRed, AccentOrange, AccentBlue, AccentPurple, AccentTeal, AccentNavy)
+    val maxMttr = (stats.maxOfOrNull { it.mttrHours } ?: 1.0).coerceAtLeast(0.1)
+    val maxMtbf = (stats.mapNotNull { it.mtbfDays }.maxOrNull() ?: 1.0).coerceAtLeast(0.1)
 
     LazyColumn(
         modifier = Modifier
@@ -3717,6 +3748,20 @@ private fun FailureAnalysisScreen(
             }
         }
 
+        if (stats.isNotEmpty()) {
+            item {
+                val seg = stats.take(6).mapIndexed { i, s ->
+                    ChartSegment(assetMap[s.assetId]?.code ?: "#${s.assetId}", s.failures, palette[i % palette.size])
+                }
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = failures.size.toString(), centerLabel = "عطل")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
         item { SectionHeader("حسب الأصل") }
         if (stats.isEmpty()) {
             item { EmptyState("لا توجد أعطال مسجّلة بعد", Icons.Filled.TrendingUp) }
@@ -3724,7 +3769,7 @@ private fun FailureAnalysisScreen(
         items(stats, key = { it.assetId }) { stat ->
             val asset = assetMap[stat.assetId]
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
                             LtrText(asset?.code ?: "Asset #${stat.assetId}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -3733,8 +3778,8 @@ private fun FailureAnalysisScreen(
                         StatusBadge("أعطال: ${stat.failures}", statusTone(if (stat.failures >= 3) "stopped" else "warning"))
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                    InfoRow("MTTR", "%.1f ساعة".format(stat.mttrHours))
-                    InfoRow("MTBF", stat.mtbfDays?.let { "%.0f يوم".format(it) } ?: "—")
+                    BarMeter("MTTR", (stat.mttrHours / maxMttr).toFloat(), AccentOrange, "%.1f ساعة".format(stat.mttrHours))
+                    BarMeter("MTBF", ((stat.mtbfDays ?: 0.0) / maxMtbf).toFloat(), AccentGreen, stat.mtbfDays?.let { "%.0f يوم".format(it) } ?: "—")
                 }
             }
         }
