@@ -1,6 +1,7 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
@@ -30,6 +31,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val capaDao = database.capaDao()
     private val documentDao = database.assetDocumentDao()
     private val characteristicDao = database.assetCharacteristicDao()
+    private val bomDao = database.assetBomDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -45,6 +47,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val capaActions: Flow<List<CapaEntity>> = capaDao.observeCapa()
     val assetDocuments: Flow<List<AssetDocumentEntity>> = documentDao.observeDocuments()
     val assetCharacteristics: Flow<List<AssetCharacteristicEntity>> = characteristicDao.observeCharacteristics()
+    val assetBom: Flow<List<AssetBomItemEntity>> = bomDao.observeBom()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -86,6 +89,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                bomDao.deleteAll()
                 characteristicDao.deleteAll()
                 documentDao.deleteAll()
                 capaDao.deleteAll()
@@ -202,11 +206,19 @@ class CmmsRepository(private val database: AppDatabase) {
                 AssetCharacteristicEntity(5, 4, "Voltage", "400", "V")
             )
 
+            val bomItems = listOf(
+                AssetBomItemEntity(1, 7, 1, 4),
+                AssetBomItemEntity(2, 1, 2, 2),
+                AssetBomItemEntity(3, 2, 3, 6),
+                AssetBomItemEntity(4, 10, 5, 1)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
             documentDao.insertAll(documents)
             characteristicDao.insertAll(characteristics)
+            bomDao.insertAll(bomItems)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -529,5 +541,20 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteCharacteristic(item: AssetCharacteristicEntity, actor: String = "System") {
         characteristicDao.deleteById(item.id)
         recordAudit("Delete", "Characteristic", "حذف خاصية: ${item.name}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Asset BOM (maintenance bill of materials)
+    // ---------------------------------------------------------------------
+
+    suspend fun saveBomItem(item: AssetBomItemEntity, actor: String = "System") {
+        val isNew = item.id == 0L
+        bomDao.insert(item)
+        recordAudit(if (isNew) "Create" else "Update", "BOM", "${if (isNew) "إضافة" else "تعديل"} بند مكوّنات (قطعة #${item.partId})", actor)
+    }
+
+    suspend fun deleteBomItem(item: AssetBomItemEntity, actor: String = "System") {
+        bomDao.deleteById(item.id)
+        recordAudit("Delete", "BOM", "حذف بند مكوّنات (قطعة #${item.partId})", actor)
     }
 }

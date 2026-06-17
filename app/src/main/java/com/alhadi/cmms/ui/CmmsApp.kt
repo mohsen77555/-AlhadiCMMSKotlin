@@ -103,6 +103,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
@@ -174,6 +175,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
     val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
+    val assetBom by viewModel.assetBom.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -277,6 +279,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         locations = locations,
                         documents = assetDocuments,
                         characteristics = assetCharacteristics,
+                        bomItems = assetBom,
+                        spareParts = spareParts,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveAsset,
@@ -287,7 +291,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onSaveDocument = viewModel::saveAssetDocument,
                         onDeleteDocument = viewModel::deleteAssetDocument,
                         onSaveCharacteristic = viewModel::saveCharacteristic,
-                        onDeleteCharacteristic = viewModel::deleteCharacteristic
+                        onDeleteCharacteristic = viewModel::deleteCharacteristic,
+                        onSaveBom = viewModel::saveBomItem,
+                        onDeleteBom = viewModel::deleteBomItem
                     )
 
                     BottomTab.More -> when (moreRoute) {
@@ -924,6 +930,8 @@ private fun AssetsScreen(
     locations: List<FunctionalLocationEntity>,
     documents: List<AssetDocumentEntity>,
     characteristics: List<AssetCharacteristicEntity>,
+    bomItems: List<AssetBomItemEntity>,
+    spareParts: List<SparePartEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (AssetEntity) -> Unit,
@@ -934,7 +942,9 @@ private fun AssetsScreen(
     onSaveDocument: (AssetDocumentEntity) -> Unit,
     onDeleteDocument: (AssetDocumentEntity) -> Unit,
     onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
-    onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit
+    onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onSaveBom: (AssetBomItemEntity) -> Unit,
+    onDeleteBom: (AssetBomItemEntity) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showForm by remember { mutableStateOf(false) }
@@ -954,6 +964,8 @@ private fun AssetsScreen(
             pmItems = pmItems.filter { it.assetId == detailAsset.id },
             documents = documents.filter { it.assetId == detailAsset.id },
             characteristics = characteristics.filter { it.assetId == detailAsset.id },
+            bomItems = bomItems.filter { it.assetId == detailAsset.id },
+            spareParts = spareParts,
             locations = locations,
             canManage = canManage,
             defaultAssignee = defaultAssignee,
@@ -966,7 +978,9 @@ private fun AssetsScreen(
             onSaveDocument = onSaveDocument,
             onDeleteDocument = onDeleteDocument,
             onSaveCharacteristic = onSaveCharacteristic,
-            onDeleteCharacteristic = onDeleteCharacteristic
+            onDeleteCharacteristic = onDeleteCharacteristic,
+            onSaveBom = onSaveBom,
+            onDeleteBom = onDeleteBom
         )
         return
     }
@@ -1066,6 +1080,8 @@ private fun AssetDetailScreen(
     pmItems: List<PreventiveMaintenanceEntity>,
     documents: List<AssetDocumentEntity>,
     characteristics: List<AssetCharacteristicEntity>,
+    bomItems: List<AssetBomItemEntity>,
+    spareParts: List<SparePartEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
@@ -1078,7 +1094,9 @@ private fun AssetDetailScreen(
     onSaveDocument: (AssetDocumentEntity) -> Unit,
     onDeleteDocument: (AssetDocumentEntity) -> Unit,
     onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
-    onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit
+    onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onSaveBom: (AssetBomItemEntity) -> Unit,
+    onDeleteBom: (AssetBomItemEntity) -> Unit
 ) {
     var showDocForm by remember { mutableStateOf(false) }
     var editingDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
@@ -1086,6 +1104,9 @@ private fun AssetDetailScreen(
     var showCharForm by remember { mutableStateOf(false) }
     var editingChar by remember { mutableStateOf<AssetCharacteristicEntity?>(null) }
     var deleteChar by remember { mutableStateOf<AssetCharacteristicEntity?>(null) }
+    var showBomForm by remember { mutableStateOf(false) }
+    var deleteBom by remember { mutableStateOf<AssetBomItemEntity?>(null) }
+    val partMap = spareParts.associateBy { it.id }
     val locationLabel = asset.locationId?.let { id -> locations.firstOrNull { it.id == id }?.let { "${it.code} • ${it.name}" } } ?: "غير محدد"
     val today = DateStrings.today()
     val underWarranty = asset.isUnderWarranty(today)
@@ -1165,6 +1186,41 @@ private fun AssetDetailScreen(
                             Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                         }
                         IconButton(onClick = { deleteChar = ch }) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("قائمة المكوّنات BOM (${bomItems.size})")
+                Spacer(modifier = Modifier.weight(1f))
+                if (canManage && spareParts.isNotEmpty()) {
+                    OutlinedButton(onClick = { showBomForm = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة")
+                    }
+                }
+            }
+        }
+        if (bomItems.isEmpty()) {
+            item { EmptyState("لا توجد قطع غيار مرتبطة بهذا الأصل") }
+        }
+        items(bomItems, key = { "bom-${it.id}" }) { item ->
+            val part = partMap[item.partId]
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.Inventory2, AccentPurple, AccentPurple.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(part?.partNumber ?: "Part #${item.partId}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(part?.name ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    StatusBadge("×${item.quantity}", statusTone("info"))
+                    if (canManage) {
+                        IconButton(onClick = { deleteBom = item }) {
                             Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
                         }
                     }
@@ -1356,6 +1412,23 @@ private fun AssetDetailScreen(
         }
     }
 
+    if (showBomForm) {
+        BomFormSheet(
+            initial = null,
+            assetId = asset.id,
+            parts = spareParts,
+            onDismiss = { showBomForm = false },
+            onSave = { onSaveBom(it); showBomForm = false }
+        )
+    }
+    deleteBom?.let { target ->
+        ConfirmDialog(
+            title = "حذف بند المكوّنات",
+            text = "هل تريد حذف هذا البند من قائمة المكوّنات؟",
+            onConfirm = { onDeleteBom(target); deleteBom = null },
+            onDismiss = { deleteBom = null }
+        )
+    }
     if (showCharForm) {
         CharacteristicFormSheet(
             initial = editingChar,

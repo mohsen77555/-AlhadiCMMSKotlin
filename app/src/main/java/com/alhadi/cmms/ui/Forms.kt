@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
@@ -591,6 +592,62 @@ internal fun ReadingDialog(point: MeasuringPointEntity, onSubmit: (Double, Strin
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
     )
+}
+
+// ---------------------------------------------------------------------------
+// Asset BOM form
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun PartDropdown(parts: List<SparePartEntity>, selectedId: Long, onSelect: (Long) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val selected = parts.firstOrNull { it.id == selectedId }
+    Column {
+        Text("القطعة", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Box {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    selected?.let { "${it.partNumber} • ${it.name}" } ?: "اختر قطعة",
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                parts.forEach { part ->
+                    DropdownMenuItem(text = { Text("${part.partNumber} • ${part.name}") }, onClick = { onSelect(part.id); open = false })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun BomFormSheet(
+    initial: AssetBomItemEntity?,
+    assetId: Long,
+    parts: List<SparePartEntity>,
+    onDismiss: () -> Unit,
+    onSave: (AssetBomItemEntity) -> Unit
+) {
+    var partId by remember { mutableStateOf(initial?.partId ?: parts.firstOrNull()?.id ?: 0L) }
+    var quantity by remember { mutableStateOf((initial?.quantity ?: 1).toString()) }
+
+    FormSheet(if (initial == null) "إضافة بند مكوّنات" else "تعديل البند", onDismiss) {
+        PartDropdown(parts, partId) { partId = it }
+        LabeledField("الكمية", quantity, { quantity = it }, numeric = true)
+        SaveButton(partId != 0L && (quantity.toIntOrNull() ?: 0) > 0) {
+            onSave(
+                AssetBomItemEntity(
+                    id = initial?.id ?: 0,
+                    assetId = assetId,
+                    partId = partId,
+                    quantity = quantity.toIntOrNull() ?: 1
+                )
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
