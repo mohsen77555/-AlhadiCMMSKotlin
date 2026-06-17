@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.alhadi.cmms.data.MovementType
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -120,18 +121,24 @@ private fun LabeledField(
 }
 
 @Composable
-private fun OptionDropdown(label: String, options: List<String>, selected: String, onSelect: (String) -> Unit) {
+private fun OptionDropdown(
+    label: String,
+    options: List<String>,
+    selected: String,
+    display: (String) -> String = { it },
+    onSelect: (String) -> Unit
+) {
     var open by remember { mutableStateOf(false) }
     Column {
         Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         Box {
             OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(selected.ifBlank { "اختر…" }, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(selected.ifBlank { "اختر…" }.let(display), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 options.forEach { opt ->
-                    DropdownMenuItem(text = { Text(opt) }, onClick = { onSelect(opt); open = false })
+                    DropdownMenuItem(text = { Text(display(opt)) }, onClick = { onSelect(opt); open = false })
                 }
             }
         }
@@ -714,6 +721,41 @@ internal fun DocumentFormSheet(
                     uploadedAt = initial?.uploadedAt ?: ""
                 )
             )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Asset movement form (install / transfer / dismantle / retire)
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun MovementFormSheet(
+    asset: AssetEntity,
+    locations: List<FunctionalLocationEntity>,
+    onDismiss: () -> Unit,
+    onSave: (type: String, locId: Long?, locName: String, notes: String) -> Unit
+) {
+    var type by remember { mutableStateOf(MovementType.INSTALL) }
+    var locId by remember { mutableStateOf<Long?>(asset.locationId) }
+    var notes by remember { mutableStateOf("") }
+    val needsLocation = type == MovementType.INSTALL || type == MovementType.TRANSFER
+
+    FormSheet("حركة الأصل: ${asset.code}", onDismiss) {
+        OptionDropdown(
+            "نوع الحركة",
+            MovementType.all,
+            type,
+            display = { MovementType.label(it) },
+            onSelect = { type = it }
+        )
+        if (needsLocation) {
+            LocationDropdown("الموقع الوجهة", locations, locId, onSelect = { locId = it })
+        }
+        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
+        SaveButton(!needsLocation || locId != null) {
+            val name = locations.firstOrNull { it.id == locId }?.name ?: ""
+            onSave(type, if (needsLocation) locId else null, if (needsLocation) name else "", notes.trim())
         }
     }
 }

@@ -5,6 +5,7 @@ import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
@@ -32,6 +33,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val documentDao = database.assetDocumentDao()
     private val characteristicDao = database.assetCharacteristicDao()
     private val bomDao = database.assetBomDao()
+    private val movementDao = database.assetMovementDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -48,6 +50,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val assetDocuments: Flow<List<AssetDocumentEntity>> = documentDao.observeDocuments()
     val assetCharacteristics: Flow<List<AssetCharacteristicEntity>> = characteristicDao.observeCharacteristics()
     val assetBom: Flow<List<AssetBomItemEntity>> = bomDao.observeBom()
+    val assetMovements: Flow<List<AssetMovementEntity>> = movementDao.observeMovements()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -89,6 +92,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                movementDao.deleteAll()
                 bomDao.deleteAll()
                 characteristicDao.deleteAll()
                 documentDao.deleteAll()
@@ -213,12 +217,19 @@ class CmmsRepository(private val database: AppDatabase) {
                 AssetBomItemEntity(4, 10, 5, 1)
             )
 
+            val movements = listOf(
+                AssetMovementEntity(1, 7, MovementType.INSTALL, null, 6, "", "Rollermill Station", "تركيب أولي في الموقع", "Mohsen Alhadi", today),
+                AssetMovementEntity(2, 10, MovementType.INSTALL, null, 5, "", "Utility Room", "تركيب الضاغط", "Mohsen Alhadi", today),
+                AssetMovementEntity(3, 4, MovementType.TRANSFER, 5, 3, "Utility Room", "Milling Floor", "نقل اللوحة الكهربائية", "Maintenance Supervisor", today)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
             documentDao.insertAll(documents)
             characteristicDao.insertAll(characteristics)
             bomDao.insertAll(bomItems)
+            movementDao.insertAll(movements)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -556,5 +567,58 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteBomItem(item: AssetBomItemEntity, actor: String = "System") {
         bomDao.deleteById(item.id)
         recordAudit("Delete", "BOM", "حذف بند مكوّنات (قطعة #${item.partId})", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Asset movements (install / transfer / dismantle / retire)
+    // ---------------------------------------------------------------------
+
+    /**
+     * Records a lifecycle event for an asset AND keeps the asset's own location/status
+     * consistent so the 360 card and the timeline never disagree:
+     * - Install / Transfer move the asset to [toLocationId]/[toLocationName] and set it Running.
+     * - Dismantle clears the asset's functional location and sets it to Standby.
+     * - Retire sets the asset to Retired.
+     */
+    suspend fun performAssetMovement(
+        asset: AssetEntity,
+        eventType: String,
+        toLocationId: Long?,
+        toLocationName: String,
+        notes: String,
+        actor: String = "System"
+    ) {
+        database.withTransaction {
+            val now = DateStrings.now()
+            val updated = when (eventType) {
+                MovementType.INSTALL, MovementType.TRANSFER ->
+                    asset.copy(locationId = toLocationId, location = toLocationName.ifBlank { asset.location }, status = "Running")
+                MovementType.DISMANTLE ->
+                    asset.copy(locationId = null, status = "Standby")
+                MovementType.RETIRE ->
+                    asset.copy(status = "Retired")
+                else -> asset
+            }
+            assetDao.insertAsset(updated)
+            movementDao.insert(
+                AssetMovementEntity(
+                    assetId = asset.id,
+                    eventType = eventType,
+                    fromLocationId = asset.locationId,
+                    toLocationId = if (eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) null else toLocationId,
+                    fromLocationName = asset.location,
+                    toLocationName = if (eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) "" else toLocationName,
+                    notes = notes,
+                    performedBy = actor,
+                    occurredAt = now
+                )
+            )
+            recordAudit("Movement", "Asset", "${MovementType.label(eventType)} للأصل: ${asset.code}", actor)
+        }
+    }
+
+    suspend fun deleteAssetMovement(movement: AssetMovementEntity, actor: String = "System") {
+        movementDao.deleteById(movement.id)
+        recordAudit("Delete", "Movement", "حذف حركة (${MovementType.label(movement.eventType)})", actor)
     }
 }

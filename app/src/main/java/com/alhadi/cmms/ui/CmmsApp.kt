@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
@@ -102,10 +103,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.alhadi.cmms.data.MovementType
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
+import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
@@ -176,6 +179,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
     val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
     val assetBom by viewModel.assetBom.collectAsStateWithLifecycle()
+    val assetMovements by viewModel.assetMovements.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -280,6 +284,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         documents = assetDocuments,
                         characteristics = assetCharacteristics,
                         bomItems = assetBom,
+                        movements = assetMovements,
                         spareParts = spareParts,
                         canManage = canManage,
                         defaultAssignee = actorName,
@@ -293,7 +298,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onSaveCharacteristic = viewModel::saveCharacteristic,
                         onDeleteCharacteristic = viewModel::deleteCharacteristic,
                         onSaveBom = viewModel::saveBomItem,
-                        onDeleteBom = viewModel::deleteBomItem
+                        onDeleteBom = viewModel::deleteBomItem,
+                        onMove = viewModel::performAssetMovement
                     )
 
                     BottomTab.More -> when (moreRoute) {
@@ -931,6 +937,7 @@ private fun AssetsScreen(
     documents: List<AssetDocumentEntity>,
     characteristics: List<AssetCharacteristicEntity>,
     bomItems: List<AssetBomItemEntity>,
+    movements: List<AssetMovementEntity>,
     spareParts: List<SparePartEntity>,
     canManage: Boolean,
     defaultAssignee: String,
@@ -944,7 +951,8 @@ private fun AssetsScreen(
     onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onSaveBom: (AssetBomItemEntity) -> Unit,
-    onDeleteBom: (AssetBomItemEntity) -> Unit
+    onDeleteBom: (AssetBomItemEntity) -> Unit,
+    onMove: (AssetEntity, String, Long?, String, String) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showForm by remember { mutableStateOf(false) }
@@ -965,6 +973,7 @@ private fun AssetsScreen(
             documents = documents.filter { it.assetId == detailAsset.id },
             characteristics = characteristics.filter { it.assetId == detailAsset.id },
             bomItems = bomItems.filter { it.assetId == detailAsset.id },
+            movements = movements.filter { it.assetId == detailAsset.id },
             spareParts = spareParts,
             locations = locations,
             canManage = canManage,
@@ -980,7 +989,8 @@ private fun AssetsScreen(
             onSaveCharacteristic = onSaveCharacteristic,
             onDeleteCharacteristic = onDeleteCharacteristic,
             onSaveBom = onSaveBom,
-            onDeleteBom = onDeleteBom
+            onDeleteBom = onDeleteBom,
+            onMove = onMove
         )
         return
     }
@@ -1081,6 +1091,7 @@ private fun AssetDetailScreen(
     documents: List<AssetDocumentEntity>,
     characteristics: List<AssetCharacteristicEntity>,
     bomItems: List<AssetBomItemEntity>,
+    movements: List<AssetMovementEntity>,
     spareParts: List<SparePartEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
@@ -1096,7 +1107,8 @@ private fun AssetDetailScreen(
     onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onSaveBom: (AssetBomItemEntity) -> Unit,
-    onDeleteBom: (AssetBomItemEntity) -> Unit
+    onDeleteBom: (AssetBomItemEntity) -> Unit,
+    onMove: (AssetEntity, String, Long?, String, String) -> Unit
 ) {
     var showDocForm by remember { mutableStateOf(false) }
     var editingDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
@@ -1116,6 +1128,7 @@ private fun AssetDetailScreen(
     var showEdit by remember { mutableStateOf(false) }
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
+    var showMoveForm by remember { mutableStateOf(false) }
     val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
     val retired = asset.status.equals("Retired", ignoreCase = true)
 
@@ -1286,6 +1299,13 @@ private fun AssetDetailScreen(
                 }
             }
             item {
+                OutlinedButton(onClick = { showMoveForm = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("تركيب / نقل / فك")
+                }
+            }
+            item {
                 if (retired) {
                     Text(
                         "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه.",
@@ -1410,8 +1430,46 @@ private fun AssetDetailScreen(
                 }
             }
         }
+
+        item { SectionHeader("سجل الحركات (${movements.size})") }
+        if (movements.isEmpty()) {
+            item { EmptyState("لا توجد حركات تركيب/نقل مسجّلة", Icons.Filled.SwapHoriz) }
+        }
+        items(movements, key = { "mv-${it.id}" }) { mv ->
+            val tone = when (mv.eventType) {
+                MovementType.INSTALL -> AccentGreen
+                MovementType.TRANSFER -> AccentBlue
+                MovementType.DISMANTLE -> AccentOrange
+                else -> MaterialTheme.colorScheme.error
+            }
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.SwapHoriz, tone, tone.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(MovementType.label(mv.eventType), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        val route = when {
+                            mv.fromLocationName.isNotBlank() && mv.toLocationName.isNotBlank() -> "${mv.fromLocationName} ← ${mv.toLocationName}"
+                            mv.toLocationName.isNotBlank() -> "إلى ${mv.toLocationName}"
+                            mv.fromLocationName.isNotBlank() -> "من ${mv.fromLocationName}"
+                            else -> ""
+                        }
+                        if (route.isNotBlank()) LtrText(route, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (mv.notes.isNotBlank()) Text(mv.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${mv.performedBy} • ${mv.occurredAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
     }
 
+    if (showMoveForm) {
+        MovementFormSheet(
+            asset = asset,
+            locations = locations,
+            onDismiss = { showMoveForm = false },
+            onSave = { type, locId, locName, notes -> onMove(asset, type, locId, locName, notes); showMoveForm = false }
+        )
+    }
     if (showBomForm) {
         BomFormSheet(
             initial = null,

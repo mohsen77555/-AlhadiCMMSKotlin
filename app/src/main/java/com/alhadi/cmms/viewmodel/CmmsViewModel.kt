@@ -8,6 +8,7 @@ import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
+import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
@@ -115,6 +116,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val assetBom: StateFlow<List<AssetBomItemEntity>> = repository.assetBom
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val assetMovements: StateFlow<List<AssetMovementEntity>> = repository.assetMovements
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -247,6 +251,10 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     // ----- Asset BOM -----
     fun saveBomItem(item: AssetBomItemEntity) = launchAction("تم حفظ بند المكوّنات") { repository.saveBomItem(item, actor()) }
     fun deleteBomItem(item: AssetBomItemEntity) = launchAction("تم حذف بند المكوّنات") { repository.deleteBomItem(item, actor()) }
+
+    fun performAssetMovement(asset: AssetEntity, eventType: String, toLocationId: Long?, toLocationName: String, notes: String) =
+        launchAction("تم تسجيل الحركة") { repository.performAssetMovement(asset, eventType, toLocationId, toLocationName, notes, actor()) }
+    fun deleteAssetMovement(movement: AssetMovementEntity) = launchAction("تم حذف الحركة") { repository.deleteAssetMovement(movement, actor()) }
 
     // ----- CAPA -----
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }
