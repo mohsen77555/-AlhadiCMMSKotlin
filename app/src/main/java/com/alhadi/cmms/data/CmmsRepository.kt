@@ -25,6 +25,7 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
+import com.alhadi.cmms.util.PasswordHasher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
@@ -90,10 +91,13 @@ class CmmsRepository(private val database: AppDatabase) {
     // ---------------------------------------------------------------------
 
     suspend fun authenticate(username: String, password: String): UserEntity? {
-        val user = userDao.authenticate(username.trim(), password)
-        if (user != null) {
-            recordAudit("Login", "User", "تسجيل دخول ناجح", user.name)
+        val user = userDao.findActiveByUsername(username.trim()) ?: return null
+        if (!PasswordHasher.verify(password, user.password)) return null
+        // Transparently upgrade any legacy plain-text password to a salted hash on first login.
+        if (!PasswordHasher.isHashed(user.password)) {
+            userDao.insert(user.copy(password = PasswordHasher.hash(password)))
         }
+        recordAudit("Login", "User", "تسجيل دخول ناجح", user.name)
         return user
     }
 
@@ -331,7 +335,7 @@ class CmmsRepository(private val database: AppDatabase) {
             )
 
             assetDao.insertAssets(assets)
-            userDao.insertAll(users)
+            userDao.insertAll(users.map { it.copy(password = PasswordHasher.hash(it.password)) })
             workOrderDao.insertWorkOrders(workOrders)
             pmDao.insertAll(preventiveMaintenance)
             sparePartDao.insertAll(spareParts)
@@ -588,7 +592,7 @@ class CmmsRepository(private val database: AppDatabase) {
                 username = "tech$number",
                 role = "Technician",
                 isActive = true,
-                password = "1234"
+                password = PasswordHasher.hash("1234")
             )
         )
         recordAudit("Create", "User", "إضافة فني جديد tech$number", actor)
@@ -677,7 +681,17 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveUser(user: UserEntity, actor: String = "System") {
         val isNew = user.id == 0L
-        userDao.insert(user)
+        // Resolve the password: keep the existing hash when editing without a new password,
+        // hash any new plain-text password, and never store plain text.
+        val resolved = when {
+            user.password.isBlank() && !isNew ->
+                user.copy(password = userDao.getById(user.id)?.password ?: PasswordHasher.hash("1234"))
+            user.password.isBlank() && isNew ->
+                user.copy(password = PasswordHasher.hash("1234"))
+            PasswordHasher.isHashed(user.password) -> user
+            else -> user.copy(password = PasswordHasher.hash(user.password))
+        }
+        userDao.insert(resolved)
         recordAudit(if (isNew) "Create" else "Update", "User", "${if (isNew) "إضافة" else "تعديل"} مستخدم: ${user.username}", actor)
     }
 

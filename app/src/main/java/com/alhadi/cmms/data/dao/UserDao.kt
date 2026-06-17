@@ -18,8 +18,11 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
     fun observeUserById(id: Long): Flow<UserEntity?>
 
-    @Query("SELECT * FROM users WHERE LOWER(username) = LOWER(:username) AND password = :password AND isActive = 1 LIMIT 1")
-    suspend fun authenticate(username: String, password: String): UserEntity?
+    @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): UserEntity?
+
+    @Query("SELECT * FROM users WHERE LOWER(username) = LOWER(:username) AND isActive = 1 LIMIT 1")
+    suspend fun findActiveByUsername(username: String): UserEntity?
 
     @Query("SELECT COUNT(*) FROM users")
     suspend fun countOnce(): Int

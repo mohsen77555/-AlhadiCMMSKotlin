@@ -18,6 +18,8 @@ import java.util.Locale
 import java.util.TimeZone
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -45,6 +47,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alhadi.cmms.data.MovementType
@@ -1222,14 +1226,28 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var username by remember { mutableStateOf(initial?.username ?: "") }
     var role by remember { mutableStateOf(initial?.role ?: "Technician") }
-    var password by remember { mutableStateOf(initial?.password ?: "1234") }
+    // Never pre-fill the stored (hashed) password. Blank means "keep current" when editing.
+    var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
     var active by remember { mutableStateOf(initial?.isActive ?: true) }
 
     FormSheet(if (initial == null) "إضافة مستخدم" else "تعديل المستخدم", onDismiss) {
         LabeledField("الاسم", name, { name = it })
         LabeledField("اسم المستخدم", username, { username = it })
         OptionDropdown("الدور", listOf("Admin", "Supervisor", "Technician"), role) { role = it }
-        LabeledField("كلمة المرور", password, { password = it })
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text(if (initial == null) "كلمة المرور" else "كلمة مرور جديدة (اتركها فارغة للإبقاء)") },
+            singleLine = true,
+            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { showPassword = !showPassword }) {
+                    Icon(if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = "إظهار/إخفاء")
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("مفعّل", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = active, onCheckedChange = { active = it })
@@ -1242,7 +1260,8 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
                     username = username.trim(),
                     role = role,
                     isActive = active,
-                    password = password.ifBlank { "1234" }
+                    // Blank is resolved by the repository (kept on edit, defaulted on create).
+                    password = password
                 )
             )
         }
