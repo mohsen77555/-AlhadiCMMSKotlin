@@ -27,7 +27,8 @@ data class WorkOrderEntity(
     val laborRate: Double = 0.0,
     val partsCost: Double = 0.0,
     val approvalStatus: String = "NotRequired",
-    val approvedBy: String = ""
+    val approvedBy: String = "",
+    val requiresPermit: Boolean = false
 ) {
     /** Recorded labour cost (hours × rate). */
     fun laborCost(): Double = laborHours * laborRate

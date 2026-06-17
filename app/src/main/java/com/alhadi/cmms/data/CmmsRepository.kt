@@ -23,6 +23,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
 import kotlinx.coroutines.flow.Flow
 
@@ -47,6 +48,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val confirmationDao = database.workOrderConfirmationDao()
     private val photoDao = database.workOrderPhotoDao()
     private val taskListDao = database.taskListDao()
+    private val permitDao = database.workPermitDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -71,6 +73,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val workOrderPhotos: Flow<List<WorkOrderPhotoEntity>> = photoDao.observePhotos()
     val taskLists: Flow<List<TaskListEntity>> = taskListDao.observeTaskLists()
     val taskListOperations: Flow<List<TaskListOperationEntity>> = taskListDao.observeTaskListOperations()
+    val workPermits: Flow<List<WorkPermitEntity>> = permitDao.observePermits()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -112,6 +115,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                permitDao.deleteAll()
                 taskListDao.deleteAllOperations()
                 taskListDao.deleteAllTaskLists()
                 photoDao.deleteAll()
@@ -162,7 +166,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
             val workOrders = listOf(
                 WorkOrderEntity(1, 7, "Check rollermill vibration", "Inspect bearings, belts, and abnormal noise on RM-01.", "High", "Open", "Mechanical Technician", today, DateStrings.daysFromToday(1), 120.0),
-                WorkOrderEntity(2, 4, "Silo fan not starting", "Check overload, contactor, motor insulation, and fan impeller.", "High", "In Progress", "Electrical Technician", DateStrings.daysFromToday(-1), today, 250.0, isFailure = true, downtimeHours = 6.0),
+                WorkOrderEntity(2, 4, "Silo fan not starting", "Check overload, contactor, motor insulation, and fan impeller.", "High", "In Progress", "Electrical Technician", DateStrings.daysFromToday(-1), today, 250.0, isFailure = true, downtimeHours = 6.0, requiresPermit = true),
                 WorkOrderEntity(3, 11, "Packing machine bag sensor alarm", "Clean and align sensor, verify signal in control panel.", "Medium", "Open", "Electrical Technician", today, DateStrings.daysFromToday(2), 1500.0, approvalStatus = "Pending"),
                 WorkOrderEntity(4, 2, "Chain conveyor lubrication", "Lubricate chain and inspect tension.", "Low", "Closed", "Mechanical Technician", DateStrings.daysFromToday(-7), DateStrings.daysFromToday(-5), 30.0, "Completed and tested."),
                 WorkOrderEntity(5, 4, "Silo fan bearing failure", "Replaced damaged fan bearing.", "High", "Closed", "Mechanical Technician", DateStrings.daysFromToday(-45), DateStrings.daysFromToday(-44), 180.0, "Bearing replaced.", isFailure = true, downtimeHours = 8.0, laborHours = 6.0, laborRate = 25.0, partsCost = 90.0),
@@ -287,6 +291,10 @@ class CmmsRepository(private val database: AppDatabase) {
                 TaskListOperationEntity(3, 1, "0030", "فحص شدّ السيور وضبطها", "Mechanical", 0.5)
             )
 
+            val permits = listOf(
+                WorkPermitEntity(1, 2, "LOTO", "طاقة كهربائية مخزّنة، أجزاء دوّارة", "قفازات عازلة، نظارة واقية", "Approved", "Maintenance Supervisor", DateStrings.daysFromToday(2), "Mohsen Alhadi", today)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
@@ -300,6 +308,7 @@ class CmmsRepository(private val database: AppDatabase) {
             confirmationDao.insertAll(confirmations)
             taskListDao.insertTaskLists(taskLists)
             taskListDao.insertOperations(taskListOps)
+            permitDao.insertAll(permits)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -350,6 +359,12 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun updateWorkOrderStatus(id: Long, status: String, actor: String = "System") {
+        // Governance: hazardous work cannot start without an approved, valid permit (SAFE-002).
+        if (status == "In Progress" && workOrderDao.requiresPermit(id) == true &&
+            permitDao.countValid(id, DateStrings.today()) == 0
+        ) {
+            throw IllegalStateException("يتطلّب تصريح عمل ساري المفعول قبل بدء التنفيذ")
+        }
         // Governance: no technical completion before every required operation is confirmed (TC-001).
         if (status == "Technically Completed") {
             if (operationDao.countForOrder(id) == 0) {
@@ -879,6 +894,28 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteWorkOrderPhoto(photo: WorkOrderPhotoEntity, actor: String = "System") {
         photoDao.deleteById(photo.id)
         recordAudit("Delete", "WorkOrder", "حذف صورة دليل لأمر العمل #${photo.orderId}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Work permits (تصاريح العمل / السلامة)
+    // ---------------------------------------------------------------------
+
+    suspend fun savePermit(permit: WorkPermitEntity, actor: String = "System") {
+        val isNew = permit.id == 0L
+        val toSave = if (isNew) permit.copy(createdBy = actor, createdAt = DateStrings.now(), status = "Pending") else permit
+        permitDao.insert(toSave)
+        recordAudit(if (isNew) "Create" else "Update", "Permit", "${if (isNew) "إصدار" else "تعديل"} تصريح (${permit.type}) لأمر العمل #${permit.orderId}", actor)
+    }
+
+    suspend fun setPermitStatus(permit: WorkPermitEntity, approved: Boolean, actor: String = "System") {
+        val status = if (approved) "Approved" else "Rejected"
+        permitDao.insert(permit.copy(status = status, approvedBy = actor))
+        recordAudit("Approval", "Permit", "${if (approved) "اعتماد" else "رفض"} تصريح العمل #${permit.id}", actor)
+    }
+
+    suspend fun deletePermit(permit: WorkPermitEntity, actor: String = "System") {
+        permitDao.deleteById(permit.id)
+        recordAudit("Delete", "Permit", "حذف تصريح عمل #${permit.id}", actor)
     }
 
     // ---------------------------------------------------------------------

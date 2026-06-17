@@ -28,6 +28,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.XlsxReader
 import kotlinx.coroutines.Dispatchers
@@ -152,6 +153,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val taskListOperations: StateFlow<List<TaskListOperationEntity>> = repository.taskListOperations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val workPermits: StateFlow<List<WorkPermitEntity>> = repository.workPermits
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -318,6 +322,11 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun saveTaskListOperation(operation: TaskListOperationEntity) = launchAction("تم حفظ عملية القالب") { repository.saveTaskListOperation(operation, actor()) }
     fun deleteTaskListOperation(operation: TaskListOperationEntity) = launchAction("تم حذف عملية القالب") { repository.deleteTaskListOperation(operation, actor()) }
     fun generateWorkOrderFromPm(pm: PreventiveMaintenanceEntity) = launchAction("تم توليد أمر عمل من الخطة") { repository.generateWorkOrderFromPm(pm, actor()) }
+
+    fun savePermit(permit: WorkPermitEntity) = launchAction("تم حفظ التصريح") { repository.savePermit(permit, actor()) }
+    fun setPermitStatus(permit: WorkPermitEntity, approved: Boolean) =
+        launchAction(if (approved) "تم اعتماد التصريح" else "تم رفض التصريح") { repository.setPermitStatus(permit, approved, actor()) }
+    fun deletePermit(permit: WorkPermitEntity) = launchAction("تم حذف التصريح") { repository.deletePermit(permit, actor()) }
 
     // ----- CAPA -----
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }

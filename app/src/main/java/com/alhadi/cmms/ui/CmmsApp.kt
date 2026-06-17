@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
@@ -141,6 +142,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.ui.theme.AccentBlue
 import com.alhadi.cmms.ui.theme.AccentBrown
 import com.alhadi.cmms.ui.theme.AccentGreen
@@ -208,6 +210,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
     val workOrderConfirmations by viewModel.workOrderConfirmations.collectAsStateWithLifecycle()
     val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
+    val workPermits by viewModel.workPermits.collectAsStateWithLifecycle()
     val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
     val taskListOperations by viewModel.taskListOperations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
@@ -298,6 +301,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         operations = workOrderOperations,
                         confirmations = workOrderConfirmations,
                         photos = workOrderPhotos,
+                        permits = workPermits,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveWorkOrder,
@@ -309,7 +313,10 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onDeleteOperation = viewModel::deleteOperation,
                         onConfirmOperation = viewModel::addConfirmation,
                         onAddPhoto = viewModel::addWorkOrderPhoto,
-                        onDeletePhoto = viewModel::deleteWorkOrderPhoto
+                        onDeletePhoto = viewModel::deleteWorkOrderPhoto,
+                        onSavePermit = viewModel::savePermit,
+                        onSetPermitStatus = viewModel::setPermitStatus,
+                        onDeletePermit = viewModel::deletePermit
                     )
 
                     BottomTab.Supervision -> PreventiveMaintenanceScreen(
@@ -1991,6 +1998,7 @@ private fun WorkOrdersScreen(
     operations: List<WorkOrderOperationEntity>,
     confirmations: List<WorkOrderConfirmationEntity>,
     photos: List<WorkOrderPhotoEntity>,
+    permits: List<WorkPermitEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (WorkOrderEntity) -> Unit,
@@ -2002,7 +2010,10 @@ private fun WorkOrdersScreen(
     onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
     onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
     onAddPhoto: (Long, String) -> Unit,
-    onDeletePhoto: (WorkOrderPhotoEntity) -> Unit
+    onDeletePhoto: (WorkOrderPhotoEntity) -> Unit,
+    onSavePermit: (WorkPermitEntity) -> Unit,
+    onSetPermitStatus: (WorkPermitEntity, Boolean) -> Unit,
+    onDeletePermit: (WorkPermitEntity) -> Unit
 ) {
     val statusFilters = listOf("All", "Open", "In Progress", "Technically Completed", "Closed")
     val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
@@ -2089,6 +2100,7 @@ private fun WorkOrdersScreen(
                     operations = operations.filter { it.orderId == workOrder.id },
                     confirmations = confirmations.filter { it.orderId == workOrder.id },
                     photos = photos.filter { it.orderId == workOrder.id },
+                    permits = permits.filter { it.orderId == workOrder.id },
                     canManage = canManage,
                     onUpdateStatus = onUpdateStatus,
                     onApprove = onApprove,
@@ -2098,6 +2110,9 @@ private fun WorkOrdersScreen(
                     onConfirmOperation = onConfirmOperation,
                     onAddPhoto = onAddPhoto,
                     onDeletePhoto = onDeletePhoto,
+                    onSavePermit = onSavePermit,
+                    onSetPermitStatus = onSetPermitStatus,
+                    onDeletePermit = onDeletePermit,
                     onEdit = { editing = workOrder; showForm = true },
                     onDelete = { deleteTarget = workOrder }
                 )
@@ -2131,6 +2146,7 @@ private fun WorkOrderCard(
     operations: List<WorkOrderOperationEntity>,
     confirmations: List<WorkOrderConfirmationEntity>,
     photos: List<WorkOrderPhotoEntity>,
+    permits: List<WorkPermitEntity>,
     canManage: Boolean,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
@@ -2140,17 +2156,24 @@ private fun WorkOrderCard(
     onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
     onAddPhoto: (Long, String) -> Unit,
     onDeletePhoto: (WorkOrderPhotoEntity) -> Unit,
+    onSavePermit: (WorkPermitEntity) -> Unit,
+    onSetPermitStatus: (WorkPermitEntity, Boolean) -> Unit,
+    onDeletePermit: (WorkPermitEntity) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
+    val today = DateStrings.today()
     val pending = workOrder.approvalStatus == "Pending"
     val rejected = workOrder.approvalStatus == "Rejected"
     val blocked = workOrder.isBlockedByApproval()
     var showOperations by remember { mutableStateOf(false) }
     var showAddOp by remember { mutableStateOf(false) }
+    var showAddPermit by remember { mutableStateOf(false) }
     var confirmTarget by remember { mutableStateOf<WorkOrderOperationEntity?>(null) }
     val confirmedOps = operations.count { it.status == "Confirmed" }
+    val hasValidPermit = permits.any { it.isValidOn(today) }
+    val permitBlocked = workOrder.requiresPermit && !hasValidPermit
     val hasEvidence = photos.isNotEmpty()
     var pendingPhotoPath by remember { mutableStateOf<String?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -2317,6 +2340,62 @@ private fun WorkOrderCard(
                 }
             }
 
+            if (workOrder.status != "Closed" && (workOrder.requiresPermit || permits.isNotEmpty())) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.HealthAndSafety, contentDescription = null, modifier = Modifier.size(18.dp), tint = if (permitBlocked) AccentRed else AccentGreen)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("تصاريح العمل (${permits.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (canManage) {
+                        TextButton(onClick = { showAddPermit = true }) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("إصدار تصريح")
+                        }
+                    }
+                }
+                permits.forEach { permit ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(permitTypeLabel(permit.type), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            val valid = permit.isValidOn(today)
+                            StatusBadge(
+                                when {
+                                    permit.status == "Approved" && valid -> "ساري"
+                                    permit.status == "Approved" -> "منتهٍ"
+                                    permit.status == "Rejected" -> "مرفوض"
+                                    else -> "بانتظار الاعتماد"
+                                },
+                                statusTone(if (permit.status == "Approved" && valid) "running" else if (permit.status == "Rejected") "stopped" else "overdue")
+                            )
+                        }
+                        if (permit.hazards.isNotBlank()) Text("المخاطر: ${permit.hazards}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (permit.ppe.isNotBlank()) Text("الوقاية: ${permit.ppe}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (permit.validUntil.isNotBlank()) Text("صالح حتى: ${permit.validUntil}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (canManage) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                if (permit.status == "Pending") {
+                                    Button(onClick = { onSetPermitStatus(permit, true) }, modifier = Modifier.weight(1f)) { Text("اعتماد", style = MaterialTheme.typography.labelMedium) }
+                                    OutlinedButton(onClick = { onSetPermitStatus(permit, false) }, modifier = Modifier.weight(1f)) { Text("رفض", style = MaterialTheme.typography.labelMedium) }
+                                }
+                                IconButton(onClick = { onDeletePermit(permit) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (permitBlocked) {
+                    Text("هذا العمل خطر — يلزم تصريح عمل ساري قبل البدء.", style = MaterialTheme.typography.bodySmall, color = AccentRed, fontWeight = FontWeight.Bold)
+                }
+            }
+
             if (blocked) {
                 Text(
                     if (pending) "يتطلّب اعتماد المشرف قبل البدء/الإغلاق." else "أمر العمل مرفوض — لا يمكن تنفيذه.",
@@ -2328,7 +2407,7 @@ private fun WorkOrderCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     when (workOrder.status) {
                         "Open" -> {
-                            Button(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
+                            Button(onClick = { onUpdateStatus(workOrder, "In Progress") }, enabled = !permitBlocked, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
                         }
                         "In Progress" -> {
                             Button(onClick = { onUpdateStatus(workOrder, "Technically Completed") }, enabled = allConfirmed, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
@@ -2365,6 +2444,24 @@ private fun WorkOrderCard(
             onSave = { onConfirmOperation(it, op); confirmTarget = null }
         )
     }
+    if (showAddPermit) {
+        PermitFormSheet(
+            orderId = workOrder.id,
+            onDismiss = { showAddPermit = false },
+            onSave = { onSavePermit(it); showAddPermit = false }
+        )
+    }
+}
+
+/** Arabic label for a permit type. */
+private fun permitTypeLabel(type: String): String = when (type) {
+    "Hot Work" -> "أعمال ساخنة"
+    "Confined Space" -> "أماكن مغلقة"
+    "Electrical" -> "أعمال كهربائية"
+    "Working at Height" -> "العمل على ارتفاع"
+    "LOTO" -> "عزل الطاقة (LOTO)"
+    "General" -> "تصريح عام"
+    else -> type
 }
 
 // ---------------------------------------------------------------------------

@@ -24,6 +24,7 @@ import com.alhadi.cmms.data.dao.WorkOrderConfirmationDao
 import com.alhadi.cmms.data.dao.WorkOrderDao
 import com.alhadi.cmms.data.dao.WorkOrderOperationDao
 import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
+import com.alhadi.cmms.data.dao.WorkPermitDao
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -46,6 +47,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 
 @Database(
     entities = [
@@ -70,9 +72,10 @@ import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
         WorkOrderConfirmationEntity::class,
         WorkOrderPhotoEntity::class,
         TaskListEntity::class,
-        TaskListOperationEntity::class
+        TaskListOperationEntity::class,
+        WorkPermitEntity::class
     ],
-    version = 21,
+    version = 22,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -96,6 +99,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workOrderConfirmationDao(): WorkOrderConfirmationDao
     abstract fun workOrderPhotoDao(): WorkOrderPhotoDao
     abstract fun taskListDao(): TaskListDao
+    abstract fun workPermitDao(): WorkPermitDao
 
     companion object {
         @Volatile
