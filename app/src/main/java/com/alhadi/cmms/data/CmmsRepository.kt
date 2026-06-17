@@ -334,7 +334,7 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun updateWorkOrderStatus(id: Long, status: String, actor: String = "System") {
         // Governance: a work order cannot be closed without photo evidence of the work.
         if (status == "Closed" && photoDao.countForOrder(id) == 0) {
-            throw IllegalStateException("أرفق صورة دليل تنفيذ قبل إغلاق أمر العمل")
+            throw IllegalStateException("التقط صورة دليل تنفيذ بالكاميرا قبل إغلاق أمر العمل")
         }
         workOrderDao.updateStatus(id, status)
         recordAudit("Update", "WorkOrder", "تحديث حالة أمر العمل #$id إلى $status", actor)

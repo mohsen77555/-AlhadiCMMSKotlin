@@ -1,29 +1,28 @@
 package com.alhadi.cmms.util
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
+import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.content.FileProvider
 import java.io.File
 
 /**
  * Stores work-order evidence photos inside the app's private files directory so they remain
- * available offline and survive content-URI permission expiry.
+ * available offline. Photos are captured directly from the device camera.
  */
 object ImageStore {
 
-    /** Copies the picked image [uri] into internal storage and returns the absolute path, or null. */
-    fun copyToInternal(context: Context, uri: Uri, orderId: Long): String? = try {
+    /** Creates the destination file (inside wo_photos/) the camera will write the capture to. */
+    fun createCaptureFile(context: Context, orderId: Long): File {
         val dir = File(context.filesDir, "wo_photos").apply { mkdirs() }
-        val file = File(dir, "wo_${orderId}_${System.currentTimeMillis()}.jpg")
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            file.outputStream().use { output -> input.copyTo(output) }
-        }
-        if (file.exists() && file.length() > 0) file.absolutePath else null
-    } catch (e: Exception) {
-        null
+        return File(dir, "wo_${orderId}_${System.currentTimeMillis()}.jpg")
     }
+
+    /** FileProvider content URI for [file], grantable to the camera app. */
+    fun uriFor(context: Context, file: File): Uri =
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 
     /** Decodes a stored photo (down-sampled for thumbnails) into an [ImageBitmap], or null. */
     fun decode(path: String, sampleSize: Int = 4): ImageBitmap? = try {

@@ -2045,10 +2045,11 @@ private fun WorkOrderCard(
     var confirmTarget by remember { mutableStateOf<WorkOrderOperationEntity?>(null) }
     val confirmedOps = operations.count { it.status == "Confirmed" }
     val hasEvidence = photos.isNotEmpty()
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            ImageStore.copyToInternal(context, uri, workOrder.id)?.let { path -> onAddPhoto(workOrder.id, path) }
-        }
+    var pendingPhotoPath by remember { mutableStateOf<String?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val path = pendingPhotoPath
+        if (success && path != null) onAddPhoto(workOrder.id, path) else if (path != null) ImageStore.delete(path)
+        pendingPhotoPath = null
     }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -2164,10 +2165,14 @@ private fun WorkOrderCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("أدلة التنفيذ (${photos.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     if (canManage) {
-                        TextButton(onClick = { photoPicker.launch("image/*") }) {
-                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        TextButton(onClick = {
+                            val file = ImageStore.createCaptureFile(context, workOrder.id)
+                            pendingPhotoPath = file.absolutePath
+                            cameraLauncher.launch(ImageStore.uriFor(context, file))
+                        }) {
+                            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(2.dp))
-                            Text("إضافة صورة")
+                            Text("التقاط صورة")
                         }
                     }
                 }
@@ -2201,7 +2206,7 @@ private fun WorkOrderCard(
                         }
                     }
                 } else {
-                    Text("لا توجد صور بعد — أرفق صورة دليل قبل الإغلاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("لا توجد صور بعد — التقط صورة دليل بالكاميرا قبل الإغلاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -2221,7 +2226,7 @@ private fun WorkOrderCard(
                     }
                 }
                 if (workOrder.status != "Closed" && !hasEvidence) {
-                    Text("الإغلاق يتطلّب إرفاق صورة دليل تنفيذ واحدة على الأقل.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
+                    Text("الإغلاق يتطلّب التقاط صورة دليل تنفيذ بالكاميرا.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
                 }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
