@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
@@ -589,6 +590,41 @@ internal fun ReadingDialog(point: MeasuringPointEntity, onSubmit: (Double, Strin
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
     )
+}
+
+// ---------------------------------------------------------------------------
+// Asset document form
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun DocumentFormSheet(
+    initial: AssetDocumentEntity?,
+    assetId: Long,
+    onDismiss: () -> Unit,
+    onSave: (AssetDocumentEntity) -> Unit
+) {
+    var type by remember { mutableStateOf(initial?.type ?: "Manual") }
+    var title by remember { mutableStateOf(initial?.title ?: "") }
+    var reference by remember { mutableStateOf(initial?.reference ?: "") }
+
+    FormSheet(if (initial == null) "إضافة مستند" else "تعديل المستند", onDismiss) {
+        OptionDropdown("النوع", listOf("Manual", "Drawing", "Certificate", "Image", "Report", "Other"), type) { type = it }
+        LabeledField("العنوان", title, { title = it })
+        LabeledField("المرجع (رابط/مسار/ملاحظة)", reference, { reference = it }, singleLine = false)
+        SaveButton(title.isNotBlank()) {
+            onSave(
+                AssetDocumentEntity(
+                    id = initial?.id ?: 0,
+                    assetId = assetId,
+                    type = type,
+                    title = title.trim(),
+                    reference = reference.trim(),
+                    uploadedBy = initial?.uploadedBy ?: "",
+                    uploadedAt = initial?.uploadedAt ?: ""
+                )
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

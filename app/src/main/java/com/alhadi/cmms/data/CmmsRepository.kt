@@ -1,6 +1,7 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
@@ -26,6 +27,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val measurementDao = database.measurementDao()
     private val locationDao = database.functionalLocationDao()
     private val capaDao = database.capaDao()
+    private val documentDao = database.assetDocumentDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -39,6 +41,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val readings: Flow<List<MeasurementReadingEntity>> = measurementDao.observeReadings()
     val functionalLocations: Flow<List<FunctionalLocationEntity>> = locationDao.observeLocations()
     val capaActions: Flow<List<CapaEntity>> = capaDao.observeCapa()
+    val assetDocuments: Flow<List<AssetDocumentEntity>> = documentDao.observeDocuments()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -80,6 +83,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                documentDao.deleteAll()
                 capaDao.deleteAll()
                 locationDao.deleteAll()
                 measurementDao.deleteAllReadings()
@@ -180,9 +184,16 @@ class CmmsRepository(private val database: AppDatabase) {
             pmDao.insertAll(preventiveMaintenance)
             sparePartDao.insertAll(spareParts)
             transactionDao.insertAll(transactions)
+            val documents = listOf(
+                AssetDocumentEntity(1, 7, "Manual", "دليل تشغيل Rollermill", "https://example.com/rm01-manual.pdf", "Mohsen Alhadi", today),
+                AssetDocumentEntity(2, 7, "Drawing", "مخطط كهربائي RM-01", "internal://drawings/rm01.dwg", "Maintenance Supervisor", today),
+                AssetDocumentEntity(3, 10, "Certificate", "شهادة فحص الضاغط", "https://example.com/cp01-cert.pdf", "Mohsen Alhadi", today)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
+            documentDao.insertAll(documents)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -474,5 +485,21 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteCapa(item: CapaEntity, actor: String = "System") {
         capaDao.deleteById(item.id)
         recordAudit("Delete", "CAPA", "حذف إجراء: ${item.title}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Asset documents
+    // ---------------------------------------------------------------------
+
+    suspend fun saveAssetDocument(doc: AssetDocumentEntity, actor: String = "System") {
+        val isNew = doc.id == 0L
+        val toSave = if (isNew) doc.copy(uploadedBy = actor, uploadedAt = DateStrings.now()) else doc
+        documentDao.insert(toSave)
+        recordAudit(if (isNew) "Create" else "Update", "Document", "${if (isNew) "إضافة" else "تعديل"} مستند: ${doc.title}", actor)
+    }
+
+    suspend fun deleteAssetDocument(doc: AssetDocumentEntity, actor: String = "System") {
+        documentDao.deleteById(doc.id)
+        recordAudit("Delete", "Document", "حذف مستند: ${doc.title}", actor)
     }
 }

@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.FactCheck
@@ -100,6 +101,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
@@ -167,6 +169,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
+    val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -268,13 +271,16 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         workOrders = workOrders,
                         pmItems = preventiveMaintenance,
                         locations = locations,
+                        documents = assetDocuments,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveAsset,
                         onDelete = viewModel::deleteAsset,
                         onChangeStatus = viewModel::changeAssetStatus,
                         onSaveWorkOrder = viewModel::saveWorkOrder,
-                        onUpdateWorkOrderStatus = viewModel::updateWorkOrderStatus
+                        onUpdateWorkOrderStatus = viewModel::updateWorkOrderStatus,
+                        onSaveDocument = viewModel::saveAssetDocument,
+                        onDeleteDocument = viewModel::deleteAssetDocument
                     )
 
                     BottomTab.More -> when (moreRoute) {
@@ -909,13 +915,16 @@ private fun AssetsScreen(
     workOrders: List<WorkOrderEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
     locations: List<FunctionalLocationEntity>,
+    documents: List<AssetDocumentEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (AssetEntity) -> Unit,
     onDelete: (AssetEntity) -> Unit,
     onChangeStatus: (AssetEntity, String) -> Unit,
     onSaveWorkOrder: (WorkOrderEntity) -> Unit,
-    onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit
+    onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit,
+    onSaveDocument: (AssetDocumentEntity) -> Unit,
+    onDeleteDocument: (AssetDocumentEntity) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showForm by remember { mutableStateOf(false) }
@@ -933,6 +942,7 @@ private fun AssetsScreen(
             allAssets = assets,
             workOrders = workOrders.filter { it.assetId == detailAsset.id },
             pmItems = pmItems.filter { it.assetId == detailAsset.id },
+            documents = documents.filter { it.assetId == detailAsset.id },
             locations = locations,
             canManage = canManage,
             defaultAssignee = defaultAssignee,
@@ -941,7 +951,9 @@ private fun AssetsScreen(
             onSaveAsset = onSave,
             onChangeStatus = onChangeStatus,
             onSaveWorkOrder = onSaveWorkOrder,
-            onUpdateWorkOrderStatus = onUpdateWorkOrderStatus
+            onUpdateWorkOrderStatus = onUpdateWorkOrderStatus,
+            onSaveDocument = onSaveDocument,
+            onDeleteDocument = onDeleteDocument
         )
         return
     }
@@ -1039,6 +1051,7 @@ private fun AssetDetailScreen(
     allAssets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
+    documents: List<AssetDocumentEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
@@ -1047,8 +1060,13 @@ private fun AssetDetailScreen(
     onSaveAsset: (AssetEntity) -> Unit,
     onChangeStatus: (AssetEntity, String) -> Unit,
     onSaveWorkOrder: (WorkOrderEntity) -> Unit,
-    onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit
+    onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit,
+    onSaveDocument: (AssetDocumentEntity) -> Unit,
+    onDeleteDocument: (AssetDocumentEntity) -> Unit
 ) {
+    var showDocForm by remember { mutableStateOf(false) }
+    var editingDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
+    var deleteDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
     val locationLabel = asset.locationId?.let { id -> locations.firstOrNull { it.id == id }?.let { "${it.code} • ${it.name}" } } ?: "غير محدد"
     val today = DateStrings.today()
     val underWarranty = asset.isUnderWarranty(today)
@@ -1218,6 +1236,61 @@ private fun AssetDetailScreen(
                 }
             }
         }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("المستندات (${documents.size})")
+                Spacer(modifier = Modifier.weight(1f))
+                if (canManage) {
+                    OutlinedButton(onClick = { editingDoc = null; showDocForm = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة")
+                    }
+                }
+            }
+        }
+        if (documents.isEmpty()) {
+            item { EmptyState("لا توجد مستندات لهذا الأصل", Icons.Filled.Description) }
+        }
+        items(documents, key = { "doc-${it.id}" }) { doc ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconBubble(Icons.Filled.Description, AccentBlue, AccentBlue.copy(alpha = 0.14f), 36)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(doc.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LtrText(doc.reference, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusBadge(doc.type, statusTone("info"))
+                    }
+                    Text("${doc.uploadedBy} • ${doc.uploadedAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (canManage) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(onClick = { editingDoc = doc; showDocForm = true }, modifier = Modifier.weight(1f)) { Text("تعديل") }
+                            TextButton(onClick = { deleteDoc = doc }, modifier = Modifier.weight(1f)) { Text("حذف", color = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDocForm) {
+        DocumentFormSheet(
+            initial = editingDoc,
+            assetId = asset.id,
+            onDismiss = { showDocForm = false },
+            onSave = { onSaveDocument(it); showDocForm = false }
+        )
+    }
+    deleteDoc?.let { target ->
+        ConfirmDialog(
+            title = "حذف المستند",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDeleteDocument(target); deleteDoc = null },
+            onDismiss = { deleteDoc = null }
+        )
     }
 
     if (showEdit) {

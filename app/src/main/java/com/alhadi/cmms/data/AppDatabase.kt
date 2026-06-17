@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.alhadi.cmms.data.dao.AssetDao
+import com.alhadi.cmms.data.dao.AssetDocumentDao
 import com.alhadi.cmms.data.dao.AuditLogDao
 import com.alhadi.cmms.data.dao.CapaDao
 import com.alhadi.cmms.data.dao.FunctionalLocationDao
@@ -14,6 +15,7 @@ import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
 import com.alhadi.cmms.data.dao.SparePartDao
 import com.alhadi.cmms.data.dao.UserDao
 import com.alhadi.cmms.data.dao.WorkOrderDao
+import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
@@ -38,9 +40,10 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
         MeasuringPointEntity::class,
         MeasurementReadingEntity::class,
         FunctionalLocationEntity::class,
-        CapaEntity::class
+        CapaEntity::class,
+        AssetDocumentEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -54,6 +57,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun measurementDao(): MeasurementDao
     abstract fun functionalLocationDao(): FunctionalLocationDao
     abstract fun capaDao(): CapaDao
+    abstract fun assetDocumentDao(): AssetDocumentDao
 
     companion object {
         @Volatile
