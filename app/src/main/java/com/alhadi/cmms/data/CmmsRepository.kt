@@ -404,3 +404,4 @@ class CmmsRepository(private val database: AppDatabase) {
         val limit = point.upperLimit
         return if (limit != null && value > limit) "تنبيه: تجاوزت القراءة الحد الأعلى ($limit ${point.unit})" else null
     }
+}
