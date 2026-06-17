@@ -277,6 +277,11 @@ class CmmsRepository(private val database: AppDatabase) {
         recordAudit("Delete", "Asset", "حذف أصل: ${asset.code}", actor)
     }
 
+    suspend fun changeAssetStatus(asset: AssetEntity, status: String, actor: String = "System") {
+        assetDao.insertAsset(asset.copy(status = status))
+        recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status", actor)
+    }
+
     // ---------------------------------------------------------------------
     // CRUD — Spare parts
     // ---------------------------------------------------------------------

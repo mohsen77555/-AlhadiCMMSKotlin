@@ -253,9 +253,15 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                     BottomTab.Assets -> AssetsScreen(
                         innerPadding = innerPadding,
                         assets = assets,
+                        workOrders = workOrders,
+                        pmItems = preventiveMaintenance,
                         canManage = canManage,
+                        defaultAssignee = actorName,
                         onSave = viewModel::saveAsset,
-                        onDelete = viewModel::deleteAsset
+                        onDelete = viewModel::deleteAsset,
+                        onChangeStatus = viewModel::changeAssetStatus,
+                        onSaveWorkOrder = viewModel::saveWorkOrder,
+                        onUpdateWorkOrderStatus = viewModel::updateWorkOrderStatus
                     )
 
                     BottomTab.More -> when (moreRoute) {
@@ -835,14 +841,42 @@ private fun ModuleCard(
 private fun AssetsScreen(
     innerPadding: PaddingValues,
     assets: List<AssetEntity>,
+    workOrders: List<WorkOrderEntity>,
+    pmItems: List<PreventiveMaintenanceEntity>,
     canManage: Boolean,
+    defaultAssignee: String,
     onSave: (AssetEntity) -> Unit,
-    onDelete: (AssetEntity) -> Unit
+    onDelete: (AssetEntity) -> Unit,
+    onChangeStatus: (AssetEntity, String) -> Unit,
+    onSaveWorkOrder: (WorkOrderEntity) -> Unit,
+    onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AssetEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<AssetEntity?>(null) }
+    var detailId by remember { mutableStateOf<Long?>(null) }
+
+    // Detail view (re-resolved from the live list so edits/status changes reflect).
+    val detailAsset = detailId?.let { id -> assets.firstOrNull { it.id == id } }
+    if (detailAsset != null) {
+        BackHandler { detailId = null }
+        AssetDetailScreen(
+            innerPadding = innerPadding,
+            asset = detailAsset,
+            workOrders = workOrders.filter { it.assetId == detailAsset.id },
+            pmItems = pmItems.filter { it.assetId == detailAsset.id },
+            canManage = canManage,
+            defaultAssignee = defaultAssignee,
+            onBack = { detailId = null },
+            onSaveAsset = onSave,
+            onChangeStatus = onChangeStatus,
+            onSaveWorkOrder = onSaveWorkOrder,
+            onUpdateWorkOrderStatus = onUpdateWorkOrderStatus
+        )
+        return
+    }
+
     val filtered = remember(query, assets) {
         if (query.isBlank()) assets else assets.filter { asset ->
             val q = query.lowercase(Locale.getDefault())
@@ -875,6 +909,7 @@ private fun AssetsScreen(
                     AssetCard(
                         asset = asset,
                         canManage = canManage,
+                        onOpen = { detailId = asset.id },
                         onEdit = { editing = asset; showForm = true },
                         onDelete = { deleteTarget = asset }
                     )
@@ -900,11 +935,14 @@ private fun AssetsScreen(
 private fun AssetCard(
     asset: AssetEntity,
     canManage: Boolean,
+    onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -914,15 +952,161 @@ private fun AssetCard(
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 StatusBadge(asset.status, statusTone(asset.status))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             InfoRow("المجموعة", asset.groupName)
             InfoRow("الموقع", asset.location)
-            InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
             InfoRow("الأهمية", asset.criticality)
-            InfoRow("آخر فحص", asset.lastInspectionAt)
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
+    }
+}
+
+@Composable
+private fun AssetDetailScreen(
+    innerPadding: PaddingValues,
+    asset: AssetEntity,
+    workOrders: List<WorkOrderEntity>,
+    pmItems: List<PreventiveMaintenanceEntity>,
+    canManage: Boolean,
+    defaultAssignee: String,
+    onBack: () -> Unit,
+    onSaveAsset: (AssetEntity) -> Unit,
+    onChangeStatus: (AssetEntity, String) -> Unit,
+    onSaveWorkOrder: (WorkOrderEntity) -> Unit,
+    onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit
+) {
+    var showEdit by remember { mutableStateOf(false) }
+    var showStatus by remember { mutableStateOf(false) }
+    var showWoForm by remember { mutableStateOf(false) }
+    val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
+    val retired = asset.status.equals("Retired", ignoreCase = true)
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع") }
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(asset.code, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(asset.status, statusTone(asset.status))
+            }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SectionHeader("المعلومات")
+                    InfoRow("المجموعة", asset.groupName)
+                    InfoRow("الموقع", asset.location)
+                    InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                    InfoRow("الأهمية", asset.criticality)
+                    InfoRow("تاريخ التركيب", asset.installedAt)
+                    InfoRow("آخر فحص", asset.lastInspectionAt)
+                }
+            }
+        }
+
+        if (canManage) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { showEdit = true }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("تعديل")
+                    }
+                    OutlinedButton(onClick = { showStatus = true }, modifier = Modifier.weight(1f)) {
+                        Text("تغيير الحالة")
+                    }
+                }
+            }
+            item {
+                if (retired) {
+                    Text(
+                        "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    AddButton("أمر عمل لهذا الأصل") { showWoForm = true }
+                }
+            }
+        }
+
+        item { SectionHeader("أوامر العمل المرتبطة (${workOrders.size})") }
+        if (workOrders.isEmpty()) {
+            item { EmptyState("لا توجد أوامر عمل لهذا الأصل") }
+        }
+        items(workOrders, key = { "wo-${it.id}" }) { wo ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(wo.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        StatusBadge(wo.status, statusTone(wo.status))
+                    }
+                    Text("الاستحقاق: ${wo.dueAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (canManage && wo.status != "Closed") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            if (wo.status == "Open") {
+                                OutlinedButton(onClick = { onUpdateWorkOrderStatus(wo, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
+                            }
+                            Button(onClick = { onUpdateWorkOrderStatus(wo, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
+                        }
+                    }
+                }
+            }
+        }
+
+        item { SectionHeader("الصيانة الدورية المرتبطة (${pmItems.size})") }
+        if (pmItems.isEmpty()) {
+            item { EmptyState("لا توجد مهام صيانة لهذا الأصل") }
+        }
+        items(pmItems, key = { "pm-${it.id}" }) { pm ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(pm.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        StatusBadge(if (DateStrings.isDueOrOverdue(pm.nextDueAt)) "مستحقة" else "مجدولة", statusTone(if (DateStrings.isDueOrOverdue(pm.nextDueAt)) "overdue" else "scheduled"))
+                    }
+                    Text("التنفيذ القادم: ${pm.nextDueAt} • كل ${pm.frequencyDays} يوم", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+
+    if (showEdit) {
+        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false })
+    }
+    if (showStatus) {
+        StatusPickerDialog(
+            current = asset.status,
+            options = lifecycle,
+            onPick = { onChangeStatus(asset, it); showStatus = false },
+            onDismiss = { showStatus = false }
+        )
+    }
+    if (showWoForm) {
+        WorkOrderFormSheet(
+            initial = null,
+            assets = listOf(asset),
+            defaultAssignee = defaultAssignee,
+            onDismiss = { showWoForm = false },
+            onSave = { onSaveWorkOrder(it); showWoForm = false }
+        )
     }
 }
 

@@ -66,6 +66,35 @@ internal fun ConfirmDialog(
     )
 }
 
+/** Lets the user pick a new lifecycle status for an asset. */
+@Composable
+internal fun StatusPickerDialog(
+    current: String,
+    options: List<String>,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تغيير حالة الأصل", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                options.forEach { opt ->
+                    TextButton(onClick = { onPick(opt) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            (if (opt == current) "• " else "") + opt,
+                            modifier = Modifier.fillMaxWidth(),
+                            fontWeight = if (opt == current) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } }
+    )
+}
+
 @Composable
 private fun LabeledField(
     label: String,

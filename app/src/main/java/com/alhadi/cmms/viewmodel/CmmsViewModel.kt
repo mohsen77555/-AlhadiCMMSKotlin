@@ -171,6 +171,7 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     // ----- CRUD: Assets -----
     fun saveAsset(asset: AssetEntity) = launchAction("تم حفظ الأصل") { repository.saveAsset(asset, actor()) }
     fun deleteAsset(asset: AssetEntity) = launchAction("تم حذف الأصل") { repository.deleteAsset(asset, actor()) }
+    fun changeAssetStatus(asset: AssetEntity, status: String) = launchAction("تم تغيير حالة الأصل") { repository.changeAssetStatus(asset, status, actor()) }
 
     // ----- CRUD: Spare parts -----
     fun savePart(part: SparePartEntity) = launchAction("تم حفظ القطعة") { repository.savePart(part, actor()) }
