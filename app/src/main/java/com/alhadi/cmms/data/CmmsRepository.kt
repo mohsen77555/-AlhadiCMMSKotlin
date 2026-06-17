@@ -140,7 +140,7 @@ class CmmsRepository(private val database: AppDatabase) {
             val workOrders = listOf(
                 WorkOrderEntity(1, 7, "Check rollermill vibration", "Inspect bearings, belts, and abnormal noise on RM-01.", "High", "Open", "Mechanical Technician", today, DateStrings.daysFromToday(1), 120.0),
                 WorkOrderEntity(2, 4, "Silo fan not starting", "Check overload, contactor, motor insulation, and fan impeller.", "High", "In Progress", "Electrical Technician", DateStrings.daysFromToday(-1), today, 250.0, isFailure = true, downtimeHours = 6.0),
-                WorkOrderEntity(3, 11, "Packing machine bag sensor alarm", "Clean and align sensor, verify signal in control panel.", "Medium", "Open", "Electrical Technician", today, DateStrings.daysFromToday(2), 45.0),
+                WorkOrderEntity(3, 11, "Packing machine bag sensor alarm", "Clean and align sensor, verify signal in control panel.", "Medium", "Open", "Electrical Technician", today, DateStrings.daysFromToday(2), 1500.0, approvalStatus = "Pending"),
                 WorkOrderEntity(4, 2, "Chain conveyor lubrication", "Lubricate chain and inspect tension.", "Low", "Closed", "Mechanical Technician", DateStrings.daysFromToday(-7), DateStrings.daysFromToday(-5), 30.0, "Completed and tested."),
                 WorkOrderEntity(5, 4, "Silo fan bearing failure", "Replaced damaged fan bearing.", "High", "Closed", "Mechanical Technician", DateStrings.daysFromToday(-45), DateStrings.daysFromToday(-44), 180.0, "Bearing replaced.", isFailure = true, downtimeHours = 8.0, laborHours = 6.0, laborRate = 25.0, partsCost = 90.0),
                 WorkOrderEntity(6, 4, "Silo fan motor overheat", "Cleaned and re-greased motor, fixed ventilation.", "High", "Closed", "Electrical Technician", DateStrings.daysFromToday(-90), DateStrings.daysFromToday(-89), 120.0, "Motor serviced.", isFailure = true, downtimeHours = 5.0),
@@ -274,7 +274,8 @@ class CmmsRepository(private val database: AppDatabase) {
                 assignedTo = assignedTo,
                 createdAt = now,
                 dueAt = dueAt,
-                estimatedCost = estimatedCost
+                estimatedCost = estimatedCost,
+                approvalStatus = if (priority == "Critical" || estimatedCost >= WorkOrderEntity.APPROVAL_THRESHOLD) "Pending" else "NotRequired"
             )
         )
         recordAudit("Create", "WorkOrder", "إنشاء أمر عمل: $title", actor)
@@ -413,8 +414,20 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
         val isNew = workOrder.id == 0L
-        workOrderDao.insertWorkOrder(workOrder)
+        // Keep an existing decision; otherwise (re)derive whether sign-off is needed.
+        val toSave = if (workOrder.approvalStatus == "Approved" || workOrder.approvalStatus == "Rejected") {
+            workOrder
+        } else {
+            workOrder.copy(approvalStatus = if (workOrder.needsApproval()) "Pending" else "NotRequired")
+        }
+        workOrderDao.insertWorkOrder(toSave)
         recordAudit(if (isNew) "Create" else "Update", "WorkOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر عمل: ${workOrder.title}", actor)
+    }
+
+    suspend fun setWorkOrderApproval(workOrder: WorkOrderEntity, approved: Boolean, actor: String = "System") {
+        val status = if (approved) "Approved" else "Rejected"
+        workOrderDao.insertWorkOrder(workOrder.copy(approvalStatus = status, approvedBy = actor))
+        recordAudit("Approval", "WorkOrder", "${if (approved) "اعتماد" else "رفض"} أمر العمل: ${workOrder.title}", actor)
     }
 
     suspend fun deleteWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {

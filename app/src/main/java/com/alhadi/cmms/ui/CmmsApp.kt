@@ -266,7 +266,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         defaultAssignee = actorName,
                         onSave = viewModel::saveWorkOrder,
                         onDelete = viewModel::deleteWorkOrder,
-                        onUpdateStatus = viewModel::updateWorkOrderStatus
+                        onUpdateStatus = viewModel::updateWorkOrderStatus,
+                        onApprove = viewModel::setWorkOrderApproval
                     )
 
                     BottomTab.Supervision -> PreventiveMaintenanceScreen(
@@ -1418,7 +1419,10 @@ private fun AssetDetailScreen(
                         StatusBadge(wo.status, statusTone(wo.status))
                     }
                     Text("الاستحقاق: ${wo.dueAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (canManage && wo.status != "Closed") {
+                    if (wo.approvalStatus == "Pending") {
+                        StatusBadge("بانتظار الاعتماد", statusTone("overdue"))
+                    }
+                    if (canManage && wo.status != "Closed" && !wo.isBlockedByApproval()) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             if (wo.status == "Open") {
                                 OutlinedButton(onClick = { onUpdateWorkOrderStatus(wo, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
@@ -1609,7 +1613,8 @@ private fun WorkOrdersScreen(
     defaultAssignee: String,
     onSave: (WorkOrderEntity) -> Unit,
     onDelete: (WorkOrderEntity) -> Unit,
-    onUpdateStatus: (WorkOrderEntity, String) -> Unit
+    onUpdateStatus: (WorkOrderEntity, String) -> Unit,
+    onApprove: (WorkOrderEntity, Boolean) -> Unit
 ) {
     val statusFilters = listOf("All", "Open", "In Progress", "Closed")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
@@ -1657,6 +1662,7 @@ private fun WorkOrdersScreen(
                     asset = assetMap[workOrder.assetId],
                     canManage = canManage,
                     onUpdateStatus = onUpdateStatus,
+                    onApprove = onApprove,
                     onEdit = { editing = workOrder; showForm = true },
                     onDelete = { deleteTarget = workOrder }
                 )
@@ -1689,9 +1695,13 @@ private fun WorkOrderCard(
     asset: AssetEntity?,
     canManage: Boolean,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
+    onApprove: (WorkOrderEntity, Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val pending = workOrder.approvalStatus == "Pending"
+    val rejected = workOrder.approvalStatus == "Rejected"
+    val blocked = workOrder.isBlockedByApproval()
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -1709,16 +1719,39 @@ private fun WorkOrderCard(
                 StatusBadge(workOrder.priority, priorityTone(workOrder.priority))
                 AssistChip(onClick = {}, label = { Text(workOrder.assignedTo, maxLines = 1) })
             }
+            when (workOrder.approvalStatus) {
+                "Pending" -> StatusBadge("بانتظار الاعتماد", statusTone("overdue"))
+                "Approved" -> StatusBadge("معتمد${if (workOrder.approvedBy.isNotBlank()) " • ${workOrder.approvedBy}" else ""}", statusTone("running"))
+                "Rejected" -> StatusBadge("مرفوض", statusTone("stopped"))
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             InfoRow("تاريخ الإنشاء", workOrder.createdAt)
             InfoRow("تاريخ الاستحقاق", workOrder.dueAt)
             InfoRow("التكلفة التقديرية", "%.2f".format(workOrder.estimatedCost))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                if (workOrder.status == "Open") {
-                    OutlinedButton(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
+            if (canManage && (pending || rejected)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (pending) {
+                        Button(onClick = { onApprove(workOrder, true) }, modifier = Modifier.weight(1f)) { Text("اعتماد") }
+                        OutlinedButton(onClick = { onApprove(workOrder, false) }, modifier = Modifier.weight(1f)) { Text("رفض") }
+                    } else {
+                        Button(onClick = { onApprove(workOrder, true) }, modifier = Modifier.fillMaxWidth()) { Text("إعادة الاعتماد") }
+                    }
                 }
-                if (workOrder.status != "Closed") {
-                    Button(onClick = { onUpdateStatus(workOrder, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
+            }
+            if (blocked) {
+                Text(
+                    if (pending) "يتطلّب اعتماد المشرف قبل البدء/الإغلاق." else "أمر العمل مرفوض — لا يمكن تنفيذه.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (workOrder.status == "Open") {
+                        OutlinedButton(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
+                    }
+                    if (workOrder.status != "Closed") {
+                        Button(onClick = { onUpdateStatus(workOrder, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
+                    }
                 }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)

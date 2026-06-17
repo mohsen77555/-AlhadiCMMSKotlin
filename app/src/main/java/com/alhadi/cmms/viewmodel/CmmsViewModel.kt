@@ -218,6 +218,8 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
 
     // ----- CRUD: Work orders -----
     fun saveWorkOrder(workOrder: WorkOrderEntity) = launchAction("تم حفظ أمر العمل") { repository.saveWorkOrder(workOrder, actor()) }
+    fun setWorkOrderApproval(workOrder: WorkOrderEntity, approved: Boolean) =
+        launchAction(if (approved) "تم اعتماد أمر العمل" else "تم رفض أمر العمل") { repository.setWorkOrderApproval(workOrder, approved, actor()) }
     fun deleteWorkOrder(workOrder: WorkOrderEntity) = launchAction("تم حذف أمر العمل") { repository.deleteWorkOrder(workOrder, actor()) }
 
     // ----- CRUD: Preventive maintenance -----

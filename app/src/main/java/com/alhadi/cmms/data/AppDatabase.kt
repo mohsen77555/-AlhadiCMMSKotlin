@@ -55,7 +55,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
         AssetMovementEntity::class,
         PmChecklistItemEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
