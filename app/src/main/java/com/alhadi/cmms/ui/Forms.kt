@@ -245,6 +245,9 @@ internal fun AssetFormSheet(
     var status by remember { mutableStateOf(initial?.status ?: "Running") }
     var criticality by remember { mutableStateOf(initial?.criticality ?: "Medium") }
     var locationId by remember { mutableStateOf(initial?.locationId) }
+    var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
+    var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
+    var warrantyEnd by remember { mutableStateOf(initial?.warrantyEnd ?: "") }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         LabeledField("الكود (Code)", code, { code = it })
@@ -258,6 +261,10 @@ internal fun AssetFormSheet(
         LabeledField("الموديل (Model)", model, { model = it })
         OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
+        Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
+        LabeledField("بداية الضمان (YYYY-MM-DD)", warrantyStart, { warrantyStart = it })
+        LabeledField("نهاية الضمان (YYYY-MM-DD)", warrantyEnd, { warrantyEnd = it })
         SaveButton(code.isNotBlank() && name.isNotBlank()) {
             val today = DateStrings.today()
             onSave(
@@ -273,7 +280,10 @@ internal fun AssetFormSheet(
                     criticality = criticality,
                     installedAt = initial?.installedAt ?: today,
                     lastInspectionAt = initial?.lastInspectionAt ?: today,
-                    locationId = locationId
+                    locationId = locationId,
+                    warrantyProvider = warrantyProvider.trim(),
+                    warrantyStart = warrantyStart.trim(),
+                    warrantyEnd = warrantyEnd.trim()
                 )
             )
         }

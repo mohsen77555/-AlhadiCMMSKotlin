@@ -294,6 +294,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         MoreRoute.Reports -> ReportsScreen(
                             innerPadding = innerPadding,
                             stats = stats,
+                            assets = assets,
                             workOrders = workOrders,
                             parts = spareParts,
                             pmItems = preventiveMaintenance
@@ -1017,6 +1018,9 @@ private fun AssetDetailScreen(
     onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit
 ) {
     val locationLabel = asset.locationId?.let { id -> locations.firstOrNull { it.id == id }?.let { "${it.code} • ${it.name}" } } ?: "غير محدد"
+    val today = DateStrings.today()
+    val underWarranty = asset.isUnderWarranty(today)
+    val hasWarranty = asset.warrantyEnd.isNotBlank()
     var showEdit by remember { mutableStateOf(false) }
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
@@ -1062,6 +1066,23 @@ private fun AssetDetailScreen(
             }
         }
 
+        if (hasWarranty) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            SectionHeader("الضمان")
+                            Spacer(modifier = Modifier.weight(1f))
+                            StatusBadge(if (underWarranty) "ضمن الضمان" else "منتهٍ", statusTone(if (underWarranty) "running" else "stopped"))
+                        }
+                        InfoRow("الجهة", asset.warrantyProvider)
+                        InfoRow("من", asset.warrantyStart)
+                        InfoRow("إلى", asset.warrantyEnd)
+                    }
+                }
+            }
+        }
+
         if (canManage) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1083,7 +1104,17 @@ private fun AssetDetailScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                 } else {
-                    AddButton("أمر عمل لهذا الأصل") { showWoForm = true }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (underWarranty) {
+                            Text(
+                                "تنبيه: هذا الأصل ضمن الضمان — قد تتحمّل جهة الضمان تكلفة الإصلاح.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AccentOrange,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        AddButton("أمر عمل لهذا الأصل") { showWoForm = true }
+                    }
                 }
             }
         }
@@ -1541,14 +1572,19 @@ private fun TransactionCard(transaction: InventoryTransactionEntity) {
 private fun ReportsScreen(
     innerPadding: PaddingValues,
     stats: DashboardStats,
+    assets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     parts: List<SparePartEntity>,
     pmItems: List<PreventiveMaintenanceEntity>
 ) {
+    val today = DateStrings.today()
+    val soon = DateStrings.daysFromToday(30)
     val openCost = workOrders.filter { it.status != "Closed" }.sumOf { it.estimatedCost }
     val closed = workOrders.count { it.status == "Closed" }
     val lowStock = parts.filter { it.onHandQty <= it.minQty }
     val duePm = pmItems.filter { DateStrings.isDueOrOverdue(it.nextDueAt) }
+    val underWarranty = assets.filter { it.isUnderWarranty(today) }
+    val expiringSoon = assets.filter { it.warrantyEnd.isNotBlank() && it.warrantyEnd in today..soon }
 
     LazyColumn(
         modifier = Modifier
@@ -1579,6 +1615,13 @@ private fun ReportsScreen(
             ReportCard("المخزون", listOf(
                 "قطع تحت الحد الأدنى: ${lowStock.size}",
                 "أول قطعة ناقصة: ${lowStock.firstOrNull()?.partNumber ?: "لا يوجد"}"
+            ))
+        }
+        item {
+            ReportCard("الضمان", listOf(
+                "أصول ضمن الضمان: ${underWarranty.size}",
+                "ضمانات تنتهي خلال 30 يوم: ${expiringSoon.size}",
+                "الأقرب انتهاءً: ${expiringSoon.minByOrNull { it.warrantyEnd }?.let { "${it.code} (${it.warrantyEnd})" } ?: "لا يوجد"}"
             ))
         }
     }

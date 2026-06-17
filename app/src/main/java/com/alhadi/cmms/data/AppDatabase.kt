@@ -37,7 +37,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
         MeasurementReadingEntity::class,
         FunctionalLocationEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
