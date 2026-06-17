@@ -1289,18 +1289,21 @@ private fun AssetCard(
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val tone = statusTone(asset.status)
+                IconBubble(Icons.Filled.PrecisionManufacturing, tone.content, tone.container, 44)
                 Column(modifier = Modifier.weight(1f)) {
                     LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(asset.status, statusTone(asset.status))
+                StatusBadge(asset.status, tone)
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-            InfoRow("المجموعة", asset.groupName)
-            InfoRow("الموقع", asset.location)
-            InfoRow("الأهمية", asset.criticality)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusBadge(asset.criticality, priorityTone(asset.criticality))
+                AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
+            }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
@@ -3215,7 +3218,20 @@ private fun ReportsScreen(
                 "تكلفة العمالة: ${money(laborCost)}",
                 "تكلفة قطع الغيار: ${money(partsCost)}",
                 "تكلفة تقديرية مفتوحة: ${money(openCost)}"
-            ) + topCostAssets.map { "الأعلى تكلفة — ${assetName[it.key] ?: it.key}: ${money(it.value)}" })
+            ))
+        }
+        if (topCostAssets.isNotEmpty()) {
+            item {
+                val maxCost = (topCostAssets.maxOfOrNull { it.value } ?: 1.0).coerceAtLeast(1.0)
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SectionHeader("الأصول الأعلى تكلفة")
+                        topCostAssets.forEach {
+                            BarMeter(assetName[it.key] ?: "#${it.key}", (it.value / maxCost).toFloat(), AccentRed, money(it.value))
+                        }
+                    }
+                }
+            }
         }
         item {
             ReportCard("الصيانة الدورية", listOf(
