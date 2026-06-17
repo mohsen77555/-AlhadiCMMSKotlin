@@ -1,5 +1,7 @@
 package com.alhadi.cmms.ui
 
+import android.content.Context
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -58,6 +60,7 @@ import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingUp
@@ -100,6 +103,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -2110,6 +2114,22 @@ private fun ReportsScreen(
         .mapValues { (_, list) -> list.sumOf { it.totalCost() } }
         .entries.sortedByDescending { it.value }
         .take(3)
+    val failures = workOrders.filter { it.isFailure }
+    val totalDowntime = failures.sumOf { it.downtimeHours }
+    val mttr = if (failures.isNotEmpty()) totalDowntime / failures.size else 0.0
+    val openWos = workOrders.filter { it.status != "Closed" }
+    val overdueWos = openWos.count { DateStrings.isDueOrOverdue(it.dueAt) }
+    val pendingApprovals = workOrders.count { it.approvalStatus == "Pending" }
+    val windowHours = (assets.size.coerceAtLeast(1)) * 30.0 * 24.0
+    val availability = ((windowHours - totalDowntime) / windowHours * 100.0).coerceIn(0.0, 100.0)
+    val context = LocalContext.current
+    val reportText = buildReportText(
+        assets = stats.assets, openWo = stats.openWorkOrders, closed = closed,
+        totalCost = totalCost, laborCost = laborCost, partsCost = partsCost, openCost = openCost,
+        availability = availability, failures = failures.size, downtime = totalDowntime, mttr = mttr,
+        overdue = overdueWos, pendingApprovals = pendingApprovals, duePm = duePm.size,
+        lowStock = lowStock.size, underWarranty = underWarranty.size, expiringSoon = expiringSoon.size
+    )
 
     LazyColumn(
         modifier = Modifier
@@ -2119,8 +2139,33 @@ private fun ReportsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            SectionHeader("تقارير مختصرة")
-            Text("جاهزة للتوسعة لاحقًا لتصدير PDF أو Excel.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    SectionHeader("التقارير والتحليلات")
+                    Text("ملخصات حيّة للتكاليف والتوفر والأعطال.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = { shareText(context, "تقرير الصيانة — الهادي CMMS", reportText) }) {
+                    Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("مشاركة")
+                }
+            }
+        }
+        item {
+            ReportCard("التوفّر والأعطال", listOf(
+                "نسبة التوفّر (30 يوم): ${"%.1f".format(availability)}%",
+                "عدد الأعطال: ${failures.size}",
+                "إجمالي زمن التوقف: ${"%.1f".format(totalDowntime)} ساعة",
+                "متوسط زمن الإصلاح MTTR: ${"%.1f".format(mttr)} ساعة"
+            ))
+        }
+        item {
+            ReportCard("حالة أوامر العمل", listOf(
+                "مفتوحة حالياً: ${openWos.size}",
+                "متأخرة عن الاستحقاق: $overdueWos",
+                "بانتظار الاعتماد: $pendingApprovals",
+                "مغلقة: $closed"
+            ))
         }
         item {
             ReportCard("ملخص الصيانة", listOf(
@@ -2884,6 +2929,37 @@ private fun FailureAnalysisScreen(
 
 /** Formats a monetary amount with thousands separators and a currency suffix. */
 private fun money(value: Double): String = "%,.0f ر.س".format(value)
+
+/** Shares a plain-text report through the Android share sheet (email, WhatsApp, notes…). */
+private fun shareText(context: Context, subject: String, body: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, body)
+    }
+    context.startActivity(Intent.createChooser(intent, subject))
+}
+
+/** Builds the shareable maintenance report body from the dashboard figures. */
+private fun buildReportText(
+    assets: Int, openWo: Int, closed: Int,
+    totalCost: Double, laborCost: Double, partsCost: Double, openCost: Double,
+    availability: Double, failures: Int, downtime: Double, mttr: Double,
+    overdue: Int, pendingApprovals: Int, duePm: Int,
+    lowStock: Int, underWarranty: Int, expiringSoon: Int
+): String = buildString {
+    appendLine("تقرير الصيانة — الهادي CMMS")
+    appendLine("التاريخ: ${DateStrings.today()}")
+    appendLine("──────────────")
+    appendLine("الأصول: $assets")
+    appendLine("أوامر العمل — مفتوحة: $openWo | مغلقة: $closed | متأخرة: $overdue | بانتظار الاعتماد: $pendingApprovals")
+    appendLine("التكاليف — إجمالي: ${money(totalCost)} | عمالة: ${money(laborCost)} | قطع: ${money(partsCost)} | تقديرية مفتوحة: ${money(openCost)}")
+    appendLine("التوفّر (30 يوم): ${"%.1f".format(availability)}%")
+    appendLine("الأعطال: $failures | زمن التوقف: ${"%.1f".format(downtime)}س | MTTR: ${"%.1f".format(mttr)}س")
+    appendLine("الصيانة الدورية المستحقة: $duePm")
+    appendLine("المخزون تحت الحد الأدنى: $lowStock")
+    appendLine("الضمان — ساري: $underWarranty | ينتهي خلال 30 يوم: $expiringSoon")
+}
 
 @Composable
 private fun SearchField(query: String, onChange: (String) -> Unit, placeholder: String) {
