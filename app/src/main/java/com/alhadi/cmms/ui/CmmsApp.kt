@@ -1878,11 +1878,16 @@ private fun NotificationsScreen(
                 Text("نقطة بداية كل عمل صيانة — تُراجع وتُعتمد ثم تتحول إلى أوامر عمل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item {
+                val seg = listOf(
+                    ChartSegment("جديدة/مراجعة", notifications.count { it.status == "New" || it.status == "Screened" }, AccentOrange),
+                    ChartSegment("معتمدة", notifications.count { it.status == "Approved" }, AccentTeal),
+                    ChartSegment("تحوّلت لأمر", notifications.count { it.status == "OrderCreated" }, AccentGreen),
+                    ChartSegment("مرفوضة/مغلقة", notifications.count { it.status == "Rejected" || it.status == "Closed" }, AccentRed)
+                )
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        MetricColumn("الإجمالي", notifications.size.toString(), AccentBlue)
-                        MetricColumn("مفتوحة", openCount.toString(), if (openCount > 0) AccentOrange else AccentGreen)
-                        MetricColumn("معتمدة", notifications.count { it.status == "Approved" }.toString(), AccentTeal)
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = notifications.size.toString(), centerLabel = "بلاغ")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -3516,10 +3521,10 @@ private fun MeterCard(
             }
             InfoRow("آخر تحديث", point.lastReadingAt)
             if (recentReadings.size >= 2) {
-                LtrText(
-                    "آخر القراءات: " + recentReadings.take(6).joinToString(" ← ") { "${it.value}" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                Text("اتجاه آخر القراءات", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Sparkline(
+                    values = recentReadings.take(8).reversed().map { it.value.toFloat() },
+                    color = if (overLimit) AccentRed else AccentPurple
                 )
             }
             if (overLimit) {
@@ -3791,12 +3796,16 @@ private fun CapaScreen(
                 val today = DateStrings.today()
                 val open = items.count { it.status == "Open" }
                 val inProg = items.count { it.status == "In Progress" }
-                val overdue = items.count { it.status != "Closed" && it.dueAt < today }
+                val closed = items.count { it.status == "Closed" }
+                val seg = listOf(
+                    ChartSegment("مفتوح", open, AccentBlue),
+                    ChartSegment("قيد التنفيذ", inProg, AccentOrange),
+                    ChartSegment("مغلق", closed, AccentGreen)
+                )
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        MetricColumn("مفتوح", open.toString(), AccentBlue)
-                        MetricColumn("قيد التنفيذ", inProg.toString(), AccentOrange)
-                        MetricColumn("متأخر", overdue.toString(), if (overdue > 0) AccentRed else AccentGreen)
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = items.size.toString(), centerLabel = "إجراء")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
                     }
                 }
             }

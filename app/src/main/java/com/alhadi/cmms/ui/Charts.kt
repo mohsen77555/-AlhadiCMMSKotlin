@@ -133,6 +133,32 @@ internal fun BarMeter(
     }
 }
 
+/** A compact line chart (sparkline) of recent values, drawn with Canvas. */
+@Composable
+internal fun Sparkline(
+    values: List<Float>,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    if (values.size < 2) return
+    val min = values.min()
+    val max = values.max()
+    val range = (max - min).let { if (it == 0f) 1f else it }
+    Canvas(modifier = modifier.fillMaxWidth().height(44.dp)) {
+        val stepX = if (values.size > 1) size.width / (values.size - 1) else size.width
+        val pad = 6f
+        val usableH = size.height - pad * 2
+        val points = values.mapIndexed { i, v ->
+            Offset(i * stepX, pad + usableH - ((v - min) / range) * usableH)
+        }
+        for (i in 0 until points.size - 1) {
+            drawLine(color, points[i], points[i + 1], strokeWidth = 4f, cap = StrokeCap.Round)
+        }
+        // dot on the latest point
+        drawCircle(color, radius = 5f, center = points.last())
+    }
+}
+
 /** A wrap-friendly legend showing each donut segment with its colour and value. */
 @Composable
 internal fun ChartLegend(segments: List<ChartSegment>, modifier: Modifier = Modifier) {
