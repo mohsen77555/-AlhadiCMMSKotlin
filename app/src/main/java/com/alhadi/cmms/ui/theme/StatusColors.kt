@@ -11,6 +11,8 @@ fun statusTone(status: String): StatusTone {
     return when (status.lowercase(Locale.US)) {
         "running", "closed", "done", "completed", "ok", "active" ->
             StatusTone(StatusRunning, StatusRunningContainer)
+        "technically completed" ->
+            StatusTone(StatusInfo, StatusInfoContainer)
         "warning", "in progress", "scheduled", "pending", "due" ->
             StatusTone(StatusWarning, StatusWarningContainer)
         "stopped", "overdue", "failed", "critical" ->

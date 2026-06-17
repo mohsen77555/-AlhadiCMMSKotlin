@@ -27,6 +27,9 @@ interface SparePartDao {
     @Query("UPDATE spare_parts SET onHandQty = onHandQty + :delta WHERE id = :id")
     suspend fun adjustStock(id: Long, delta: Int)
 
+    @Query("DELETE FROM spare_parts WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("DELETE FROM spare_parts")
     suspend fun deleteAll()
 }

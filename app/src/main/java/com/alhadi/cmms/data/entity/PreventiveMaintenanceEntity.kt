@@ -17,5 +17,6 @@ data class PreventiveMaintenanceEntity(
     val lastDoneAt: String,
     val nextDueAt: String,
     val status: String,
-    val estimatedDurationMinutes: Int
+    val estimatedDurationMinutes: Int,
+    val taskListId: Long? = null
 )

@@ -4,20 +4,48 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.alhadi.cmms.data.dao.AssetBomDao
+import com.alhadi.cmms.data.dao.AssetCharacteristicDao
 import com.alhadi.cmms.data.dao.AssetDao
+import com.alhadi.cmms.data.dao.AssetDocumentDao
+import com.alhadi.cmms.data.dao.AssetMovementDao
 import com.alhadi.cmms.data.dao.AuditLogDao
+import com.alhadi.cmms.data.dao.CapaDao
+import com.alhadi.cmms.data.dao.FunctionalLocationDao
 import com.alhadi.cmms.data.dao.InventoryTransactionDao
+import com.alhadi.cmms.data.dao.MaintenanceNotificationDao
+import com.alhadi.cmms.data.dao.MeasurementDao
+import com.alhadi.cmms.data.dao.PmChecklistDao
 import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
 import com.alhadi.cmms.data.dao.SparePartDao
+import com.alhadi.cmms.data.dao.TaskListDao
 import com.alhadi.cmms.data.dao.UserDao
+import com.alhadi.cmms.data.dao.WorkOrderConfirmationDao
 import com.alhadi.cmms.data.dao.WorkOrderDao
+import com.alhadi.cmms.data.dao.WorkOrderOperationDao
+import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
+import com.alhadi.cmms.data.entity.AssetBomItemEntity
+import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
+import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.CapaEntity
+import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
+import com.alhadi.cmms.data.entity.MeasurementReadingEntity
+import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.TaskListEntity
+import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
+import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
+import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
+import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 
 @Database(
     entities = [
@@ -27,9 +55,24 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
         SparePartEntity::class,
         InventoryTransactionEntity::class,
         UserEntity::class,
-        AuditLogEntity::class
+        AuditLogEntity::class,
+        MeasuringPointEntity::class,
+        MeasurementReadingEntity::class,
+        FunctionalLocationEntity::class,
+        CapaEntity::class,
+        AssetDocumentEntity::class,
+        AssetCharacteristicEntity::class,
+        AssetBomItemEntity::class,
+        AssetMovementEntity::class,
+        PmChecklistItemEntity::class,
+        MaintenanceNotificationEntity::class,
+        WorkOrderOperationEntity::class,
+        WorkOrderConfirmationEntity::class,
+        WorkOrderPhotoEntity::class,
+        TaskListEntity::class,
+        TaskListOperationEntity::class
     ],
-    version = 2,
+    version = 21,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,6 +83,19 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun inventoryTransactionDao(): InventoryTransactionDao
     abstract fun userDao(): UserDao
     abstract fun auditLogDao(): AuditLogDao
+    abstract fun measurementDao(): MeasurementDao
+    abstract fun functionalLocationDao(): FunctionalLocationDao
+    abstract fun capaDao(): CapaDao
+    abstract fun assetDocumentDao(): AssetDocumentDao
+    abstract fun assetCharacteristicDao(): AssetCharacteristicDao
+    abstract fun assetBomDao(): AssetBomDao
+    abstract fun assetMovementDao(): AssetMovementDao
+    abstract fun pmChecklistDao(): PmChecklistDao
+    abstract fun maintenanceNotificationDao(): MaintenanceNotificationDao
+    abstract fun workOrderOperationDao(): WorkOrderOperationDao
+    abstract fun workOrderConfirmationDao(): WorkOrderConfirmationDao
+    abstract fun workOrderPhotoDao(): WorkOrderPhotoDao
+    abstract fun taskListDao(): TaskListDao
 
     companion object {
         @Volatile

@@ -1,10 +1,17 @@
 package com.alhadi.cmms.ui
 
+import android.content.Context
+import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,50 +29,71 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -77,53 +106,82 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.alhadi.cmms.data.MovementType
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetBomItemEntity
+import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
+import com.alhadi.cmms.data.entity.AssetDocumentEntity
+import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.CapaEntity
+import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
+import com.alhadi.cmms.data.entity.MeasurementReadingEntity
+import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.TaskListEntity
+import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
+import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
-import com.alhadi.cmms.ui.theme.BrandIndigo
-import com.alhadi.cmms.ui.theme.BrandTeal
+import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
+import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.ui.theme.AccentBlue
+import com.alhadi.cmms.ui.theme.AccentBrown
+import com.alhadi.cmms.ui.theme.AccentGreen
+import com.alhadi.cmms.ui.theme.AccentNavy
+import com.alhadi.cmms.ui.theme.AccentOrange
+import com.alhadi.cmms.ui.theme.AccentPurple
+import com.alhadi.cmms.ui.theme.AccentRed
+import com.alhadi.cmms.ui.theme.AccentTeal
 import com.alhadi.cmms.ui.theme.StatusInfo
-import com.alhadi.cmms.ui.theme.StatusInfoContainer
 import com.alhadi.cmms.ui.theme.StatusRunning
 import com.alhadi.cmms.ui.theme.StatusRunningContainer
 import com.alhadi.cmms.ui.theme.StatusStopped
 import com.alhadi.cmms.ui.theme.StatusStoppedContainer
-import com.alhadi.cmms.ui.theme.StatusTone
-import com.alhadi.cmms.ui.theme.StatusWarning
-import com.alhadi.cmms.ui.theme.StatusWarningContainer
 import com.alhadi.cmms.ui.theme.priorityTone
 import com.alhadi.cmms.ui.theme.statusTone
 import com.alhadi.cmms.util.DateStrings
+import com.alhadi.cmms.util.ImageStore
 import com.alhadi.cmms.viewmodel.CmmsViewModel
 import com.alhadi.cmms.viewmodel.DashboardStats
-import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlinx.coroutines.launch
 
-private enum class AppSection(
-    val arabicTitle: String,
-    val icon: ImageVector
-) {
-    Dashboard("الرئيسية", Icons.Filled.Dashboard),
-    Assets("الأصول", Icons.Filled.PrecisionManufacturing),
-    WorkOrders("أوامر العمل", Icons.Filled.Assignment),
-    PreventiveMaintenance("الصيانة", Icons.Filled.EventRepeat),
-    Inventory("المخزون", Icons.Filled.Inventory2),
-    Reports("التقارير", Icons.Filled.Analytics),
-    Admin("الإدارة", Icons.Filled.AdminPanelSettings)
+// ---------------------------------------------------------------------------
+// Navigation model
+// ---------------------------------------------------------------------------
+
+private enum class BottomTab(val label: String, val icon: ImageVector, val accent: Color) {
+    Home("الرئيسية", Icons.Filled.Home, AccentNavy),
+    WorkOrders("أوامر العمل", Icons.Filled.Assignment, AccentBlue),
+    Supervision("الإشراف", Icons.Filled.Verified, AccentTeal),
+    Assets("الأصول", Icons.Filled.PrecisionManufacturing, AccentGreen),
+    More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
+
+private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures }
+
+private data class ScreenMeta(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val accent: Color
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -136,21 +194,34 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val users by viewModel.users.collectAsStateWithLifecycle()
     val auditLog by viewModel.auditLog.collectAsStateWithLifecycle()
+    val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
+    val readings by viewModel.readings.collectAsStateWithLifecycle()
+    val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
+    val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
+    val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
+    val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
+    val assetBom by viewModel.assetBom.collectAsStateWithLifecycle()
+    val assetMovements by viewModel.assetMovements.collectAsStateWithLifecycle()
+    val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
+    val notifications by viewModel.notifications.collectAsStateWithLifecycle()
+    val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
+    val workOrderConfirmations by viewModel.workOrderConfirmations.collectAsStateWithLifecycle()
+    val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
+    val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
+    val taskListOperations by viewModel.taskListOperations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    var selectedSection by rememberSaveable { mutableStateOf(AppSection.Dashboard) }
-    var showCreateSheet by rememberSaveable { mutableStateOf(false) }
+    var selectedTab by rememberSaveable { mutableStateOf(BottomTab.Home) }
+    var moreRoute by rememberSaveable { mutableStateOf<MoreRoute?>(null) }
+    val actorName = currentUser?.name ?: "Unassigned"
 
-    val visibleSections = remember(currentUser) {
-        AppSection.entries.filter { section ->
-            section != AppSection.Admin || currentUser?.isAdmin == true
-        }
-    }
+    val isAdmin = currentUser?.isAdmin == true
+    val canManage = currentUser?.canManage == true
 
-    LaunchedEffect(visibleSections) {
-        if (selectedSection !in visibleSections) selectedSection = AppSection.Dashboard
+    BackHandler(enabled = selectedTab == BottomTab.More && moreRoute != null) {
+        moreRoute = null
     }
 
     LaunchedEffect(message) {
@@ -161,153 +232,500 @@ fun CmmsApp(viewModel: CmmsViewModel) {
         }
     }
 
-    val canManage = currentUser?.canManage == true
+    val meta = screenMeta(selectedTab, moreRoute)
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(selectedSection.arabicTitle, fontWeight = FontWeight.Bold)
-                            Text(
-                                text = "Alhadi CMMS",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        Box(modifier = Modifier.padding(start = 12.dp)) {
-                            CircleAvatar(initials = currentUser?.initials ?: "?", size = 38)
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = viewModel::logout) {
-                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "تسجيل الخروج")
-                        }
-                    },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                AppHeader(
+                    meta = meta,
+                    user = currentUser,
+                    openWorkOrders = stats.openWorkOrders,
+                    assetsCount = stats.assets,
+                    showBack = selectedTab == BottomTab.More && moreRoute != null,
+                    onBack = { moreRoute = null },
+                    onLogout = viewModel::logout,
+                    onSchedule = { selectedTab = BottomTab.Supervision },
+                    onMaintenance = { selectedTab = BottomTab.Supervision },
+                    onAlerts = { selectedTab = BottomTab.Home }
                 )
             },
             bottomBar = {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                    visibleSections.forEach { section ->
-                        NavigationBarItem(
-                            selected = selectedSection == section,
-                            onClick = { selectedSection = section },
-                            icon = { Icon(section.icon, contentDescription = section.arabicTitle) },
-                            label = {
-                                Text(
-                                    section.arabicTitle,
-                                    maxLines = 1,
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
-                        )
+                AppBottomBar(
+                    selected = selectedTab,
+                    isAdmin = isAdmin,
+                    onSelect = {
+                        selectedTab = it
+                        if (it != BottomTab.More) moreRoute = null
                     }
-                }
+                )
             },
-            floatingActionButton = {
-                if (selectedSection == AppSection.WorkOrders && canManage) {
-                    ExtendedFloatingActionButton(
-                        onClick = { showCreateSheet = true },
-                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                        text = { Text("أمر عمل") }
-                    )
-                }
-            },
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            containerColor = MaterialTheme.colorScheme.background
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
         ) { innerPadding ->
             val assetMap = assets.associateBy { it.id }
             AnimatedContent(
-                targetState = selectedSection,
+                targetState = meta.title,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "section"
-            ) { section ->
-                when (section) {
-                    AppSection.Dashboard -> DashboardScreen(
+                label = "screen"
+            ) {
+                when (selectedTab) {
+                    BottomTab.Home -> DashboardScreen(
                         innerPadding = innerPadding,
-                        userName = currentUser?.name ?: "",
                         stats = stats,
                         assets = assets,
                         workOrders = workOrders,
                         parts = spareParts,
-                        pmItems = preventiveMaintenance
+                        pmItems = preventiveMaintenance,
+                        notifications = notifications,
+                        onReports = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Reports },
+                        onGovernance = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Audit },
+                        onOpenTab = { selectedTab = it; if (it != BottomTab.More) moreRoute = null },
+                        onOpenMore = { selectedTab = BottomTab.More; moreRoute = it }
                     )
 
-                    AppSection.Assets -> AssetsScreen(innerPadding = innerPadding, assets = assets)
-
-                    AppSection.WorkOrders -> WorkOrdersScreen(
+                    BottomTab.WorkOrders -> WorkOrdersScreen(
                         innerPadding = innerPadding,
                         workOrders = workOrders,
+                        assets = assets,
                         assetMap = assetMap,
-                        onUpdateStatus = viewModel::updateWorkOrderStatus
+                        operations = workOrderOperations,
+                        confirmations = workOrderConfirmations,
+                        photos = workOrderPhotos,
+                        canManage = canManage,
+                        defaultAssignee = actorName,
+                        onSave = viewModel::saveWorkOrder,
+                        onDelete = viewModel::deleteWorkOrder,
+                        onUpdateStatus = viewModel::updateWorkOrderStatus,
+                        onApprove = viewModel::setWorkOrderApproval,
+                        onSaveOperation = viewModel::saveOperation,
+                        onSetOperationStatus = viewModel::setOperationStatus,
+                        onDeleteOperation = viewModel::deleteOperation,
+                        onConfirmOperation = viewModel::addConfirmation,
+                        onAddPhoto = viewModel::addWorkOrderPhoto,
+                        onDeletePhoto = viewModel::deleteWorkOrderPhoto
                     )
 
-                    AppSection.PreventiveMaintenance -> PreventiveMaintenanceScreen(
+                    BottomTab.Supervision -> PreventiveMaintenanceScreen(
                         innerPadding = innerPadding,
                         pmItems = preventiveMaintenance,
+                        assets = assets,
                         assetMap = assetMap,
-                        onDone = viewModel::markPreventiveMaintenanceDone
+                        canManage = canManage,
+                        checklist = pmChecklist,
+                        taskLists = taskLists,
+                        onSave = viewModel::savePreventiveMaintenance,
+                        onDelete = viewModel::deletePreventiveMaintenance,
+                        onDone = viewModel::markPreventiveMaintenanceDone,
+                        onSaveChecklistItem = viewModel::saveChecklistItem,
+                        onSetChecklistResult = viewModel::setChecklistResult,
+                        onDeleteChecklistItem = viewModel::deleteChecklistItem,
+                        onGenerateOrder = viewModel::generateWorkOrderFromPm
                     )
 
-                    AppSection.Inventory -> InventoryScreen(
+                    BottomTab.Assets -> AssetsScreen(
                         innerPadding = innerPadding,
-                        parts = spareParts,
-                        transactions = transactions,
-                        canReceive = canManage,
-                        onIssue = viewModel::issuePart,
-                        onReceive = viewModel::receivePart
-                    )
-
-                    AppSection.Reports -> ReportsScreen(
-                        innerPadding = innerPadding,
-                        stats = stats,
+                        assets = assets,
                         workOrders = workOrders,
-                        parts = spareParts,
-                        pmItems = preventiveMaintenance
+                        pmItems = preventiveMaintenance,
+                        locations = locations,
+                        documents = assetDocuments,
+                        characteristics = assetCharacteristics,
+                        bomItems = assetBom,
+                        movements = assetMovements,
+                        spareParts = spareParts,
+                        canManage = canManage,
+                        defaultAssignee = actorName,
+                        onSave = viewModel::saveAsset,
+                        onDelete = viewModel::deleteAsset,
+                        onChangeStatus = viewModel::changeAssetStatus,
+                        onSaveWorkOrder = viewModel::saveWorkOrder,
+                        onUpdateWorkOrderStatus = viewModel::updateWorkOrderStatus,
+                        onSaveDocument = viewModel::saveAssetDocument,
+                        onDeleteDocument = viewModel::deleteAssetDocument,
+                        onSaveCharacteristic = viewModel::saveCharacteristic,
+                        onDeleteCharacteristic = viewModel::deleteCharacteristic,
+                        onSaveBom = viewModel::saveBomItem,
+                        onDeleteBom = viewModel::deleteBomItem,
+                        onMove = viewModel::performAssetMovement
                     )
 
-                    AppSection.Admin -> AdminScreen(
-                        innerPadding = innerPadding,
-                        users = users,
-                        auditLog = auditLog,
-                        currentUser = currentUser,
-                        onAddTechnician = viewModel::addTechnician,
-                        onResetSampleData = viewModel::resetSampleData
-                    )
+                    BottomTab.More -> when (moreRoute) {
+                        null -> MoreGrid(
+                            innerPadding = innerPadding,
+                            isAdmin = isAdmin,
+                            onOpen = { moreRoute = it },
+                            onLogout = viewModel::logout
+                        )
+                        MoreRoute.Notifications -> NotificationsScreen(
+                            innerPadding = innerPadding,
+                            notifications = notifications,
+                            assets = assets,
+                            assetMap = assetMap,
+                            canManage = canManage,
+                            onSave = viewModel::saveNotification,
+                            onSetStatus = viewModel::setNotificationStatus,
+                            onCreateOrder = viewModel::createOrderFromNotification,
+                            onDelete = viewModel::deleteNotification
+                        )
+                        MoreRoute.Inventory -> InventoryScreen(
+                            innerPadding = innerPadding,
+                            parts = spareParts,
+                            transactions = transactions,
+                            canReceive = canManage,
+                            canManage = canManage,
+                            onIssue = viewModel::issuePart,
+                            onReceive = viewModel::receivePart,
+                            onSave = viewModel::savePart,
+                            onDelete = viewModel::deletePart
+                        )
+                        MoreRoute.Reports -> ReportsScreen(
+                            innerPadding = innerPadding,
+                            stats = stats,
+                            assets = assets,
+                            workOrders = workOrders,
+                            parts = spareParts,
+                            pmItems = preventiveMaintenance
+                        )
+                        MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
+                        MoreRoute.Meters -> MetersScreen(
+                            innerPadding = innerPadding,
+                            points = measuringPoints,
+                            readings = readings,
+                            assetMap = assetMap,
+                            assets = assets,
+                            canManage = canManage,
+                            onSavePoint = viewModel::saveMeasuringPoint,
+                            onDeletePoint = viewModel::deleteMeasuringPoint,
+                            onAddReading = viewModel::addReading
+                        )
+                        MoreRoute.Locations -> LocationsScreen(
+                            innerPadding = innerPadding,
+                            locations = locations,
+                            assets = assets,
+                            canManage = canManage,
+                            onSave = viewModel::saveFunctionalLocation,
+                            onDelete = viewModel::deleteFunctionalLocation
+                        )
+                        MoreRoute.Capa -> CapaScreen(
+                            innerPadding = innerPadding,
+                            items = capaActions,
+                            assets = assets,
+                            assetMap = assetMap,
+                            canManage = canManage,
+                            defaultAssignee = actorName,
+                            onSave = viewModel::saveCapa,
+                            onUpdateStatus = viewModel::updateCapaStatus,
+                            onDelete = viewModel::deleteCapa
+                        )
+                        MoreRoute.Failures -> FailureAnalysisScreen(
+                            innerPadding = innerPadding,
+                            workOrders = workOrders,
+                            assetMap = assetMap
+                        )
+                        MoreRoute.Admin -> AdminScreen(
+                            innerPadding = innerPadding,
+                            users = users,
+                            currentUser = currentUser,
+                            onAddTechnician = viewModel::addTechnician,
+                            onResetSampleData = viewModel::resetSampleData,
+                            onSave = viewModel::saveUser,
+                            onSetActive = viewModel::setUserActive,
+                            onDelete = viewModel::deleteUser
+                        )
+                        MoreRoute.PreventiveMaintenance -> PreventiveMaintenanceScreen(
+                            innerPadding = innerPadding,
+                            pmItems = preventiveMaintenance,
+                            assets = assets,
+                            assetMap = assetMap,
+                            canManage = canManage,
+                            checklist = pmChecklist,
+                            taskLists = taskLists,
+                            onSave = viewModel::savePreventiveMaintenance,
+                            onDelete = viewModel::deletePreventiveMaintenance,
+                            onDone = viewModel::markPreventiveMaintenanceDone,
+                            onSaveChecklistItem = viewModel::saveChecklistItem,
+                            onSetChecklistResult = viewModel::setChecklistResult,
+                            onDeleteChecklistItem = viewModel::deleteChecklistItem,
+                            onGenerateOrder = viewModel::generateWorkOrderFromPm
+                        )
+                        MoreRoute.TaskLists -> TaskListsScreen(
+                            innerPadding = innerPadding,
+                            taskLists = taskLists,
+                            operations = taskListOperations,
+                            canManage = canManage,
+                            onSaveTaskList = viewModel::saveTaskList,
+                            onDeleteTaskList = viewModel::deleteTaskList,
+                            onSaveOperation = viewModel::saveTaskListOperation,
+                            onDeleteOperation = viewModel::deleteTaskListOperation
+                        )
+                    }
                 }
             }
         }
 
-        if (showCreateSheet) {
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            val scope = rememberCoroutineScope()
-            CreateWorkOrderSheet(
-                assets = assets,
-                sheetState = sheetState,
-                onDismiss = { showCreateSheet = false },
-                onCreate = { assetId, title, desc, priority, dueDays ->
-                    viewModel.createWorkOrder(
-                        assetId = assetId,
-                        title = title,
-                        description = desc,
-                        priority = priority,
-                        assignedTo = currentUser?.name ?: "Unassigned",
-                        dueAt = DateStrings.daysFromToday(dueDays),
-                        estimatedCost = 0.0
+    }
+}
+
+private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (tab) {
+    BottomTab.Home -> ScreenMeta("الرئيسية", "لوحة المؤشرات والتنبيهات", Icons.Filled.Home, AccentNavy)
+    BottomTab.WorkOrders -> ScreenMeta("أوامر العمل", "إنشاء، إصدار، متابعة، وإغلاق", Icons.Filled.Assignment, AccentBlue)
+    BottomTab.Supervision -> ScreenMeta("الإشراف والصيانة", "الصيانة الدورية والمتابعة", Icons.Filled.Verified, AccentTeal)
+    BottomTab.Assets -> ScreenMeta("الأصول", "سجل الأصول والمعدات", Icons.Filled.PrecisionManufacturing, AccentGreen)
+    BottomTab.More -> when (route) {
+        null -> ScreenMeta("المزيد", "كل الوحدات والإعدادات", Icons.Filled.GridView, AccentBrown)
+        MoreRoute.Notifications -> ScreenMeta("البلاغات", "بلاغات الصيانة وتحويلها لأوامر", Icons.Filled.NotificationsActive, AccentRed)
+        MoreRoute.Inventory -> ScreenMeta("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple)
+        MoreRoute.Reports -> ScreenMeta("التقارير", "مؤشرات وتصدير وتحليلات", Icons.Filled.Analytics, AccentBlue)
+        MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
+        MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
+        MoreRoute.PreventiveMaintenance -> ScreenMeta("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal)
+        MoreRoute.TaskLists -> ScreenMeta("قوالب العمل", "قوالب العمليات للخطط الوقائية", Icons.AutoMirrored.Filled.List, AccentBlue)
+        MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
+        MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
+        MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
+        MoreRoute.Failures -> ScreenMeta("تحليل الأعطال", "MTTR و MTBF وتكرار الأعطال", Icons.Filled.TrendingUp, AccentRed)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AppHeader(
+    meta: ScreenMeta,
+    user: UserEntity?,
+    openWorkOrders: Int,
+    assetsCount: Int,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    onLogout: () -> Unit,
+    onSchedule: () -> Unit,
+    onMaintenance: () -> Unit,
+    onAlerts: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 3.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Title row: section icon (right) + title block + production badge (left).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .background(meta.accent, RoundedCornerShape(14.dp))
+                        .clickable(enabled = showBack, onClick = onBack),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (showBack) Icons.AutoMirrored.Filled.ArrowBack else meta.icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
-                    scope.launch { sheetState.hide() }
-                    showCreateSheet = false
                 }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Alhadi CMMS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            meta.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .background(meta.accent, CircleShape)
+                        )
+                    }
+                    Text(
+                        meta.subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    ProductionBadge()
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        user?.role ?: "محلي",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Status chips row.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SyncCard()
+                StatCard("أمر مفتوح", openWorkOrders.toString(), StatusInfo)
+                StatCard("أصل", assetsCount.toString(), StatusRunning)
+            }
+
+            // Quick action pills row.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                QuickPill("محرك الجدولة", Icons.Filled.Schedule, onSchedule)
+                QuickPill("إدارة الصيانة", Icons.Filled.Build, onMaintenance)
+                QuickPill("التنبيهات", Icons.Filled.NotificationsActive, onAlerts)
+                QuickPill("تسجيل الخروج", Icons.AutoMirrored.Filled.Logout, onLogout)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductionBadge() {
+    Surface(shape = CircleShape, color = StatusRunningContainer) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(modifier = Modifier.size(7.dp).background(StatusRunning, CircleShape))
+            Text(
+                "Production",
+                style = MaterialTheme.typography.labelMedium,
+                color = StatusRunning,
+                fontWeight = FontWeight.Bold
             )
+        }
+    }
+}
+
+@Composable
+private fun SyncCard() {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = StatusRunningContainer
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+            Text(
+                "حالة المزامنة",
+                style = MaterialTheme.typography.labelMedium,
+                color = StatusRunning,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "محلي • جاهز للعمل بدون إنترنت",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatCard(label: String, value: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun QuickPill(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bottom navigation (custom, filled-square selected icon)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AppBottomBar(selected: BottomTab, isAdmin: Boolean, onSelect: (BottomTab) -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomTab.entries.forEach { tab ->
+                val isSel = tab == selected
+                Column(
+                    modifier = Modifier
+                        .clickable { onSelect(tab) }
+                        .padding(horizontal = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                if (isSel) tab.accent else Color.Transparent,
+                                RoundedCornerShape(12.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            tab.icon,
+                            contentDescription = tab.label,
+                            tint = if (isSel) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Text(
+                        tab.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isSel) tab.accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1
+                    )
+                }
+            }
         }
     }
 }
@@ -319,13 +737,33 @@ fun CmmsApp(viewModel: CmmsViewModel) {
 @Composable
 private fun DashboardScreen(
     innerPadding: PaddingValues,
-    userName: String,
     stats: DashboardStats,
     assets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     parts: List<SparePartEntity>,
-    pmItems: List<PreventiveMaintenanceEntity>
+    pmItems: List<PreventiveMaintenanceEntity>,
+    notifications: List<MaintenanceNotificationEntity>,
+    onReports: () -> Unit,
+    onGovernance: () -> Unit,
+    onOpenTab: (BottomTab) -> Unit,
+    onOpenMore: (MoreRoute) -> Unit
 ) {
+    val today = DateStrings.today()
+    val soon = DateStrings.daysFromToday(30)
+    val criticalAssets = assets.count { it.status != "Running" }
+    val overdue = workOrders.count { it.status != "Closed" && it.dueAt < today }
+    val inProgress = workOrders.count { it.status == "In Progress" }
+    val urgent = workOrders.count { it.priority == "Critical" || it.priority == "High" }
+    val assigned = workOrders.count { it.assignedTo.isNotBlank() }
+    val governance = if (workOrders.isEmpty()) 100 else (assigned * 100 / workOrders.size)
+    val pendingApprovals = workOrders.filter { it.approvalStatus == "Pending" }
+    val expiringWarranty = assets.filter { it.warrantyEnd.isNotBlank() && it.warrantyEnd in today..soon }
+    val totalCost = workOrders.sumOf { it.totalCost() }
+    val failures = workOrders.filter { it.isFailure }
+    val downtime = failures.sumOf { it.downtimeHours }
+    val windowHours = (assets.size.coerceAtLeast(1)) * 30.0 * 24.0
+    val availability = ((windowHours - downtime) / windowHours * 100.0).coerceIn(0.0, 100.0)
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -333,129 +771,160 @@ private fun DashboardScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { HeroHeader(userName = userName, openWorkOrders = stats.openWorkOrders, duePm = stats.duePm) }
+        item { DotSectionTitle("واجهة الإدارة السريعة", AccentOrange) }
 
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    KpiCard("الأصول", stats.assets.toString(), "Assets", Icons.Filled.PrecisionManufacturing, StatusInfo, StatusInfoContainer, Modifier.weight(1f))
-                    KpiCard("أوامر مفتوحة", stats.openWorkOrders.toString(), "Open WO", Icons.Filled.Assignment, StatusWarning, StatusWarningContainer, Modifier.weight(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    KpiCard("صيانة مستحقة", stats.duePm.toString(), "Due PM", Icons.Filled.EventRepeat, StatusStopped, StatusStoppedContainer, Modifier.weight(1f))
-                    KpiCard("نقص مخزون", stats.lowStock.toString(), "Low Stock", Icons.Filled.Inventory2, StatusRunning, StatusRunningContainer, Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiTile("أصول حرجة", criticalAssets.toString(), AccentRed, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.Assets) })
+                KpiTile("CAPA", stats.capa.toString(), AccentOrange, Modifier.weight(1f), onClick = { onOpenMore(MoreRoute.Capa) })
+                KpiTile("متأخرة", overdue.toString(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("أوامر مفتوحة", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+            }
+        }
+
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                BigActionButton("التقارير", AccentBlue, Modifier.weight(1f), onReports)
+                BigActionButton("حوكمة $governance%", AccentNavy, Modifier.weight(1f), onGovernance)
+            }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SectionHeader("نظرة عامة على الأداء")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MetricColumn("التوفّر", "${"%.0f".format(availability)}%", AccentGreen)
+                        MetricColumn("زمن التوقف", "${"%.0f".format(downtime)}س", AccentOrange)
+                        MetricColumn("التكلفة", money(totalCost), AccentBlue)
+                    }
                 }
             }
         }
 
-        item { SectionHeader("تنبيهات مهمة") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiTile("مفتوح", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("قيد التنفيذ", inProgress.toString(), AccentOrange, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("متأخر", overdue.toString(), AccentRed, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("طارئ", urgent.toString(), AccentPurple, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+            }
+        }
+
+        item { DotSectionTitle("يحتاج انتباهك", AccentRed) }
 
         val warningAssets = assets.filter { it.status != "Running" }.take(4)
         val lowStockParts = parts.filter { it.onHandQty <= it.minQty }.take(4)
         val duePm = pmItems.filter { DateStrings.isDueOrOverdue(it.nextDueAt) }.take(4)
+        val openNotifications = notifications.filter {
+            (it.status == "New" || it.status == "Screened") && (it.priority == "Critical" || it.priority == "High")
+        }.take(4)
 
-        if (warningAssets.isEmpty() && lowStockParts.isEmpty() && duePm.isEmpty()) {
-            item { EmptyState("لا توجد تنبيهات حاليًا — كل شيء يعمل بشكل جيد", Icons.Filled.CheckCircle) }
-        } else {
-            items(warningAssets, key = { "asset-${it.id}" }) { asset ->
-                AlertCard(
-                    icon = Icons.Filled.Warning,
-                    tone = statusTone(asset.status),
-                    title = "${asset.code} • ${asset.name}",
-                    body = "الحالة: ${asset.status} • الموقع: ${asset.location}"
-                )
-            }
-            items(lowStockParts, key = { "part-${it.id}" }) { part ->
-                AlertCard(
-                    icon = Icons.Filled.Inventory2,
-                    tone = statusTone("stopped"),
-                    title = "${part.partNumber} • ${part.name}",
-                    body = "المتوفر ${part.onHandQty} ${part.unit} • الحد الأدنى ${part.minQty}"
-                )
-            }
-            items(duePm, key = { "pm-${it.id}" }) { pm ->
-                AlertCard(
-                    icon = Icons.Filled.EventRepeat,
-                    tone = statusTone("warning"),
-                    title = pm.title,
-                    body = "مستحقة بتاريخ ${pm.nextDueAt}"
-                )
-            }
-        }
-
-        item { SectionHeader("آخر أوامر العمل") }
-        if (workOrders.isEmpty()) {
-            item { EmptyState("لا توجد أوامر عمل") }
-        }
-        items(workOrders.take(5), key = { "wo-${it.id}" }) { workOrder ->
-            CompactWorkOrderCard(workOrder)
-        }
-    }
-}
-
-@Composable
-private fun HeroHeader(userName: String, openWorkOrders: Int, duePm: Int) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Brush.linearGradient(listOf(BrandTeal, BrandIndigo)))
-                .padding(20.dp)
+        if (warningAssets.isEmpty() && lowStockParts.isEmpty() && duePm.isEmpty() &&
+            pendingApprovals.isEmpty() && expiringWarranty.isEmpty() && openNotifications.isEmpty()
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = if (userName.isBlank()) "مرحباً" else "مرحباً، $userName",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "لديك $openWorkOrders أمر عمل مفتوح و $duePm مهمة صيانة مستحقة.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.9f)
-                )
+            item { CalmCard() }
+        } else {
+            items(openNotifications, key = { "nt-${it.id}" }) { ntf ->
+                AlertRow(Icons.Filled.NotificationsActive, AccentRed, "${ntf.number} • ${ntf.title}", "بلاغ ${notificationStatusLabel(ntf.status)} • ${ntf.priority}", onClick = { onOpenMore(MoreRoute.Notifications) })
+            }
+            items(pendingApprovals.take(4), key = { "ap-${it.id}" }) { wo ->
+                AlertRow(Icons.Filled.FactCheck, AccentPurple, wo.title, "بانتظار اعتماد المشرف", onClick = { onOpenTab(BottomTab.WorkOrders) })
+            }
+            items(warningAssets, key = { "a-${it.id}" }) { asset ->
+                AlertRow(Icons.Filled.Warning, statusTone(asset.status).content, "${asset.code} • ${asset.name}", "الحالة: ${asset.status} • ${asset.location}", onClick = { onOpenTab(BottomTab.Assets) })
+            }
+            items(lowStockParts, key = { "p-${it.id}" }) { part ->
+                AlertRow(Icons.Filled.Inventory2, AccentRed, "${part.partNumber} • ${part.name}", "المتوفر ${part.onHandQty} • الحد الأدنى ${part.minQty}", onClick = { onOpenMore(MoreRoute.Inventory) })
+            }
+            items(duePm, key = { "m-${it.id}" }) { pm ->
+                AlertRow(Icons.Filled.EventRepeat, AccentOrange, pm.title, "مستحقة بتاريخ ${pm.nextDueAt}", onClick = { onOpenTab(BottomTab.Supervision) })
+            }
+            items(expiringWarranty.take(4), key = { "w-${it.id}" }) { asset ->
+                AlertRow(Icons.Filled.Verified, AccentTeal, "${asset.code} • ${asset.name}", "ينتهي الضمان بتاريخ ${asset.warrantyEnd}", onClick = { onOpenTab(BottomTab.Assets) })
             }
         }
     }
 }
 
 @Composable
-private fun KpiCard(
-    title: String,
-    value: String,
-    subtitle: String,
-    icon: ImageVector,
-    tint: Color,
-    container: Color,
-    modifier: Modifier = Modifier
-) {
+private fun MetricColumn(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun DotSectionTitle(text: String, dot: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.size(8.dp).background(dot, CircleShape))
+    }
+}
+
+@Composable
+private fun KpiTile(label: String, value: String, color: Color, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     ElevatedCard(
-        modifier = modifier.height(148.dp),
+        modifier = modifier.height(92.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconBubble(icon = icon, tint = tint, container = container)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            LtrText(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = color)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
 
 @Composable
-private fun AlertCard(icon: ImageVector, tone: StatusTone, title: String, body: String) {
+private fun BigActionButton(label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(54.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = color)
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+    }
+}
+
+@Composable
+private fun CalmCard() {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconBubble(Icons.Filled.CheckCircle, StatusRunning, StatusRunningContainer, 40)
+            Column {
+                Text("لا شيء عاجل", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text("كل شيء تحت السيطرة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String, onClick: (() -> Unit)? = null) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
@@ -463,10 +932,124 @@ private fun AlertCard(icon: ImageVector, tone: StatusTone, title: String, body: 
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconBubble(icon = icon, tint = tone.content, container = tone.container, size = 40)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            IconBubble(icon, tint, tint.copy(alpha = 0.14f), 40)
+            Column(modifier = Modifier.weight(1f)) {
                 LtrText(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (onClick != null) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// "More" grid
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun MoreGrid(
+    innerPadding: PaddingValues,
+    isAdmin: Boolean,
+    onOpen: (MoreRoute) -> Unit,
+    onLogout: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Notifications) }
+                ModuleCard("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Inventory) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.Reports) }
+                ModuleCard("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal, Modifier.weight(1f)) { onOpen(MoreRoute.PreventiveMaintenance) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.TaskLists) }
+                ModuleCard("العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Meters) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
+                ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
+                ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
+            }
+        }
+        if (isAdmin) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    ModuleCard("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Admin) }
+                    ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
+                }
+            }
+        } else {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModuleCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    ElevatedCard(
+        modifier = modifier
+            .height(132.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(accent)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconBubble(icon, accent, accent.copy(alpha = 0.14f), 40)
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -477,18 +1060,211 @@ private fun AlertCard(icon: ImageVector, tone: StatusTone, title: String, body: 
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AssetsScreen(innerPadding: PaddingValues, assets: List<AssetEntity>) {
+private fun AssetsScreen(
+    innerPadding: PaddingValues,
+    assets: List<AssetEntity>,
+    workOrders: List<WorkOrderEntity>,
+    pmItems: List<PreventiveMaintenanceEntity>,
+    locations: List<FunctionalLocationEntity>,
+    documents: List<AssetDocumentEntity>,
+    characteristics: List<AssetCharacteristicEntity>,
+    bomItems: List<AssetBomItemEntity>,
+    movements: List<AssetMovementEntity>,
+    spareParts: List<SparePartEntity>,
+    canManage: Boolean,
+    defaultAssignee: String,
+    onSave: (AssetEntity) -> Unit,
+    onDelete: (AssetEntity) -> Unit,
+    onChangeStatus: (AssetEntity, String) -> Unit,
+    onSaveWorkOrder: (WorkOrderEntity) -> Unit,
+    onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit,
+    onSaveDocument: (AssetDocumentEntity) -> Unit,
+    onDeleteDocument: (AssetDocumentEntity) -> Unit,
+    onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onSaveBom: (AssetBomItemEntity) -> Unit,
+    onDeleteBom: (AssetBomItemEntity) -> Unit,
+    onMove: (AssetEntity, String, Long?, String, String) -> Unit
+) {
     var query by rememberSaveable { mutableStateOf("") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<AssetEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<AssetEntity?>(null) }
+    var detailId by remember { mutableStateOf<Long?>(null) }
+
+    // Detail view (re-resolved from the live list so edits/status changes reflect).
+    val detailAsset = detailId?.let { id -> assets.firstOrNull { it.id == id } }
+    if (detailAsset != null) {
+        BackHandler { detailId = null }
+        AssetDetailScreen(
+            innerPadding = innerPadding,
+            asset = detailAsset,
+            allAssets = assets,
+            workOrders = workOrders.filter { it.assetId == detailAsset.id },
+            pmItems = pmItems.filter { it.assetId == detailAsset.id },
+            documents = documents.filter { it.assetId == detailAsset.id },
+            characteristics = characteristics.filter { it.assetId == detailAsset.id },
+            bomItems = bomItems.filter { it.assetId == detailAsset.id },
+            movements = movements.filter { it.assetId == detailAsset.id },
+            spareParts = spareParts,
+            locations = locations,
+            canManage = canManage,
+            defaultAssignee = defaultAssignee,
+            onBack = { detailId = null },
+            onOpenAsset = { detailId = it },
+            onSaveAsset = onSave,
+            onChangeStatus = onChangeStatus,
+            onSaveWorkOrder = onSaveWorkOrder,
+            onUpdateWorkOrderStatus = onUpdateWorkOrderStatus,
+            onSaveDocument = onSaveDocument,
+            onDeleteDocument = onDeleteDocument,
+            onSaveCharacteristic = onSaveCharacteristic,
+            onDeleteCharacteristic = onDeleteCharacteristic,
+            onSaveBom = onSaveBom,
+            onDeleteBom = onDeleteBom,
+            onMove = onMove
+        )
+        return
+    }
+
     val filtered = remember(query, assets) {
         if (query.isBlank()) assets else assets.filter { asset ->
             val q = query.lowercase(Locale.getDefault())
             asset.code.lowercase(Locale.getDefault()).contains(q) ||
                 asset.name.lowercase(Locale.getDefault()).contains(q) ||
                 asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
-                asset.location.lowercase(Locale.getDefault()).contains(q)
+                asset.location.lowercase(Locale.getDefault()).contains(q) ||
+                asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetTag.lowercase(Locale.getDefault()).contains(q)
         }
     }
     val grouped = filtered.groupBy { it.groupName }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill") }
+            if (canManage) {
+                item { AddButton("أصل جديد") { editing = null; showForm = true } }
+            }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد أصول مطابقة للبحث", Icons.Filled.Search) }
+            }
+            grouped.forEach { (group, groupAssets) ->
+                item { SectionHeader("$group (${groupAssets.size})") }
+                items(groupAssets, key = { it.id }) { asset ->
+                    AssetCard(
+                        asset = asset,
+                        canManage = canManage,
+                        onOpen = { detailId = asset.id },
+                        onEdit = { editing = asset; showForm = true },
+                        onDelete = { deleteTarget = asset }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showForm) {
+        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations, allAssets = assets)
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف الأصل",
+            text = "هل تريد حذف ${target.code} - ${target.name}؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun AssetCard(
+    asset: AssetEntity,
+    canManage: Boolean,
+    onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(asset.status, statusTone(asset.status))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            InfoRow("المجموعة", asset.groupName)
+            InfoRow("الموقع", asset.location)
+            InfoRow("الأهمية", asset.criticality)
+            if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+@Composable
+private fun AssetDetailScreen(
+    innerPadding: PaddingValues,
+    asset: AssetEntity,
+    allAssets: List<AssetEntity>,
+    workOrders: List<WorkOrderEntity>,
+    pmItems: List<PreventiveMaintenanceEntity>,
+    documents: List<AssetDocumentEntity>,
+    characteristics: List<AssetCharacteristicEntity>,
+    bomItems: List<AssetBomItemEntity>,
+    movements: List<AssetMovementEntity>,
+    spareParts: List<SparePartEntity>,
+    locations: List<FunctionalLocationEntity>,
+    canManage: Boolean,
+    defaultAssignee: String,
+    onBack: () -> Unit,
+    onOpenAsset: (Long) -> Unit,
+    onSaveAsset: (AssetEntity) -> Unit,
+    onChangeStatus: (AssetEntity, String) -> Unit,
+    onSaveWorkOrder: (WorkOrderEntity) -> Unit,
+    onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit,
+    onSaveDocument: (AssetDocumentEntity) -> Unit,
+    onDeleteDocument: (AssetDocumentEntity) -> Unit,
+    onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onSaveBom: (AssetBomItemEntity) -> Unit,
+    onDeleteBom: (AssetBomItemEntity) -> Unit,
+    onMove: (AssetEntity, String, Long?, String, String) -> Unit
+) {
+    var showDocForm by remember { mutableStateOf(false) }
+    var editingDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
+    var deleteDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
+    var showCharForm by remember { mutableStateOf(false) }
+    var editingChar by remember { mutableStateOf<AssetCharacteristicEntity?>(null) }
+    var deleteChar by remember { mutableStateOf<AssetCharacteristicEntity?>(null) }
+    var showBomForm by remember { mutableStateOf(false) }
+    var deleteBom by remember { mutableStateOf<AssetBomItemEntity?>(null) }
+    val partMap = spareParts.associateBy { it.id }
+    val locationLabel = asset.locationId?.let { id -> locations.firstOrNull { it.id == id }?.let { "${it.code} • ${it.name}" } } ?: "غير محدد"
+    val today = DateStrings.today()
+    val underWarranty = asset.isUnderWarranty(today)
+    val hasWarranty = asset.warrantyEnd.isNotBlank()
+    val parent = asset.parentAssetId?.let { id -> allAssets.firstOrNull { it.id == id } }
+    val children = allAssets.filter { it.parentAssetId == asset.id }
+    var showEdit by remember { mutableStateOf(false) }
+    var showStatus by remember { mutableStateOf(false) }
+    var showWoForm by remember { mutableStateOf(false) }
+    var showMoveForm by remember { mutableStateOf(false) }
+    val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
+    val retired = asset.status.equals("Retired", ignoreCase = true)
 
     LazyColumn(
         modifier = Modifier
@@ -498,43 +1274,625 @@ private fun AssetsScreen(innerPadding: PaddingValues, assets: List<AssetEntity>)
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill")
-        }
-
-        if (filtered.isEmpty()) {
-            item { EmptyState("لا توجد أصول مطابقة للبحث", Icons.Filled.Search) }
-        }
-
-        grouped.forEach { (group, groupAssets) ->
-            item { SectionHeader("$group (${groupAssets.size})") }
-            items(groupAssets, key = { it.id }) { asset -> AssetCard(asset) }
-        }
-    }
-}
-
-@Composable
-private fun AssetCard(asset: AssetEntity) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع") }
                 Column(modifier = Modifier.weight(1f)) {
-                    LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    LtrText(asset.code, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 StatusBadge(asset.status, statusTone(asset.status))
             }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SectionHeader("المعلومات")
+                    InfoRow("المجموعة", asset.groupName)
+                    InfoRow("الموقع", asset.location)
+                    InfoRow("الموقع الفني", locationLabel)
+                    InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
+                    InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                    if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
+                    if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
+                    InfoRow("الأهمية", asset.criticality)
+                    InfoRow("تاريخ التركيب", asset.installedAt)
+                    InfoRow("آخر فحص", asset.lastInspectionAt)
+                }
+            }
+        }
+
+        item {
+            val laborTotal = workOrders.sumOf { it.laborCost() }
+            val partsTotal = workOrders.sumOf { it.partsCost }
+            val grandTotal = workOrders.sumOf { it.totalCost() }
+            val closedCount = workOrders.count { it.status == "Closed" }
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        SectionHeader("التكاليف")
+                        Spacer(modifier = Modifier.weight(1f))
+                        StatusBadge(money(grandTotal), statusTone("info"))
+                    }
+                    InfoRow("إجمالي التكلفة", money(grandTotal))
+                    InfoRow("تكلفة العمالة", money(laborTotal))
+                    InfoRow("تكلفة قطع الغيار", money(partsTotal))
+                    InfoRow("أوامر العمل", "${workOrders.size} (مغلقة: $closedCount)")
+                }
+            }
+        }
+
+        val hasFinancial = asset.supplier.isNotBlank() || asset.purchaseOrder.isNotBlank() ||
+            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank()
+        if (hasFinancial) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("المعلومات المالية")
+                        if (asset.supplier.isNotBlank()) InfoRow("المورّد", asset.supplier)
+                        if (asset.purchaseOrder.isNotBlank()) InfoRow("أمر الشراء", asset.purchaseOrder)
+                        if (asset.purchaseCost > 0.0) InfoRow("تكلفة الشراء", money(asset.purchaseCost))
+                        if (asset.acquiredAt.isNotBlank()) InfoRow("تاريخ الاقتناء", asset.acquiredAt)
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("الخصائص الفنية (${characteristics.size})")
+                Spacer(modifier = Modifier.weight(1f))
+                if (canManage) {
+                    OutlinedButton(onClick = { editingChar = null; showCharForm = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة")
+                    }
+                }
+            }
+        }
+        if (characteristics.isEmpty()) {
+            item { EmptyState("لا توجد خصائص مسجّلة") }
+        }
+        items(characteristics, key = { "ch2-${it.id}" }) { ch ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(ch.name, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    LtrText("${ch.value} ${ch.unit}".trim(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    if (canManage) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = { editingChar = ch; showCharForm = true }) {
+                            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = { deleteChar = ch }) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("قائمة المكوّنات BOM (${bomItems.size})")
+                Spacer(modifier = Modifier.weight(1f))
+                if (canManage && spareParts.isNotEmpty()) {
+                    OutlinedButton(onClick = { showBomForm = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة")
+                    }
+                }
+            }
+        }
+        if (bomItems.isEmpty()) {
+            item { EmptyState("لا توجد قطع غيار مرتبطة بهذا الأصل") }
+        }
+        items(bomItems, key = { "bom-${it.id}" }) { item ->
+            val part = partMap[item.partId]
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.Inventory2, AccentPurple, AccentPurple.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(part?.partNumber ?: "Part #${item.partId}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(part?.name ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    StatusBadge("×${item.quantity}", statusTone("info"))
+                    if (canManage) {
+                        IconButton(onClick = { deleteBom = item }) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            val qr = rememberQrBitmap("ALHADI:${asset.code}")
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SectionHeader("رمز QR للأصل")
+                    if (qr != null) {
+                        Image(
+                            bitmap = qr,
+                            contentDescription = "QR ${asset.code}",
+                            modifier = Modifier
+                                .size(180.dp)
+                                .background(Color.White, RoundedCornerShape(8.dp))
+                                .padding(8.dp)
+                        )
+                    }
+                    LtrText("ALHADI:${asset.code}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("امسح الرمز للوصول إلى بطاقة الأصل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        if (hasWarranty) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            SectionHeader("الضمان")
+                            Spacer(modifier = Modifier.weight(1f))
+                            StatusBadge(if (underWarranty) "ضمن الضمان" else "منتهٍ", statusTone(if (underWarranty) "running" else "stopped"))
+                        }
+                        InfoRow("الجهة", asset.warrantyProvider)
+                        InfoRow("من", asset.warrantyStart)
+                        InfoRow("إلى", asset.warrantyEnd)
+                    }
+                }
+            }
+        }
+
+        if (canManage) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { showEdit = true }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("تعديل")
+                    }
+                    OutlinedButton(onClick = { showStatus = true }, modifier = Modifier.weight(1f)) {
+                        Text("تغيير الحالة")
+                    }
+                }
+            }
+            item {
+                OutlinedButton(onClick = { showMoveForm = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("تركيب / نقل / فك")
+                }
+            }
+            item {
+                if (retired) {
+                    Text(
+                        "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (underWarranty) {
+                            Text(
+                                "تنبيه: هذا الأصل ضمن الضمان — قد تتحمّل جهة الضمان تكلفة الإصلاح.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AccentOrange,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        AddButton("أمر عمل لهذا الأصل") { showWoForm = true }
+                    }
+                }
+            }
+        }
+
+        if (parent != null || children.isNotEmpty()) {
+            item { SectionHeader("الأصول الفرعية (${children.size})") }
+            items(children, key = { "ch-${it.id}" }) { child ->
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenAsset(child.id) },
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconBubble(Icons.Filled.PrecisionManufacturing, AccentGreen, AccentGreen.copy(alpha = 0.14f), 36)
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(child.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LtrText(child.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusBadge(child.status, statusTone(child.status))
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (children.isEmpty()) {
+                item { EmptyState("لا توجد أصول فرعية") }
+            }
+        }
+
+        item { SectionHeader("أوامر العمل المرتبطة (${workOrders.size})") }
+        if (workOrders.isEmpty()) {
+            item { EmptyState("لا توجد أوامر عمل لهذا الأصل") }
+        }
+        items(workOrders, key = { "wo-${it.id}" }) { wo ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(wo.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        StatusBadge(workOrderStatusLabel(wo.status), statusTone(wo.status))
+                    }
+                    Text("الاستحقاق: ${wo.dueAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (wo.approvalStatus == "Pending") {
+                        StatusBadge("بانتظار الاعتماد", statusTone("overdue"))
+                    }
+                    if (canManage && wo.status != "Closed" && !wo.isBlockedByApproval()) {
+                        when (wo.status) {
+                            "Open" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "In Progress") }, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
+                            "In Progress" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "Technically Completed") }, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
+                            "Technically Completed" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "Closed") }, modifier = Modifier.fillMaxWidth()) { Text("إغلاق نهائي") }
+                        }
+                    }
+                }
+            }
+        }
+
+        item { SectionHeader("الصيانة الدورية المرتبطة (${pmItems.size})") }
+        if (pmItems.isEmpty()) {
+            item { EmptyState("لا توجد مهام صيانة لهذا الأصل") }
+        }
+        items(pmItems, key = { "pm-${it.id}" }) { pm ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(pm.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        StatusBadge(if (DateStrings.isDueOrOverdue(pm.nextDueAt)) "مستحقة" else "مجدولة", statusTone(if (DateStrings.isDueOrOverdue(pm.nextDueAt)) "overdue" else "scheduled"))
+                    }
+                    Text("التنفيذ القادم: ${pm.nextDueAt} • كل ${pm.frequencyDays} يوم", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("المستندات (${documents.size})")
+                Spacer(modifier = Modifier.weight(1f))
+                if (canManage) {
+                    OutlinedButton(onClick = { editingDoc = null; showDocForm = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة")
+                    }
+                }
+            }
+        }
+        if (documents.isEmpty()) {
+            item { EmptyState("لا توجد مستندات لهذا الأصل", Icons.Filled.Description) }
+        }
+        items(documents, key = { "doc-${it.id}" }) { doc ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconBubble(Icons.Filled.Description, AccentBlue, AccentBlue.copy(alpha = 0.14f), 36)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(doc.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LtrText(doc.reference, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusBadge(doc.type, statusTone("info"))
+                    }
+                    Text("${doc.uploadedBy} • ${doc.uploadedAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (canManage) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(onClick = { editingDoc = doc; showDocForm = true }, modifier = Modifier.weight(1f)) { Text("تعديل") }
+                            TextButton(onClick = { deleteDoc = doc }, modifier = Modifier.weight(1f)) { Text("حذف", color = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                }
+            }
+        }
+
+        item { SectionHeader("سجل الحركات (${movements.size})") }
+        if (movements.isEmpty()) {
+            item { EmptyState("لا توجد حركات تركيب/نقل مسجّلة", Icons.Filled.SwapHoriz) }
+        }
+        items(movements, key = { "mv-${it.id}" }) { mv ->
+            val tone = when (mv.eventType) {
+                MovementType.INSTALL -> AccentGreen
+                MovementType.TRANSFER -> AccentBlue
+                MovementType.DISMANTLE -> AccentOrange
+                else -> MaterialTheme.colorScheme.error
+            }
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.SwapHoriz, tone, tone.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(MovementType.label(mv.eventType), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        val route = when {
+                            mv.fromLocationName.isNotBlank() && mv.toLocationName.isNotBlank() -> "${mv.fromLocationName} ← ${mv.toLocationName}"
+                            mv.toLocationName.isNotBlank() -> "إلى ${mv.toLocationName}"
+                            mv.fromLocationName.isNotBlank() -> "من ${mv.fromLocationName}"
+                            else -> ""
+                        }
+                        if (route.isNotBlank()) LtrText(route, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (mv.notes.isNotBlank()) Text(mv.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${mv.performedBy} • ${mv.occurredAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showMoveForm) {
+        MovementFormSheet(
+            asset = asset,
+            locations = locations,
+            onDismiss = { showMoveForm = false },
+            onSave = { type, locId, locName, notes -> onMove(asset, type, locId, locName, notes); showMoveForm = false }
+        )
+    }
+    if (showBomForm) {
+        BomFormSheet(
+            initial = null,
+            assetId = asset.id,
+            parts = spareParts,
+            onDismiss = { showBomForm = false },
+            onSave = { onSaveBom(it); showBomForm = false }
+        )
+    }
+    deleteBom?.let { target ->
+        ConfirmDialog(
+            title = "حذف بند المكوّنات",
+            text = "هل تريد حذف هذا البند من قائمة المكوّنات؟",
+            onConfirm = { onDeleteBom(target); deleteBom = null },
+            onDismiss = { deleteBom = null }
+        )
+    }
+    if (showCharForm) {
+        CharacteristicFormSheet(
+            initial = editingChar,
+            assetId = asset.id,
+            onDismiss = { showCharForm = false },
+            onSave = { onSaveCharacteristic(it); showCharForm = false }
+        )
+    }
+    deleteChar?.let { target ->
+        ConfirmDialog(
+            title = "حذف الخاصية",
+            text = "هل تريد حذف \"${target.name}\"؟",
+            onConfirm = { onDeleteCharacteristic(target); deleteChar = null },
+            onDismiss = { deleteChar = null }
+        )
+    }
+    if (showDocForm) {
+        DocumentFormSheet(
+            initial = editingDoc,
+            assetId = asset.id,
+            onDismiss = { showDocForm = false },
+            onSave = { onSaveDocument(it); showDocForm = false }
+        )
+    }
+    deleteDoc?.let { target ->
+        ConfirmDialog(
+            title = "حذف المستند",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDeleteDocument(target); deleteDoc = null },
+            onDismiss = { deleteDoc = null }
+        )
+    }
+
+    if (showEdit) {
+        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations, allAssets = allAssets)
+    }
+    if (showStatus) {
+        StatusPickerDialog(
+            current = asset.status,
+            options = lifecycle,
+            onPick = { onChangeStatus(asset, it); showStatus = false },
+            onDismiss = { showStatus = false }
+        )
+    }
+    if (showWoForm) {
+        WorkOrderFormSheet(
+            initial = null,
+            assets = listOf(asset),
+            defaultAssignee = defaultAssignee,
+            onDismiss = { showWoForm = false },
+            onSave = { onSaveWorkOrder(it); showWoForm = false }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance notifications (بلاغات)
+// ---------------------------------------------------------------------------
+
+private fun notificationStatusLabel(status: String): String = when (status) {
+    "New" -> "جديد"
+    "Screened" -> "تمت المراجعة"
+    "Approved" -> "معتمد"
+    "Rejected" -> "مرفوض"
+    "OrderCreated" -> "تحوّل لأمر"
+    "Closed" -> "مغلق"
+    else -> status
+}
+
+private fun workOrderStatusLabel(status: String): String = when (status) {
+    "Open" -> "مفتوح"
+    "In Progress" -> "قيد التنفيذ"
+    "Technically Completed" -> "مكتمل فنياً"
+    "Closed" -> "مغلق"
+    else -> status
+}
+
+private fun notificationStatusTone(status: String) = when (status) {
+    "Approved", "OrderCreated" -> statusTone("running")
+    "Rejected", "Closed" -> statusTone("stopped")
+    "Screened" -> statusTone("scheduled")
+    else -> statusTone("overdue")
+}
+
+@Composable
+private fun NotificationsScreen(
+    innerPadding: PaddingValues,
+    notifications: List<MaintenanceNotificationEntity>,
+    assets: List<AssetEntity>,
+    assetMap: Map<Long, AssetEntity>,
+    canManage: Boolean,
+    onSave: (MaintenanceNotificationEntity) -> Unit,
+    onSetStatus: (MaintenanceNotificationEntity, String) -> Unit,
+    onCreateOrder: (MaintenanceNotificationEntity) -> Unit,
+    onDelete: (MaintenanceNotificationEntity) -> Unit
+) {
+    val filters = listOf("All", "New", "Screened", "Approved", "OrderCreated", "Closed")
+    var selectedFilter by rememberSaveable { mutableStateOf("All") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<MaintenanceNotificationEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<MaintenanceNotificationEntity?>(null) }
+    val filtered = remember(selectedFilter, notifications) {
+        if (selectedFilter == "All") notifications else notifications.filter { it.status == selectedFilter }
+    }
+    val openCount = notifications.count { it.status == "New" || it.status == "Screened" }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("بلاغات الصيانة")
+                Text("نقطة بداية كل عمل صيانة — تُراجع وتُعتمد ثم تتحول إلى أوامر عمل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MetricColumn("الإجمالي", notifications.size.toString(), AccentBlue)
+                        MetricColumn("مفتوحة", openCount.toString(), if (openCount > 0) AccentOrange else AccentGreen)
+                        MetricColumn("معتمدة", notifications.count { it.status == "Approved" }.toString(), AccentTeal)
+                    }
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filters.forEach { f ->
+                        FilterChip(selected = selectedFilter == f, onClick = { selectedFilter = f }, label = { Text(if (f == "All") "الكل" else notificationStatusLabel(f)) })
+                    }
+                }
+            }
+            item { AddButton("بلاغ جديد") { editing = null; showForm = true } }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد بلاغات", Icons.Filled.NotificationsActive) }
+            }
+            items(filtered, key = { it.id }) { ntf ->
+                NotificationCard(
+                    notification = ntf,
+                    asset = ntf.assetId?.let { assetMap[it] },
+                    canManage = canManage,
+                    onSetStatus = onSetStatus,
+                    onCreateOrder = onCreateOrder,
+                    onEdit = { editing = ntf; showForm = true },
+                    onDelete = { deleteTarget = ntf }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        NotificationFormSheet(
+            initial = editing,
+            assets = assets,
+            onDismiss = { showForm = false },
+            onSave = { onSave(it); showForm = false }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف البلاغ",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun NotificationCard(
+    notification: MaintenanceNotificationEntity,
+    asset: AssetEntity?,
+    canManage: Boolean,
+    onSetStatus: (MaintenanceNotificationEntity, String) -> Unit,
+    onCreateOrder: (MaintenanceNotificationEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(notification.number, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(notification.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                }
+                StatusBadge(notificationStatusLabel(notification.status), notificationStatusTone(notification.status))
+            }
+            Text(notification.description, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusBadge(notification.type, statusTone("info"))
+                StatusBadge(notification.priority, priorityTone(notification.priority))
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-            InfoRow("المجموعة", asset.groupName)
-            InfoRow("الموقع", asset.location)
-            InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
-            InfoRow("الأهمية", asset.criticality)
-            InfoRow("آخر فحص", asset.lastInspectionAt)
+            if (asset != null) InfoRow("الأصل", "${asset.code} • ${asset.name}")
+            if (notification.damageCode.isNotBlank()) InfoRow("كود الضرر", notification.damageCode)
+            if (notification.causeCode.isNotBlank()) InfoRow("كود السبب", notification.causeCode)
+            InfoRow("المُبلِّغ", notification.reportedBy)
+            if (notification.requiredEnd.isNotBlank()) InfoRow("مطلوب الإنجاز قبل", notification.requiredEnd)
+            if (notification.linkedOrderId != null) {
+                StatusBadge("أمر عمل #${notification.linkedOrderId}", statusTone("running"))
+            }
+            if (canManage && notification.status != "Closed" && notification.status != "OrderCreated") {
+                when (notification.status) {
+                    "New" -> {
+                        OutlinedButton(onClick = { onSetStatus(notification, "Screened") }, modifier = Modifier.fillMaxWidth()) { Text("مراجعة البلاغ") }
+                    }
+                    "Screened" -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = { onSetStatus(notification, "Approved") }, modifier = Modifier.weight(1f)) { Text("اعتماد") }
+                            OutlinedButton(onClick = { onSetStatus(notification, "Rejected") }, modifier = Modifier.weight(1f)) { Text("رفض") }
+                        }
+                    }
+                    "Approved" -> {
+                        Button(onClick = { onCreateOrder(notification) }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Assignment, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("إنشاء أمر عمل")
+                        }
+                    }
+                    "Rejected" -> {
+                        OutlinedButton(onClick = { onSetStatus(notification, "Closed") }, modifier = Modifier.fillMaxWidth()) { Text("إغلاق البلاغ") }
+                    }
+                }
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 }
@@ -547,50 +1905,141 @@ private fun AssetCard(asset: AssetEntity) {
 private fun WorkOrdersScreen(
     innerPadding: PaddingValues,
     workOrders: List<WorkOrderEntity>,
+    assets: List<AssetEntity>,
     assetMap: Map<Long, AssetEntity>,
-    onUpdateStatus: (WorkOrderEntity, String) -> Unit
+    operations: List<WorkOrderOperationEntity>,
+    confirmations: List<WorkOrderConfirmationEntity>,
+    photos: List<WorkOrderPhotoEntity>,
+    canManage: Boolean,
+    defaultAssignee: String,
+    onSave: (WorkOrderEntity) -> Unit,
+    onDelete: (WorkOrderEntity) -> Unit,
+    onUpdateStatus: (WorkOrderEntity, String) -> Unit,
+    onApprove: (WorkOrderEntity, Boolean) -> Unit,
+    onSaveOperation: (WorkOrderOperationEntity) -> Unit,
+    onSetOperationStatus: (WorkOrderOperationEntity, String) -> Unit,
+    onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
+    onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
+    onAddPhoto: (Long, String) -> Unit,
+    onDeletePhoto: (WorkOrderPhotoEntity) -> Unit
 ) {
-    val statusFilters = listOf("All", "Open", "In Progress", "Closed")
+    val statusFilters = listOf("All", "Open", "In Progress", "Technically Completed", "Closed")
+    val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
-    val filtered = remember(selectedFilter, workOrders) {
-        if (selectedFilter == "All") workOrders else workOrders.filter { it.status == selectedFilter }
+    var selectedPriority by rememberSaveable { mutableStateOf("All") }
+    var pendingOnly by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<WorkOrderEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<WorkOrderEntity?>(null) }
+    val filtered = remember(selectedFilter, selectedPriority, pendingOnly, query, workOrders, assetMap) {
+        val q = query.lowercase(Locale.getDefault())
+        workOrders.filter { wo ->
+            val asset = assetMap[wo.assetId]
+            (selectedFilter == "All" || wo.status == selectedFilter) &&
+                (selectedPriority == "All" || wo.priority == selectedPriority) &&
+                (!pendingOnly || wo.approvalStatus == "Pending") &&
+                (q.isBlank() ||
+                    wo.title.lowercase(Locale.getDefault()).contains(q) ||
+                    (asset?.code?.lowercase(Locale.getDefault())?.contains(q) == true) ||
+                    (asset?.name?.lowercase(Locale.getDefault())?.contains(q) == true))
+        }.sortedWith(compareBy({ it.status == "Closed" }, { it.dueAt }))
     }
+    val pendingCount = workOrders.count { it.approvalStatus == "Pending" }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                statusFilters.forEach { filter ->
-                    FilterChip(
-                        selected = selectedFilter == filter,
-                        onClick = { selectedFilter = filter },
-                        label = { Text(filter) }
-                    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث بالعنوان أو الأصل…") }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    statusFilters.forEach { filter ->
+                        FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter }, label = { Text(if (filter == "All") "الكل" else workOrderStatusLabel(filter)) })
+                    }
                 }
             }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    priorityFilters.forEach { p ->
+                        FilterChip(selected = selectedPriority == p, onClick = { selectedPriority = p }, label = { Text(p) })
+                    }
+                    if (pendingCount > 0) {
+                        FilterChip(
+                            selected = pendingOnly,
+                            onClick = { pendingOnly = !pendingOnly },
+                            label = { Text("بانتظار الاعتماد ($pendingCount)") },
+                            leadingIcon = { Icon(Icons.Filled.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+            }
+            item {
+                Text(
+                    "عرض ${filtered.size} من ${workOrders.size} أمر عمل",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (canManage) {
+                item { AddButton("أمر عمل جديد") { editing = null; showForm = true } }
+            }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد أوامر عمل هنا.", Icons.Filled.Assignment) }
+            }
+            items(filtered, key = { it.id }) { workOrder ->
+                WorkOrderCard(
+                    workOrder = workOrder,
+                    asset = assetMap[workOrder.assetId],
+                    operations = operations.filter { it.orderId == workOrder.id },
+                    confirmations = confirmations.filter { it.orderId == workOrder.id },
+                    photos = photos.filter { it.orderId == workOrder.id },
+                    canManage = canManage,
+                    onUpdateStatus = onUpdateStatus,
+                    onApprove = onApprove,
+                    onSaveOperation = onSaveOperation,
+                    onSetOperationStatus = onSetOperationStatus,
+                    onDeleteOperation = onDeleteOperation,
+                    onConfirmOperation = onConfirmOperation,
+                    onAddPhoto = onAddPhoto,
+                    onDeletePhoto = onDeletePhoto,
+                    onEdit = { editing = workOrder; showForm = true },
+                    onDelete = { deleteTarget = workOrder }
+                )
+            }
         }
+    }
 
-        if (filtered.isEmpty()) {
-            item { EmptyState("لا توجد أوامر عمل", Icons.Filled.Assignment) }
-        }
-
-        items(filtered, key = { it.id }) { workOrder ->
-            WorkOrderCard(
-                workOrder = workOrder,
-                asset = assetMap[workOrder.assetId],
-                onUpdateStatus = onUpdateStatus
-            )
-        }
+    if (showForm) {
+        WorkOrderFormSheet(
+            initial = editing,
+            assets = assets,
+            defaultAssignee = defaultAssignee,
+            onDismiss = { showForm = false },
+            onSave = { onSave(it); showForm = false }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف أمر العمل",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
     }
 }
 
@@ -598,212 +2047,318 @@ private fun WorkOrdersScreen(
 private fun WorkOrderCard(
     workOrder: WorkOrderEntity,
     asset: AssetEntity?,
-    onUpdateStatus: (WorkOrderEntity, String) -> Unit
+    operations: List<WorkOrderOperationEntity>,
+    confirmations: List<WorkOrderConfirmationEntity>,
+    photos: List<WorkOrderPhotoEntity>,
+    canManage: Boolean,
+    onUpdateStatus: (WorkOrderEntity, String) -> Unit,
+    onApprove: (WorkOrderEntity, Boolean) -> Unit,
+    onSaveOperation: (WorkOrderOperationEntity) -> Unit,
+    onSetOperationStatus: (WorkOrderOperationEntity, String) -> Unit,
+    onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
+    onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
+    onAddPhoto: (Long, String) -> Unit,
+    onDeletePhoto: (WorkOrderPhotoEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
+    val pending = workOrder.approvalStatus == "Pending"
+    val rejected = workOrder.approvalStatus == "Rejected"
+    val blocked = workOrder.isBlockedByApproval()
+    var showOperations by remember { mutableStateOf(false) }
+    var showAddOp by remember { mutableStateOf(false) }
+    var confirmTarget by remember { mutableStateOf<WorkOrderOperationEntity?>(null) }
+    val confirmedOps = operations.count { it.status == "Confirmed" }
+    val hasEvidence = photos.isNotEmpty()
+    var pendingPhotoPath by remember { mutableStateOf<String?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val path = pendingPhotoPath
+        if (success && path != null) onAddPhoto(workOrder.id, path) else if (path != null) ImageStore.delete(path)
+        pendingPhotoPath = null
+    }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(workOrder.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    LtrText(
-                        asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${workOrder.assetId}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    LtrText(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${workOrder.assetId}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(workOrder.status, statusTone(workOrder.status))
+                StatusBadge(workOrderStatusLabel(workOrder.status), statusTone(workOrder.status))
             }
             Text(workOrder.description, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 StatusBadge(workOrder.priority, priorityTone(workOrder.priority))
                 AssistChip(onClick = {}, label = { Text(workOrder.assignedTo, maxLines = 1) })
             }
+            when (workOrder.approvalStatus) {
+                "Pending" -> StatusBadge("بانتظار الاعتماد", statusTone("overdue"))
+                "Approved" -> StatusBadge("معتمد${if (workOrder.approvedBy.isNotBlank()) " • ${workOrder.approvedBy}" else ""}", statusTone("running"))
+                "Rejected" -> StatusBadge("مرفوض", statusTone("stopped"))
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             InfoRow("تاريخ الإنشاء", workOrder.createdAt)
             InfoRow("تاريخ الاستحقاق", workOrder.dueAt)
             InfoRow("التكلفة التقديرية", "%.2f".format(workOrder.estimatedCost))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                if (workOrder.status == "Open") {
-                    OutlinedButton(
-                        onClick = { onUpdateStatus(workOrder, "In Progress") },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("بدء") }
-                }
-                if (workOrder.status != "Closed") {
-                    Button(
-                        onClick = { onUpdateStatus(workOrder, "Closed") },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("إغلاق") }
-                }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showOperations = !showOperations },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentBlue)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("العمليات ($confirmedOps/${operations.size} مؤكدة)", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                Icon(if (showOperations) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null)
             }
-        }
-    }
-}
-
-@Composable
-private fun CompactWorkOrderCard(workOrder: WorkOrderEntity) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(workOrder.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusBadge(workOrder.status, statusTone(workOrder.status))
-                StatusBadge(workOrder.priority, priorityTone(workOrder.priority))
-            }
-            Text(
-                "الاستحقاق: ${workOrder.dueAt}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CreateWorkOrderSheet(
-    assets: List<AssetEntity>,
-    sheetState: SheetState,
-    onDismiss: () -> Unit,
-    onCreate: (assetId: Long, title: String, description: String, priority: String, dueInDays: Int) -> Unit
-) {
-    var title by rememberSaveable { mutableStateOf("") }
-    var description by rememberSaveable { mutableStateOf("") }
-    var priority by rememberSaveable { mutableStateOf("Medium") }
-    var dueDays by rememberSaveable { mutableStateOf(3) }
-    var selectedAsset by remember { mutableStateOf(assets.firstOrNull()) }
-    var assetMenuOpen by remember { mutableStateOf(false) }
-
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text("إنشاء أمر عمل جديد", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("عنوان أمر العمل") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("الوصف") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Text("الأصل", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Box {
-                OutlinedButton(onClick = { assetMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = selectedAsset?.let { "${it.code} • ${it.name}" } ?: "اختر أصلاً",
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            if (showOperations) {
+                if (operations.isEmpty()) {
+                    Text("لا توجد عمليات. أضِف خطوات التنفيذ.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                DropdownMenu(expanded = assetMenuOpen, onDismissRequest = { assetMenuOpen = false }) {
-                    assets.forEach { asset ->
-                        DropdownMenuItem(
-                            text = { Text("${asset.code} • ${asset.name}") },
-                            onClick = {
-                                selectedAsset = asset
-                                assetMenuOpen = false
-                            }
+                operations.forEach { op ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            LtrText(op.operationNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(op.description, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            StatusBadge(
+                                when (op.status) { "Confirmed" -> "مؤكد"; "In Progress" -> "جارٍ"; else -> "مفتوح" },
+                                statusTone(when (op.status) { "Confirmed" -> "running"; "In Progress" -> "scheduled"; else -> "info" })
+                            )
+                        }
+                        Text(
+                            "مركز العمل: ${op.workCenter.ifBlank { "—" }} • مخطط ${op.plannedHours}س" + if (op.actualHours > 0) " • فعلي ${op.actualHours}س" else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        confirmations.filter { it.operationId == op.id }.forEach { c ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp), tint = AccentGreen)
+                                Text(
+                                    "${c.technician} • ${c.workDate} • ${c.actualWork}س" + if (c.finalConfirmation) " • نهائي" else "",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (c.actionTaken.isNotBlank()) {
+                                Text("الإجراء: ${c.actionTaken}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (canManage && op.status != "Confirmed") {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                if (op.status == "Open") {
+                                    OutlinedButton(onClick = { onSetOperationStatus(op, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء", style = MaterialTheme.typography.labelMedium) }
+                                }
+                                Button(onClick = { confirmTarget = op }, modifier = Modifier.weight(1f)) { Text("تأكيد", style = MaterialTheme.typography.labelMedium) }
+                                IconButton(onClick = { onDeleteOperation(op) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (canManage) {
+                    OutlinedButton(onClick = { showAddOp = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة عملية")
                     }
                 }
             }
 
-            Text("الأولوية", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf("Low", "Medium", "High", "Critical").forEach { p ->
-                    FilterChip(selected = priority == p, onClick = { priority = p }, label = { Text(p) })
+            if (canManage && (pending || rejected)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (pending) {
+                        Button(onClick = { onApprove(workOrder, true) }, modifier = Modifier.weight(1f)) { Text("اعتماد") }
+                        OutlinedButton(onClick = { onApprove(workOrder, false) }, modifier = Modifier.weight(1f)) { Text("رفض") }
+                    } else {
+                        Button(onClick = { onApprove(workOrder, true) }, modifier = Modifier.fillMaxWidth()) { Text("إعادة الاعتماد") }
+                    }
+                }
+            }
+            if (workOrder.status != "Closed") {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentTeal)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("أدلة التنفيذ (${photos.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (canManage) {
+                        TextButton(onClick = {
+                            val file = ImageStore.createCaptureFile(context, workOrder.id)
+                            pendingPhotoPath = file.absolutePath
+                            cameraLauncher.launch(ImageStore.uriFor(context, file))
+                        }) {
+                            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("التقاط صورة")
+                        }
+                    }
+                }
+                if (photos.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        photos.forEach { photo ->
+                            Box {
+                                val bmp = remember(photo.path) { ImageStore.decode(photo.path) }
+                                if (bmp != null) {
+                                    Image(
+                                        bitmap = bmp,
+                                        contentDescription = "دليل تنفيذ",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp))
+                                    )
+                                } else {
+                                    Box(modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Filled.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                if (canManage) {
+                                    Box(
+                                        modifier = Modifier.align(Alignment.TopEnd).size(22.dp).background(MaterialTheme.colorScheme.error, CircleShape).clickable { onDeletePhoto(photo) },
+                                        contentAlignment = Alignment.Center
+                                    ) { Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = Color.White, modifier = Modifier.size(14.dp)) }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text("لا توجد صور بعد — التقط صورة دليل بالكاميرا قبل الإغلاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
-            Text("الاستحقاق خلال (أيام): $dueDays", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(1, 3, 7, 14, 30).forEach { d ->
-                    FilterChip(selected = dueDays == d, onClick = { dueDays = d }, label = { Text(d.toString()) })
+            if (blocked) {
+                Text(
+                    if (pending) "يتطلّب اعتماد المشرف قبل البدء/الإغلاق." else "أمر العمل مرفوض — لا يمكن تنفيذه.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else {
+                val allConfirmed = operations.isNotEmpty() && operations.none { it.requiresConfirmation && it.status != "Confirmed" }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    when (workOrder.status) {
+                        "Open" -> {
+                            Button(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
+                        }
+                        "In Progress" -> {
+                            Button(onClick = { onUpdateStatus(workOrder, "Technically Completed") }, enabled = allConfirmed, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
+                        }
+                        "Technically Completed" -> {
+                            Button(onClick = { onUpdateStatus(workOrder, "Closed") }, enabled = hasEvidence, modifier = Modifier.fillMaxWidth()) { Text("إغلاق نهائي") }
+                        }
+                    }
+                }
+                if (workOrder.status == "In Progress" && !allConfirmed) {
+                    Text("الإكمال الفني يتطلّب تأكيد كل العمليات المطلوبة.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
+                }
+                if (workOrder.status == "Technically Completed" && !hasEvidence) {
+                    Text("الإغلاق النهائي يتطلّب التقاط صورة دليل تنفيذ بالكاميرا.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
                 }
             }
-
-            Button(
-                onClick = {
-                    val assetId = selectedAsset?.id
-                    if (assetId != null) onCreate(assetId, title, description, priority, dueDays)
-                },
-                enabled = selectedAsset != null && title.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                Text("حفظ أمر العمل", style = MaterialTheme.typography.titleMedium)
-            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
+    }
+
+    if (showAddOp) {
+        OperationFormSheet(
+            orderId = workOrder.id,
+            nextNumber = "%04d".format(((operations.mapNotNull { it.operationNumber.toIntOrNull() }.maxOrNull() ?: 0) + 10)),
+            onDismiss = { showAddOp = false },
+            onSave = { onSaveOperation(it); showAddOp = false }
+        )
+    }
+    confirmTarget?.let { op ->
+        ConfirmationFormSheet(
+            operation = op,
+            isFailureOrder = workOrder.isFailure,
+            onDismiss = { confirmTarget = null },
+            onSave = { onConfirmOperation(it, op); confirmTarget = null }
+        )
     }
 }
 
 // ---------------------------------------------------------------------------
-// Preventive maintenance
+// Preventive maintenance (Supervision tab)
 // ---------------------------------------------------------------------------
 
 @Composable
 private fun PreventiveMaintenanceScreen(
     innerPadding: PaddingValues,
     pmItems: List<PreventiveMaintenanceEntity>,
+    assets: List<AssetEntity>,
     assetMap: Map<Long, AssetEntity>,
-    onDone: (PreventiveMaintenanceEntity) -> Unit
+    canManage: Boolean,
+    checklist: List<PmChecklistItemEntity>,
+    taskLists: List<TaskListEntity>,
+    onSave: (PreventiveMaintenanceEntity) -> Unit,
+    onDelete: (PreventiveMaintenanceEntity) -> Unit,
+    onDone: (PreventiveMaintenanceEntity) -> Unit,
+    onSaveChecklistItem: (PmChecklistItemEntity) -> Unit,
+    onSetChecklistResult: (PmChecklistItemEntity, String) -> Unit,
+    onDeleteChecklistItem: (PmChecklistItemEntity) -> Unit,
+    onGenerateOrder: (PreventiveMaintenanceEntity) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            SectionHeader("جدول الصيانة الدورية")
-            Text(
-                "المهام مرتبة حسب أقرب تاريخ استحقاق.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<PreventiveMaintenanceEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<PreventiveMaintenanceEntity?>(null) }
+    val taskListMap = taskLists.associateBy { it.id }
 
-        if (pmItems.isEmpty()) {
-            item { EmptyState("لا توجد مهام صيانة دورية", Icons.Filled.EventRepeat) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("جدول الصيانة الدورية")
+                Text("المهام مرتبة حسب أقرب تاريخ استحقاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("مهمة صيانة جديدة") { editing = null; showForm = true } }
+            }
+            if (pmItems.isEmpty()) {
+                item { EmptyState("لا توجد مهام صيانة دورية", Icons.Filled.EventRepeat) }
+            }
+            items(pmItems, key = { it.id }) { item ->
+                PreventiveMaintenanceCard(
+                    item = item,
+                    asset = assetMap[item.assetId],
+                    canManage = canManage,
+                    checklist = checklist.filter { it.pmId == item.id },
+                    taskListName = item.taskListId?.let { taskListMap[it]?.name },
+                    onDone = onDone,
+                    onGenerateOrder = onGenerateOrder,
+                    onEdit = { editing = item; showForm = true },
+                    onDelete = { deleteTarget = item },
+                    onSaveChecklistItem = onSaveChecklistItem,
+                    onSetChecklistResult = onSetChecklistResult,
+                    onDeleteChecklistItem = onDeleteChecklistItem
+                )
+            }
         }
+    }
 
-        items(pmItems, key = { it.id }) { item ->
-            PreventiveMaintenanceCard(item = item, asset = assetMap[item.assetId], onDone = onDone)
-        }
+    if (showForm) {
+        PmFormSheet(initial = editing, assets = assets, taskLists = taskLists, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف مهمة الصيانة",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
     }
 }
 
@@ -811,24 +2366,30 @@ private fun PreventiveMaintenanceScreen(
 private fun PreventiveMaintenanceCard(
     item: PreventiveMaintenanceEntity,
     asset: AssetEntity?,
-    onDone: (PreventiveMaintenanceEntity) -> Unit
+    canManage: Boolean,
+    checklist: List<PmChecklistItemEntity>,
+    taskListName: String?,
+    onDone: (PreventiveMaintenanceEntity) -> Unit,
+    onGenerateOrder: (PreventiveMaintenanceEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onSaveChecklistItem: (PmChecklistItemEntity) -> Unit,
+    onSetChecklistResult: (PmChecklistItemEntity, String) -> Unit,
+    onDeleteChecklistItem: (PmChecklistItemEntity) -> Unit
 ) {
     val due = DateStrings.isDueOrOverdue(item.nextDueAt)
+    var showChecklist by remember { mutableStateOf(false) }
+    var showAddItem by remember { mutableStateOf(false) }
+    val doneCount = checklist.count { it.result == "OK" || it.result == "NA" }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(item.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    LtrText(
-                        asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${item.assetId}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    LtrText(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${item.assetId}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 StatusBadge(if (due) "مستحقة" else "مجدولة", statusTone(if (due) "overdue" else "scheduled"))
             }
@@ -837,12 +2398,202 @@ private fun PreventiveMaintenanceCard(
             InfoRow("آخر تنفيذ", item.lastDoneAt)
             InfoRow("التنفيذ القادم", item.nextDueAt)
             InfoRow("المدة المقدرة", "${item.estimatedDurationMinutes} دقيقة")
+            if (taskListName != null) InfoRow("قالب العمل", taskListName)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showChecklist = !showChecklist },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentTeal)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("قائمة الفحص ($doneCount/${checklist.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                Icon(
+                    if (showChecklist) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null
+                )
+            }
+            if (showChecklist) {
+                if (checklist.isEmpty()) {
+                    Text("لا توجد بنود فحص.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                checklist.forEach { ci ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(ci.text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            if (canManage) {
+                                IconButton(onClick = { onDeleteChecklistItem(ci) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("OK" to "سليم", "NotOK" to "عطل", "NA" to "لا ينطبق").forEach { (value, label) ->
+                                FilterChip(
+                                    selected = ci.result == value,
+                                    onClick = { onSetChecklistResult(ci, if (ci.result == value) "" else value) },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+                }
+                if (canManage) {
+                    OutlinedButton(onClick = { showAddItem = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة بند فحص")
+                    }
+                }
+            }
+
             Button(onClick = { onDone(item) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("تم التنفيذ")
             }
+            if (canManage) {
+                OutlinedButton(onClick = { onGenerateOrder(item) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (taskListName != null) "توليد أمر عمل من القالب" else "توليد أمر عمل")
+                }
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
+    }
+
+    if (showAddItem) {
+        ChecklistItemFormSheet(
+            pmId = item.id,
+            nextOrder = (checklist.maxOfOrNull { it.orderIndex } ?: 0) + 1,
+            onDismiss = { showAddItem = false },
+            onSave = { onSaveChecklistItem(it); showAddItem = false }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task lists (قوالب العمل)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun TaskListsScreen(
+    innerPadding: PaddingValues,
+    taskLists: List<TaskListEntity>,
+    operations: List<TaskListOperationEntity>,
+    canManage: Boolean,
+    onSaveTaskList: (TaskListEntity) -> Unit,
+    onDeleteTaskList: (TaskListEntity) -> Unit,
+    onSaveOperation: (TaskListOperationEntity) -> Unit,
+    onDeleteOperation: (TaskListOperationEntity) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<TaskListEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<TaskListEntity?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("قوالب العمل")
+                Text("قوالب عمليات قابلة لإعادة الاستخدام، تُنسخ إلى أمر العمل عند توليده من خطة وقائية.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("قالب عمل جديد") { editing = null; showForm = true } }
+            }
+            if (taskLists.isEmpty()) {
+                item { EmptyState("لا توجد قوالب عمل", Icons.AutoMirrored.Filled.List) }
+            }
+            items(taskLists, key = { it.id }) { tl ->
+                TaskListCard(
+                    taskList = tl,
+                    operations = operations.filter { it.taskListId == tl.id },
+                    canManage = canManage,
+                    onSaveOperation = onSaveOperation,
+                    onDeleteOperation = onDeleteOperation,
+                    onEdit = { editing = tl; showForm = true },
+                    onDelete = { deleteTarget = tl }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        TaskListFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSaveTaskList(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف القالب",
+            text = "هل تريد حذف \"${target.name}\" وكل عملياته؟",
+            onConfirm = { onDeleteTaskList(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun TaskListCard(
+    taskList: TaskListEntity,
+    operations: List<TaskListOperationEntity>,
+    canManage: Boolean,
+    onSaveOperation: (TaskListOperationEntity) -> Unit,
+    onDeleteOperation: (TaskListOperationEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showAddOp by remember { mutableStateOf(false) }
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBubble(Icons.AutoMirrored.Filled.List, AccentBlue, AccentBlue.copy(alpha = 0.14f), 40)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(taskList.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    if (taskList.description.isNotBlank()) Text(taskList.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge("${operations.size} عملية", statusTone("info"))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            operations.forEach { op ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LtrText(op.operationNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(op.description, style = MaterialTheme.typography.bodyMedium)
+                        Text("${op.workCenter.ifBlank { "—" }} • ${op.plannedHours}س", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (canManage) {
+                        IconButton(onClick = { onDeleteOperation(op) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+            if (operations.isEmpty()) {
+                Text("لا توجد عمليات في هذا القالب.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                OutlinedButton(onClick = { showAddOp = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("إضافة عملية للقالب")
+                }
+                EditDeleteRow(onEdit, onDelete)
+            }
+        }
+    }
+
+    if (showAddOp) {
+        TaskListOperationFormSheet(
+            taskListId = taskList.id,
+            defaultWorkCenter = taskList.defaultWorkCenter,
+            nextNumber = "%04d".format(((operations.mapNotNull { it.operationNumber.toIntOrNull() }.maxOrNull() ?: 0) + 10)),
+            onDismiss = { showAddOp = false },
+            onSave = { onSaveOperation(it); showAddOp = false }
+        )
     }
 }
 
@@ -856,48 +2607,98 @@ private fun InventoryScreen(
     parts: List<SparePartEntity>,
     transactions: List<InventoryTransactionEntity>,
     canReceive: Boolean,
+    canManage: Boolean,
     onIssue: (SparePartEntity) -> Unit,
-    onReceive: (SparePartEntity) -> Unit
+    onReceive: (SparePartEntity) -> Unit,
+    onSave: (SparePartEntity) -> Unit,
+    onDelete: (SparePartEntity) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val filtered = remember(query, parts) {
-        if (query.isBlank()) parts else parts.filter { part ->
+    var lowStockOnly by rememberSaveable { mutableStateOf(false) }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<SparePartEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<SparePartEntity?>(null) }
+    val lowStockCount = parts.count { it.onHandQty <= it.minQty }
+    val totalValue = parts.sumOf { it.onHandQty * it.lastPrice }
+    val filtered = remember(query, lowStockOnly, parts) {
+        parts.filter { part ->
             val q = query.lowercase(Locale.getDefault())
-            part.partNumber.lowercase(Locale.getDefault()).contains(q) ||
-                part.name.lowercase(Locale.getDefault()).contains(q) ||
-                part.equipmentGroup.lowercase(Locale.getDefault()).contains(q)
+            (!lowStockOnly || part.onHandQty <= part.minQty) &&
+                (q.isBlank() ||
+                    part.partNumber.lowercase(Locale.getDefault()).contains(q) ||
+                    part.name.lowercase(Locale.getDefault()).contains(q) ||
+                    part.equipmentGroup.lowercase(Locale.getDefault()).contains(q))
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor")
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MetricColumn("أصناف", parts.size.toString(), AccentBlue)
+                        MetricColumn("منخفض", lowStockCount.toString(), if (lowStockCount > 0) AccentRed else AccentGreen)
+                        MetricColumn("قيمة المخزون", money(totalValue), AccentTeal)
+                    }
+                }
+            }
+            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = !lowStockOnly, onClick = { lowStockOnly = false }, label = { Text("الكل") })
+                    FilterChip(
+                        selected = lowStockOnly,
+                        onClick = { lowStockOnly = true },
+                        label = { Text("منخفض المخزون ($lowStockCount)") },
+                        leadingIcon = { Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+            }
+            if (canManage) {
+                item { AddButton("قطعة غيار جديدة") { editing = null; showForm = true } }
+            }
+            item { SectionHeader("قطع الغيار (${filtered.size})") }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
+            }
+            items(filtered, key = { it.id }) { part ->
+                SparePartCard(
+                    part = part,
+                    canReceive = canReceive,
+                    canManage = canManage,
+                    onIssue = onIssue,
+                    onReceive = onReceive,
+                    onEdit = { editing = part; showForm = true },
+                    onDelete = { deleteTarget = part }
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                SectionHeader("آخر حركات المخزون")
+            }
+            if (transactions.isEmpty()) {
+                item { EmptyState("لا توجد حركات مخزون") }
+            }
+            items(transactions, key = { it.id }) { transaction -> TransactionCard(transaction = transaction) }
         }
+    }
 
-        item { SectionHeader("قطع الغيار") }
-        if (filtered.isEmpty()) {
-            item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
-        }
-        items(filtered, key = { it.id }) { part ->
-            SparePartCard(part = part, canReceive = canReceive, onIssue = onIssue, onReceive = onReceive)
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            SectionHeader("آخر حركات المخزون")
-        }
-        if (transactions.isEmpty()) {
-            item { EmptyState("لا توجد حركات مخزون") }
-        }
-        items(transactions, key = { it.id }) { transaction ->
-            TransactionCard(transaction = transaction)
-        }
+    if (showForm) {
+        PartFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف القطعة",
+            text = "هل تريد حذف ${target.partNumber} - ${target.name}؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
     }
 }
 
@@ -905,18 +2706,18 @@ private fun InventoryScreen(
 private fun SparePartCard(
     part: SparePartEntity,
     canReceive: Boolean,
+    canManage: Boolean,
     onIssue: (SparePartEntity) -> Unit,
-    onReceive: (SparePartEntity) -> Unit
+    onReceive: (SparePartEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     val lowStock = part.onHandQty <= part.minQty
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     LtrText(part.partNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -930,16 +2731,14 @@ private fun SparePartCard(
             InfoRow("الحد الأدنى", "${part.minQty} ${part.unit}")
             InfoRow("الموقع", part.location)
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
+            InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = { onIssue(part) }, modifier = Modifier.weight(1f)) {
-                    Text("صرف -1")
-                }
+                OutlinedButton(onClick = { onIssue(part) }, modifier = Modifier.weight(1f)) { Text("صرف -1") }
                 if (canReceive) {
-                    Button(onClick = { onReceive(part) }, modifier = Modifier.weight(1f)) {
-                        Text("استلام +1")
-                    }
+                    Button(onClick = { onReceive(part) }, modifier = Modifier.weight(1f)) { Text("استلام +1") }
                 }
             }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 }
@@ -969,11 +2768,7 @@ private fun TransactionCard(transaction: InventoryTransactionEntity) {
                     style = MaterialTheme.typography.titleSmall
                 )
                 LtrText("Part #${transaction.partId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    "${transaction.createdAt} • ${transaction.createdBy}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text("${transaction.createdAt} • ${transaction.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -987,14 +2782,43 @@ private fun TransactionCard(transaction: InventoryTransactionEntity) {
 private fun ReportsScreen(
     innerPadding: PaddingValues,
     stats: DashboardStats,
+    assets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     parts: List<SparePartEntity>,
     pmItems: List<PreventiveMaintenanceEntity>
 ) {
+    val today = DateStrings.today()
+    val soon = DateStrings.daysFromToday(30)
     val openCost = workOrders.filter { it.status != "Closed" }.sumOf { it.estimatedCost }
     val closed = workOrders.count { it.status == "Closed" }
     val lowStock = parts.filter { it.onHandQty <= it.minQty }
     val duePm = pmItems.filter { DateStrings.isDueOrOverdue(it.nextDueAt) }
+    val underWarranty = assets.filter { it.isUnderWarranty(today) }
+    val expiringSoon = assets.filter { it.warrantyEnd.isNotBlank() && it.warrantyEnd in today..soon }
+    val totalCost = workOrders.sumOf { it.totalCost() }
+    val laborCost = workOrders.sumOf { it.laborCost() }
+    val partsCost = workOrders.sumOf { it.partsCost }
+    val assetName = assets.associate { it.id to it.code }
+    val topCostAssets = workOrders.groupBy { it.assetId }
+        .mapValues { (_, list) -> list.sumOf { it.totalCost() } }
+        .entries.sortedByDescending { it.value }
+        .take(3)
+    val failures = workOrders.filter { it.isFailure }
+    val totalDowntime = failures.sumOf { it.downtimeHours }
+    val mttr = if (failures.isNotEmpty()) totalDowntime / failures.size else 0.0
+    val openWos = workOrders.filter { it.status != "Closed" }
+    val overdueWos = openWos.count { DateStrings.isDueOrOverdue(it.dueAt) }
+    val pendingApprovals = workOrders.count { it.approvalStatus == "Pending" }
+    val windowHours = (assets.size.coerceAtLeast(1)) * 30.0 * 24.0
+    val availability = ((windowHours - totalDowntime) / windowHours * 100.0).coerceIn(0.0, 100.0)
+    val context = LocalContext.current
+    val reportText = buildReportText(
+        assets = stats.assets, openWo = stats.openWorkOrders, closed = closed,
+        totalCost = totalCost, laborCost = laborCost, partsCost = partsCost, openCost = openCost,
+        availability = availability, failures = failures.size, downtime = totalDowntime, mttr = mttr,
+        overdue = overdueWos, pendingApprovals = pendingApprovals, duePm = duePm.size,
+        lowStock = lowStock.size, underWarranty = underWarranty.size, expiringSoon = expiringSoon.size
+    )
 
     LazyColumn(
         modifier = Modifier
@@ -1004,41 +2828,68 @@ private fun ReportsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            SectionHeader("تقارير مختصرة")
-            Text(
-                "هذه الشاشة جاهزة للتوسعة لاحقًا لتصدير PDF أو Excel.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    SectionHeader("التقارير والتحليلات")
+                    Text("ملخصات حيّة للتكاليف والتوفر والأعطال.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = { shareText(context, "تقرير الصيانة — الهادي CMMS", reportText) }) {
+                    Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("مشاركة")
+                }
+            }
         }
         item {
-            ReportCard(
-                title = "ملخص الصيانة",
-                lines = listOf(
-                    "إجمالي الأصول: ${stats.assets}",
-                    "أوامر العمل المفتوحة: ${stats.openWorkOrders}",
-                    "أوامر العمل المغلقة: $closed",
-                    "تكلفة تقديرية مفتوحة: ${"%.2f".format(openCost)}"
-                )
-            )
+            ReportCard("التوفّر والأعطال", listOf(
+                "نسبة التوفّر (30 يوم): ${"%.1f".format(availability)}%",
+                "عدد الأعطال: ${failures.size}",
+                "إجمالي زمن التوقف: ${"%.1f".format(totalDowntime)} ساعة",
+                "متوسط زمن الإصلاح MTTR: ${"%.1f".format(mttr)} ساعة"
+            ))
         }
         item {
-            ReportCard(
-                title = "الصيانة الدورية",
-                lines = listOf(
-                    "مهام PM المستحقة: ${duePm.size}",
-                    "أقرب مهمة: ${duePm.firstOrNull()?.title ?: "لا يوجد"}"
-                )
-            )
+            ReportCard("حالة أوامر العمل", listOf(
+                "مفتوحة حالياً: ${openWos.size}",
+                "متأخرة عن الاستحقاق: $overdueWos",
+                "بانتظار الاعتماد: $pendingApprovals",
+                "مغلقة: $closed"
+            ))
         }
         item {
-            ReportCard(
-                title = "المخزون",
-                lines = listOf(
-                    "قطع تحت الحد الأدنى: ${lowStock.size}",
-                    "أول قطعة ناقصة: ${lowStock.firstOrNull()?.partNumber ?: "لا يوجد"}"
-                )
-            )
+            ReportCard("ملخص الصيانة", listOf(
+                "إجمالي الأصول: ${stats.assets}",
+                "أوامر العمل المفتوحة: ${stats.openWorkOrders}",
+                "أوامر العمل المغلقة: $closed",
+                "تكلفة تقديرية مفتوحة: ${"%.2f".format(openCost)}"
+            ))
+        }
+        item {
+            ReportCard("التكاليف", listOf(
+                "إجمالي تكلفة الصيانة: ${money(totalCost)}",
+                "تكلفة العمالة: ${money(laborCost)}",
+                "تكلفة قطع الغيار: ${money(partsCost)}",
+                "تكلفة تقديرية مفتوحة: ${money(openCost)}"
+            ) + topCostAssets.map { "الأعلى تكلفة — ${assetName[it.key] ?: it.key}: ${money(it.value)}" })
+        }
+        item {
+            ReportCard("الصيانة الدورية", listOf(
+                "مهام PM المستحقة: ${duePm.size}",
+                "أقرب مهمة: ${duePm.firstOrNull()?.title ?: "لا يوجد"}"
+            ))
+        }
+        item {
+            ReportCard("المخزون", listOf(
+                "قطع تحت الحد الأدنى: ${lowStock.size}",
+                "أول قطعة ناقصة: ${lowStock.firstOrNull()?.partNumber ?: "لا يوجد"}"
+            ))
+        }
+        item {
+            ReportCard("الضمان", listOf(
+                "أصول ضمن الضمان: ${underWarranty.size}",
+                "ضمانات تنتهي خلال 30 يوم: ${expiringSoon.size}",
+                "الأقرب انتهاءً: ${expiringSoon.minByOrNull { it.warrantyEnd }?.let { "${it.code} (${it.warrantyEnd})" } ?: "لا يوجد"}"
+            ))
         }
     }
 }
@@ -1049,10 +2900,7 @@ private fun ReportCard(title: String, lines: List<String>) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(title)
             lines.forEach { line -> Text("• $line", style = MaterialTheme.typography.bodyMedium) }
         }
@@ -1060,30 +2908,11 @@ private fun ReportCard(title: String, lines: List<String>) {
 }
 
 // ---------------------------------------------------------------------------
-// Admin + audit log (governance)
+// Audit (governance) + Admin
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AdminScreen(
-    innerPadding: PaddingValues,
-    users: List<UserEntity>,
-    auditLog: List<AuditLogEntity>,
-    currentUser: UserEntity?,
-    onAddTechnician: () -> Unit,
-    onResetSampleData: () -> Unit
-) {
-    if (currentUser?.isAdmin != true) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            EmptyState("هذه الصفحة للمدير فقط", Icons.Filled.AdminPanelSettings)
-        }
-        return
-    }
-
+private fun AuditScreen(innerPadding: PaddingValues, auditLog: List<AuditLogEntity>) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1092,68 +2921,13 @@ private fun AdminScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            SectionHeader("إعدادات المدير")
-            Text(
-                "صفحة الإدارة تظهر فقط للمستخدمين بدور Admin.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onAddTechnician, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("إضافة فني")
-                }
-                OutlinedButton(onClick = onResetSampleData, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("إعادة تعيين")
-                }
-            }
-        }
-
-        item { SectionHeader("المستخدمون (${users.size})") }
-        items(users, key = { it.id }) { user -> UserCard(user) }
-
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(
-                    Icons.Filled.NotificationsActive,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                SectionHeader("سجل التدقيق (الحوكمة)")
-            }
+            SectionHeader("سجل التدقيق")
+            Text("تتبّع كامل لكل إجراء: من فعل ماذا ومتى.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (auditLog.isEmpty()) {
-            item { EmptyState("لا توجد سجلات بعد") }
+            item { EmptyState("لا توجد سجلات بعد", Icons.Filled.History) }
         }
         items(auditLog, key = { it.id }) { log -> AuditLogCard(log) }
-    }
-}
-
-@Composable
-private fun UserCard(user: UserEntity) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CircleAvatar(initials = user.initials, size = 42)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(user.name, fontWeight = FontWeight.Bold)
-                LtrText("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            StatusBadge(user.role, statusTone(if (user.isAdmin) "info" else "neutral"))
-        }
     }
 }
 
@@ -1168,11 +2942,712 @@ private fun AuditLogCard(log: AuditLogEntity) {
                 Text(log.details, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                 StatusBadge(log.action, statusTone(log.action))
             }
-            Text(
-                "${log.performedBy} • ${log.createdAt}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("${log.performedBy} • ${log.createdAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun AdminScreen(
+    innerPadding: PaddingValues,
+    users: List<UserEntity>,
+    currentUser: UserEntity?,
+    onAddTechnician: () -> Unit,
+    onResetSampleData: () -> Unit,
+    onSave: (UserEntity) -> Unit,
+    onSetActive: (UserEntity, Boolean) -> Unit,
+    onDelete: (UserEntity) -> Unit
+) {
+    if (currentUser?.isAdmin != true) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) { EmptyState("هذه الصفحة للمدير فقط", Icons.Filled.AdminPanelSettings) }
+        return
+    }
+
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<UserEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<UserEntity?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { AddButton("مستخدم جديد") { editing = null; showForm = true } }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = onAddTechnician, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("فني سريع")
+                    }
+                    OutlinedButton(onClick = onResetSampleData, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("إعادة تعيين")
+                    }
+                }
+            }
+            item { SectionHeader("المستخدمون (${users.size})") }
+            items(users, key = { it.id }) { user ->
+                UserCard(
+                    user = user,
+                    isSelf = user.id == currentUser.id,
+                    onEdit = { editing = user; showForm = true },
+                    onToggleActive = { onSetActive(user, !user.isActive) },
+                    onDelete = { deleteTarget = user }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        UserFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف المستخدم",
+            text = "هل تريد حذف ${target.name} (@${target.username})؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun UserCard(
+    user: UserEntity,
+    isSelf: Boolean,
+    onEdit: () -> Unit,
+    onToggleActive: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircleAvatar(initials = user.initials, size = 42)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(user.name, fontWeight = FontWeight.Bold)
+                    LtrText("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(if (user.isActive) user.role else "معطّل", statusTone(if (!user.isActive) "neutral" else if (user.isAdmin) "info" else "running"))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("تعديل")
+                }
+                if (!isSelf) {
+                    OutlinedButton(onClick = onToggleActive, modifier = Modifier.weight(1f)) {
+                        Text(if (user.isActive) "تعطيل" else "تفعيل")
+                    }
+                    TextButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
+                        Text("حذف", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Meters & readings
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun MetersScreen(
+    innerPadding: PaddingValues,
+    points: List<MeasuringPointEntity>,
+    readings: List<MeasurementReadingEntity>,
+    assetMap: Map<Long, AssetEntity>,
+    assets: List<AssetEntity>,
+    canManage: Boolean,
+    onSavePoint: (MeasuringPointEntity) -> Unit,
+    onDeletePoint: (MeasuringPointEntity) -> Unit,
+    onAddReading: (MeasuringPointEntity, Double, String) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<MeasuringPointEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<MeasuringPointEntity?>(null) }
+    var readingTarget by remember { mutableStateOf<MeasuringPointEntity?>(null) }
+    val grouped = points.groupBy { it.assetId }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("نقاط القياس")
+                Text("تابع أداء الأصول وسجّل القراءات.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("نقطة قياس جديدة") { editing = null; showForm = true } }
+            }
+            if (points.isEmpty()) {
+                item { EmptyState("لا توجد نقاط قياس", Icons.Filled.Speed) }
+            }
+            grouped.forEach { (assetId, assetPoints) ->
+                val asset = assetMap[assetId]
+                item { SectionHeader(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #$assetId") }
+                items(assetPoints, key = { it.id }) { point ->
+                    MeterCard(
+                        point = point,
+                        recentReadings = readings.filter { it.pointId == point.id }.take(6),
+                        canManage = canManage,
+                        onAddReading = { readingTarget = point },
+                        onEdit = { editing = point; showForm = true },
+                        onDelete = { deleteTarget = point }
+                    )
+                }
+            }
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                SectionHeader("آخر القراءات")
+            }
+            if (readings.isEmpty()) {
+                item { EmptyState("لا توجد قراءات بعد") }
+            }
+            items(readings.take(30), key = { it.id }) { reading ->
+                val point = points.firstOrNull { it.id == reading.pointId }
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        IconBubble(Icons.Filled.Speed, AccentPurple, AccentPurple.copy(alpha = 0.14f), 40)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("${point?.name ?: "Point #${reading.pointId}"}: ${reading.value} ${point?.unit ?: ""}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text("${reading.createdAt} • ${reading.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showForm) {
+        MeterFormSheet(initial = editing, assets = assets, onDismiss = { showForm = false }, onSave = { onSavePoint(it); showForm = false })
+    }
+    readingTarget?.let { target ->
+        ReadingDialog(point = target, onSubmit = { v, note -> onAddReading(target, v, note); readingTarget = null }, onDismiss = { readingTarget = null })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف نقطة القياس",
+            text = "هل تريد حذف \"${target.name}\"؟",
+            onConfirm = { onDeletePoint(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun MeterCard(
+    point: MeasuringPointEntity,
+    recentReadings: List<MeasurementReadingEntity>,
+    canManage: Boolean,
+    onAddReading: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val overLimit = point.upperLimit != null && point.lastReading > point.upperLimit
+    // recentReadings come newest-first; the previous reading is index 1.
+    val previous = recentReadings.getOrNull(1)?.value
+    val delta = previous?.let { point.lastReading - it }
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(point.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "${point.lastReading} ${point.unit}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (overLimit) StatusStopped else MaterialTheme.colorScheme.primary
+                        )
+                        if (delta != null && delta != 0.0) {
+                            val up = delta > 0
+                            Icon(
+                                if (up) Icons.Filled.TrendingUp else Icons.Filled.TrendingDown,
+                                contentDescription = null,
+                                tint = if (up) AccentGreen else AccentRed,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            LtrText("${if (up) "+" else ""}${"%.1f".format(delta)}", style = MaterialTheme.typography.labelMedium, color = if (up) AccentGreen else AccentRed)
+                        }
+                    }
+                }
+                StatusBadge(if (point.isCounter) "عداد" else "قراءة", statusTone("info"))
+            }
+            if (point.upperLimit != null) {
+                InfoRow("الحد الأعلى", "${point.upperLimit} ${point.unit}")
+            }
+            InfoRow("آخر تحديث", point.lastReadingAt)
+            if (recentReadings.size >= 2) {
+                LtrText(
+                    "آخر القراءات: " + recentReadings.take(6).joinToString(" ← ") { "${it.value}" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (overLimit) {
+                Text("تجاوز الحد الأعلى!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            }
+            Button(onClick = onAddReading, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("تسجيل قراءة")
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Functional locations
+// ---------------------------------------------------------------------------
+
+/** Depth-first ordering of the location tree, returning each node with its depth. */
+private fun orderedLocations(all: List<FunctionalLocationEntity>): List<Pair<FunctionalLocationEntity, Int>> {
+    val byParent = all.groupBy { it.parentId }
+    val result = mutableListOf<Pair<FunctionalLocationEntity, Int>>()
+    val placed = mutableSetOf<Long>()
+    fun visit(parentId: Long?, depth: Int) {
+        byParent[parentId]?.sortedBy { it.code }?.forEach { loc ->
+            if (placed.add(loc.id)) {
+                result += loc to depth
+                visit(loc.id, depth + 1)
+            }
+        }
+    }
+    visit(null, 0)
+    all.filter { it.id !in placed }.sortedBy { it.code }.forEach { result += it to 0 }
+    return result
+}
+
+@Composable
+private fun LocationsScreen(
+    innerPadding: PaddingValues,
+    locations: List<FunctionalLocationEntity>,
+    assets: List<AssetEntity>,
+    canManage: Boolean,
+    onSave: (FunctionalLocationEntity) -> Unit,
+    onDelete: (FunctionalLocationEntity) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<FunctionalLocationEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<FunctionalLocationEntity?>(null) }
+    var detailId by remember { mutableStateOf<Long?>(null) }
+
+    val detail = detailId?.let { id -> locations.firstOrNull { it.id == id } }
+    if (detail != null) {
+        BackHandler { detailId = null }
+        LocationDetailScreen(
+            innerPadding = innerPadding,
+            location = detail,
+            children = locations.filter { it.parentId == detail.id },
+            assets = assets.filter { it.locationId == detail.id },
+            onBack = { detailId = null },
+            onOpenChild = { detailId = it }
+        )
+        return
+    }
+
+    val ordered = remember(locations) { orderedLocations(locations) }
+    val assetCounts = remember(assets) { assets.groupBy { it.locationId } }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                SectionHeader("شجرة المواقع الفنية")
+                Text("نظّم الأصول حسب المصنع والخط والمنطقة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("موقع فني جديد") { editing = null; showForm = true } }
+            }
+            if (ordered.isEmpty()) {
+                item { EmptyState("لا توجد مواقع فنية", Icons.Filled.AccountTree) }
+            }
+            items(ordered, key = { it.first.id }) { (loc, depth) ->
+                LocationCard(
+                    location = loc,
+                    depth = depth,
+                    assetCount = assetCounts[loc.id]?.size ?: 0,
+                    childCount = locations.count { it.parentId == loc.id },
+                    canManage = canManage,
+                    onOpen = { detailId = loc.id },
+                    onEdit = { editing = loc; showForm = true },
+                    onDelete = { deleteTarget = loc }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        LocationFormSheet(initial = editing, allLocations = locations, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف الموقع الفني",
+            text = "هل تريد حذف ${target.code} - ${target.name}؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun LocationCard(
+    location: FunctionalLocationEntity,
+    depth: Int,
+    assetCount: Int,
+    childCount: Int,
+    canManage: Boolean,
+    onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 16).dp)
+            .clickable(onClick = onOpen),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBubble(Icons.Filled.AccountTree, AccentGreen, AccentGreen.copy(alpha = 0.14f), 38)
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(location.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    LtrText(location.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusBadge("أصول: $assetCount", statusTone("info"))
+                StatusBadge("فرعية: $childCount", statusTone("neutral"))
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+@Composable
+private fun LocationDetailScreen(
+    innerPadding: PaddingValues,
+    location: FunctionalLocationEntity,
+    children: List<FunctionalLocationEntity>,
+    assets: List<AssetEntity>,
+    onBack: () -> Unit,
+    onOpenChild: (Long) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع") }
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(location.code, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    LtrText(location.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(location.status, statusTone(location.status))
+            }
+        }
+        if (location.description.isNotBlank()) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Text(location.description, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+
+        item { SectionHeader("المواقع الفرعية (${children.size})") }
+        if (children.isEmpty()) {
+            item { EmptyState("لا توجد مواقع فرعية") }
+        }
+        items(children, key = { "c-${it.id}" }) { child ->
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenChild(child.id) },
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.AccountTree, AccentGreen, AccentGreen.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(child.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        LtrText(child.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        item { SectionHeader("الأصول في هذا الموقع (${assets.size})") }
+        if (assets.isEmpty()) {
+            item { EmptyState("لا توجد أصول مرتبطة بهذا الموقع") }
+        }
+        items(assets, key = { "a-${it.id}" }) { asset ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(asset.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        LtrText(asset.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    StatusBadge(asset.status, statusTone(asset.status))
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CAPA
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun CapaScreen(
+    innerPadding: PaddingValues,
+    items: List<CapaEntity>,
+    assets: List<AssetEntity>,
+    assetMap: Map<Long, AssetEntity>,
+    canManage: Boolean,
+    defaultAssignee: String,
+    onSave: (CapaEntity) -> Unit,
+    onUpdateStatus: (CapaEntity, String) -> Unit,
+    onDelete: (CapaEntity) -> Unit
+) {
+    val filters = listOf("All", "Open", "In Progress", "Closed")
+    var selectedFilter by rememberSaveable { mutableStateOf("All") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<CapaEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<CapaEntity?>(null) }
+    val filtered = remember(selectedFilter, items) {
+        if (selectedFilter == "All") items else items.filter { it.status == selectedFilter }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("الإجراءات التصحيحية والوقائية")
+                Text("إجراءات لمعالجة الأعطال ومنع تكرارها.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            item {
+                val today = DateStrings.today()
+                val open = items.count { it.status == "Open" }
+                val inProg = items.count { it.status == "In Progress" }
+                val overdue = items.count { it.status != "Closed" && it.dueAt < today }
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MetricColumn("مفتوح", open.toString(), AccentBlue)
+                        MetricColumn("قيد التنفيذ", inProg.toString(), AccentOrange)
+                        MetricColumn("متأخر", overdue.toString(), if (overdue > 0) AccentRed else AccentGreen)
+                    }
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filters.forEach { f ->
+                        FilterChip(selected = selectedFilter == f, onClick = { selectedFilter = f }, label = { Text(f) })
+                    }
+                }
+            }
+            if (canManage) {
+                item { AddButton("إجراء CAPA جديد") { editing = null; showForm = true } }
+            }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد إجراءات", Icons.Filled.FactCheck) }
+            }
+            items(filtered, key = { it.id }) { capa ->
+                CapaCard(
+                    capa = capa,
+                    asset = capa.assetId?.let { assetMap[it] },
+                    canManage = canManage,
+                    onUpdateStatus = onUpdateStatus,
+                    onEdit = { editing = capa; showForm = true },
+                    onDelete = { deleteTarget = capa }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        CapaFormSheet(
+            initial = editing,
+            assets = assets,
+            defaultAssignee = defaultAssignee,
+            onDismiss = { showForm = false },
+            onSave = { onSave(it); showForm = false }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف الإجراء",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun CapaCard(
+    capa: CapaEntity,
+    asset: AssetEntity?,
+    canManage: Boolean,
+    onUpdateStatus: (CapaEntity, String) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(capa.code, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(capa.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                }
+                StatusBadge(capa.status, statusTone(capa.status))
+            }
+            Text(capa.description, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusBadge(if (capa.type == "Preventive") "وقائي" else "تصحيحي", statusTone(if (capa.type == "Preventive") "info" else "warning"))
+                StatusBadge(capa.priority, priorityTone(capa.priority))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            if (asset != null) InfoRow("الأصل", "${asset.code} • ${asset.name}")
+            InfoRow("المسؤول", capa.assignedTo)
+            InfoRow("الاستحقاق", capa.dueAt)
+            if (capa.status != "Closed" && capa.dueAt < DateStrings.today()) {
+                Text("متأخر عن تاريخ الاستحقاق", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            }
+            if (capa.status != "Closed") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (capa.status == "Open") {
+                        OutlinedButton(onClick = { onUpdateStatus(capa, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
+                    }
+                    Button(onClick = { onUpdateStatus(capa, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
+                }
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Failure analysis (MTTR / MTBF)
+// ---------------------------------------------------------------------------
+
+private data class FailureStat(
+    val assetId: Long,
+    val failures: Int,
+    val mttrHours: Double,
+    val mtbfDays: Double?
+)
+
+@Composable
+private fun FailureAnalysisScreen(
+    innerPadding: PaddingValues,
+    workOrders: List<WorkOrderEntity>,
+    assetMap: Map<Long, AssetEntity>
+) {
+    val failures = remember(workOrders) { workOrders.filter { it.isFailure } }
+    val stats = remember(failures) {
+        failures.groupBy { it.assetId }.map { (assetId, list) ->
+            val downtimes = list.map { it.downtimeHours }.filter { it > 0.0 }
+            val mttr = if (downtimes.isEmpty()) 0.0 else downtimes.average()
+            val sorted = list.map { it.createdAt }.sorted()
+            val mtbf = if (sorted.size >= 2) {
+                val gaps = sorted.zipWithNext { a, b -> DateStrings.daysBetween(a, b).toDouble() }
+                gaps.average()
+            } else null
+            FailureStat(assetId, list.size, mttr, mtbf)
+        }.sortedByDescending { it.failures }
+    }
+    val overallMttr = remember(failures) {
+        val d = failures.map { it.downtimeHours }.filter { it > 0.0 }
+        if (d.isEmpty()) 0.0 else d.average()
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionHeader("ملخص الموثوقية")
+            Text("MTTR = متوسط زمن الإصلاح • MTBF = متوسط الزمن بين الأعطال.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiTile("إجمالي الأعطال", failures.size.toString(), AccentRed, Modifier.weight(1f))
+                KpiTile("MTTR (ساعة)", "%.1f".format(overallMttr), AccentOrange, Modifier.weight(1f))
+                KpiTile("أصول متأثرة", stats.size.toString(), AccentBlue, Modifier.weight(1f))
+            }
+        }
+
+        item { SectionHeader("حسب الأصل") }
+        if (stats.isEmpty()) {
+            item { EmptyState("لا توجد أعطال مسجّلة بعد", Icons.Filled.TrendingUp) }
+        }
+        items(stats, key = { it.assetId }) { stat ->
+            val asset = assetMap[stat.assetId]
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(asset?.code ?: "Asset #${stat.assetId}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            LtrText(asset?.name ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusBadge("أعطال: ${stat.failures}", statusTone(if (stat.failures >= 3) "stopped" else "warning"))
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    InfoRow("MTTR", "%.1f ساعة".format(stat.mttrHours))
+                    InfoRow("MTBF", stat.mtbfDays?.let { "%.0f يوم".format(it) } ?: "—")
+                }
+            }
         }
     }
 }
@@ -1180,6 +3655,40 @@ private fun AuditLogCard(log: AuditLogEntity) {
 // ---------------------------------------------------------------------------
 // Shared
 // ---------------------------------------------------------------------------
+
+/** Formats a monetary amount with thousands separators and a currency suffix. */
+private fun money(value: Double): String = "%,.0f ر.س".format(value)
+
+/** Shares a plain-text report through the Android share sheet (email, WhatsApp, notes…). */
+private fun shareText(context: Context, subject: String, body: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, body)
+    }
+    context.startActivity(Intent.createChooser(intent, subject))
+}
+
+/** Builds the shareable maintenance report body from the dashboard figures. */
+private fun buildReportText(
+    assets: Int, openWo: Int, closed: Int,
+    totalCost: Double, laborCost: Double, partsCost: Double, openCost: Double,
+    availability: Double, failures: Int, downtime: Double, mttr: Double,
+    overdue: Int, pendingApprovals: Int, duePm: Int,
+    lowStock: Int, underWarranty: Int, expiringSoon: Int
+): String = buildString {
+    appendLine("تقرير الصيانة — الهادي CMMS")
+    appendLine("التاريخ: ${DateStrings.today()}")
+    appendLine("──────────────")
+    appendLine("الأصول: $assets")
+    appendLine("أوامر العمل — مفتوحة: $openWo | مغلقة: $closed | متأخرة: $overdue | بانتظار الاعتماد: $pendingApprovals")
+    appendLine("التكاليف — إجمالي: ${money(totalCost)} | عمالة: ${money(laborCost)} | قطع: ${money(partsCost)} | تقديرية مفتوحة: ${money(openCost)}")
+    appendLine("التوفّر (30 يوم): ${"%.1f".format(availability)}%")
+    appendLine("الأعطال: $failures | زمن التوقف: ${"%.1f".format(downtime)}س | MTTR: ${"%.1f".format(mttr)}س")
+    appendLine("الصيانة الدورية المستحقة: $duePm")
+    appendLine("المخزون تحت الحد الأدنى: $lowStock")
+    appendLine("الضمان — ساري: $underWarranty | ينتهي خلال 30 يوم: $expiringSoon")
+}
 
 @Composable
 private fun SearchField(query: String, onChange: (String) -> Unit, placeholder: String) {
@@ -1189,7 +3698,39 @@ private fun SearchField(query: String, onChange: (String) -> Unit, placeholder: 
         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
         placeholder = { Text(placeholder) },
         singleLine = true,
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+@Composable
+private fun AddButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(label, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun EditDeleteRow(onEdit: () -> Unit, onDelete: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("تعديل")
+        }
+        TextButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("حذف", color = MaterialTheme.colorScheme.error)
+        }
+    }
 }

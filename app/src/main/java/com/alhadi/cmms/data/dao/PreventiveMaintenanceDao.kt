@@ -27,6 +27,9 @@ interface PreventiveMaintenanceDao {
     @Query("UPDATE preventive_maintenance SET status = :status, lastDoneAt = :doneAt, nextDueAt = :nextDueAt WHERE id = :id")
     suspend fun markDone(id: Long, status: String, doneAt: String, nextDueAt: String)
 
+    @Query("DELETE FROM preventive_maintenance WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("DELETE FROM preventive_maintenance")
     suspend fun deleteAll()
 }
