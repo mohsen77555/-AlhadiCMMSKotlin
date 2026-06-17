@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
@@ -72,6 +74,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -158,7 +161,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedTab by rememberSaveable { mutableStateOf(BottomTab.Home) }
     var moreRoute by rememberSaveable { mutableStateOf<MoreRoute?>(null) }
-    var showCreateSheet by rememberSaveable { mutableStateOf(false) }
+    val actorName = currentUser?.name ?: "Unassigned"
 
     val isAdmin = currentUser?.isAdmin == true
     val canManage = currentUser?.canManage == true
@@ -227,20 +230,33 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                     BottomTab.WorkOrders -> WorkOrdersScreen(
                         innerPadding = innerPadding,
                         workOrders = workOrders,
+                        assets = assets,
                         assetMap = assetMap,
                         canManage = canManage,
-                        onNewWorkOrder = { showCreateSheet = true },
+                        defaultAssignee = actorName,
+                        onSave = viewModel::saveWorkOrder,
+                        onDelete = viewModel::deleteWorkOrder,
                         onUpdateStatus = viewModel::updateWorkOrderStatus
                     )
 
                     BottomTab.Supervision -> PreventiveMaintenanceScreen(
                         innerPadding = innerPadding,
                         pmItems = preventiveMaintenance,
+                        assets = assets,
                         assetMap = assetMap,
+                        canManage = canManage,
+                        onSave = viewModel::savePreventiveMaintenance,
+                        onDelete = viewModel::deletePreventiveMaintenance,
                         onDone = viewModel::markPreventiveMaintenanceDone
                     )
 
-                    BottomTab.Assets -> AssetsScreen(innerPadding = innerPadding, assets = assets)
+                    BottomTab.Assets -> AssetsScreen(
+                        innerPadding = innerPadding,
+                        assets = assets,
+                        canManage = canManage,
+                        onSave = viewModel::saveAsset,
+                        onDelete = viewModel::deleteAsset
+                    )
 
                     BottomTab.More -> when (moreRoute) {
                         null -> MoreGrid(
@@ -254,8 +270,11 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             parts = spareParts,
                             transactions = transactions,
                             canReceive = canManage,
+                            canManage = canManage,
                             onIssue = viewModel::issuePart,
-                            onReceive = viewModel::receivePart
+                            onReceive = viewModel::receivePart,
+                            onSave = viewModel::savePart,
+                            onDelete = viewModel::deletePart
                         )
                         MoreRoute.Reports -> ReportsScreen(
                             innerPadding = innerPadding,
@@ -270,12 +289,19 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             users = users,
                             currentUser = currentUser,
                             onAddTechnician = viewModel::addTechnician,
-                            onResetSampleData = viewModel::resetSampleData
+                            onResetSampleData = viewModel::resetSampleData,
+                            onSave = viewModel::saveUser,
+                            onSetActive = viewModel::setUserActive,
+                            onDelete = viewModel::deleteUser
                         )
                         MoreRoute.PreventiveMaintenance -> PreventiveMaintenanceScreen(
                             innerPadding = innerPadding,
                             pmItems = preventiveMaintenance,
+                            assets = assets,
                             assetMap = assetMap,
+                            canManage = canManage,
+                            onSave = viewModel::savePreventiveMaintenance,
+                            onDelete = viewModel::deletePreventiveMaintenance,
                             onDone = viewModel::markPreventiveMaintenanceDone
                         )
                     }
@@ -283,28 +309,6 @@ fun CmmsApp(viewModel: CmmsViewModel) {
             }
         }
 
-        if (showCreateSheet) {
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            val scope = rememberCoroutineScope()
-            CreateWorkOrderSheet(
-                assets = assets,
-                sheetState = sheetState,
-                onDismiss = { showCreateSheet = false },
-                onCreate = { assetId, title, desc, priority, dueDays ->
-                    viewModel.createWorkOrder(
-                        assetId = assetId,
-                        title = title,
-                        description = desc,
-                        priority = priority,
-                        assignedTo = currentUser?.name ?: "Unassigned",
-                        dueAt = DateStrings.daysFromToday(dueDays),
-                        estimatedCost = 0.0
-                    )
-                    scope.launch { sheetState.hide() }
-                    showCreateSheet = false
-                }
-            )
-        }
     }
 }
 
@@ -828,8 +832,17 @@ private fun ModuleCard(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AssetsScreen(innerPadding: PaddingValues, assets: List<AssetEntity>) {
+private fun AssetsScreen(
+    innerPadding: PaddingValues,
+    assets: List<AssetEntity>,
+    canManage: Boolean,
+    onSave: (AssetEntity) -> Unit,
+    onDelete: (AssetEntity) -> Unit
+) {
     var query by rememberSaveable { mutableStateOf("") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<AssetEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<AssetEntity?>(null) }
     val filtered = remember(query, assets) {
         if (query.isBlank()) assets else assets.filter { asset ->
             val q = query.lowercase(Locale.getDefault())
@@ -841,28 +854,55 @@ private fun AssetsScreen(innerPadding: PaddingValues, assets: List<AssetEntity>)
     }
     val grouped = filtered.groupBy { it.groupName }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill") }
-
-        if (filtered.isEmpty()) {
-            item { EmptyState("لا توجد أصول مطابقة للبحث", Icons.Filled.Search) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill") }
+            if (canManage) {
+                item { AddButton("أصل جديد") { editing = null; showForm = true } }
+            }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد أصول مطابقة للبحث", Icons.Filled.Search) }
+            }
+            grouped.forEach { (group, groupAssets) ->
+                item { SectionHeader("$group (${groupAssets.size})") }
+                items(groupAssets, key = { it.id }) { asset ->
+                    AssetCard(
+                        asset = asset,
+                        canManage = canManage,
+                        onEdit = { editing = asset; showForm = true },
+                        onDelete = { deleteTarget = asset }
+                    )
+                }
+            }
         }
+    }
 
-        grouped.forEach { (group, groupAssets) ->
-            item { SectionHeader("$group (${groupAssets.size})") }
-            items(groupAssets, key = { it.id }) { asset -> AssetCard(asset) }
-        }
+    if (showForm) {
+        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف الأصل",
+            text = "هل تريد حذف ${target.code} - ${target.name}؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
     }
 }
 
 @Composable
-private fun AssetCard(asset: AssetEntity) {
+private fun AssetCard(
+    asset: AssetEntity,
+    canManage: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -881,6 +921,7 @@ private fun AssetCard(asset: AssetEntity) {
             InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
             InfoRow("الأهمية", asset.criticality)
             InfoRow("آخر فحص", asset.lastInspectionAt)
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 }
@@ -893,14 +934,20 @@ private fun AssetCard(asset: AssetEntity) {
 private fun WorkOrdersScreen(
     innerPadding: PaddingValues,
     workOrders: List<WorkOrderEntity>,
+    assets: List<AssetEntity>,
     assetMap: Map<Long, AssetEntity>,
     canManage: Boolean,
-    onNewWorkOrder: () -> Unit,
+    defaultAssignee: String,
+    onSave: (WorkOrderEntity) -> Unit,
+    onDelete: (WorkOrderEntity) -> Unit,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit
 ) {
     val statusFilters = listOf("All", "Open", "In Progress", "Closed")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
     var query by rememberSaveable { mutableStateOf("") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<WorkOrderEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<WorkOrderEntity?>(null) }
     val filtered = remember(selectedFilter, query, workOrders) {
         workOrders.filter { wo ->
             (selectedFilter == "All" || wo.status == selectedFilter) &&
@@ -908,52 +955,62 @@ private fun WorkOrdersScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث في أوامر العمل…") }
-
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                statusFilters.forEach { filter ->
-                    FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter }, label = { Text(filter) })
-                }
-            }
-        }
-
-        if (canManage) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث في أوامر العمل…") }
             item {
-                Button(
-                    onClick = onNewWorkOrder,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("أمر عمل جديد", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    statusFilters.forEach { filter ->
+                        FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter }, label = { Text(filter) })
+                    }
                 }
             }
+            if (canManage) {
+                item { AddButton("أمر عمل جديد") { editing = null; showForm = true } }
+            }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد أوامر عمل هنا.", Icons.Filled.Assignment) }
+            }
+            items(filtered, key = { it.id }) { workOrder ->
+                WorkOrderCard(
+                    workOrder = workOrder,
+                    asset = assetMap[workOrder.assetId],
+                    canManage = canManage,
+                    onUpdateStatus = onUpdateStatus,
+                    onEdit = { editing = workOrder; showForm = true },
+                    onDelete = { deleteTarget = workOrder }
+                )
+            }
         }
+    }
 
-        if (filtered.isEmpty()) {
-            item { EmptyState("لا توجد أوامر عمل هنا.", Icons.Filled.Assignment) }
-        }
-
-        items(filtered, key = { it.id }) { workOrder ->
-            WorkOrderCard(workOrder = workOrder, asset = assetMap[workOrder.assetId], onUpdateStatus = onUpdateStatus)
-        }
+    if (showForm) {
+        WorkOrderFormSheet(
+            initial = editing,
+            assets = assets,
+            defaultAssignee = defaultAssignee,
+            onDismiss = { showForm = false },
+            onSave = { onSave(it); showForm = false }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف أمر العمل",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
     }
 }
 
@@ -961,7 +1018,10 @@ private fun WorkOrdersScreen(
 private fun WorkOrderCard(
     workOrder: WorkOrderEntity,
     asset: AssetEntity?,
-    onUpdateStatus: (WorkOrderEntity, String) -> Unit
+    canManage: Boolean,
+    onUpdateStatus: (WorkOrderEntity, String) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -992,95 +1052,7 @@ private fun WorkOrderCard(
                     Button(onClick = { onUpdateStatus(workOrder, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
                 }
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CreateWorkOrderSheet(
-    assets: List<AssetEntity>,
-    sheetState: SheetState,
-    onDismiss: () -> Unit,
-    onCreate: (assetId: Long, title: String, description: String, priority: String, dueInDays: Int) -> Unit
-) {
-    var title by rememberSaveable { mutableStateOf("") }
-    var description by rememberSaveable { mutableStateOf("") }
-    var priority by rememberSaveable { mutableStateOf("Medium") }
-    var dueDays by rememberSaveable { mutableStateOf(3) }
-    var selectedAsset by remember { mutableStateOf(assets.firstOrNull()) }
-    var assetMenuOpen by remember { mutableStateOf(false) }
-
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text("إنشاء أمر عمل جديد", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-            OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("عنوان أمر العمل") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("الوصف") }, minLines = 2, modifier = Modifier.fillMaxWidth())
-
-            Text("الأصل", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Box {
-                OutlinedButton(onClick = { assetMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = selectedAsset?.let { "${it.code} • ${it.name}" } ?: "اختر أصلاً",
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-                }
-                DropdownMenu(expanded = assetMenuOpen, onDismissRequest = { assetMenuOpen = false }) {
-                    assets.forEach { asset ->
-                        DropdownMenuItem(text = { Text("${asset.code} • ${asset.name}") }, onClick = {
-                            selectedAsset = asset
-                            assetMenuOpen = false
-                        })
-                    }
-                }
-            }
-
-            Text("الأولوية", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf("Low", "Medium", "High", "Critical").forEach { p ->
-                    FilterChip(selected = priority == p, onClick = { priority = p }, label = { Text(p) })
-                }
-            }
-
-            Text("الاستحقاق خلال (أيام): $dueDays", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(1, 3, 7, 14, 30).forEach { d ->
-                    FilterChip(selected = dueDays == d, onClick = { dueDays = d }, label = { Text(d.toString()) })
-                }
-            }
-
-            Button(
-                onClick = {
-                    val assetId = selectedAsset?.id
-                    if (assetId != null) onCreate(assetId, title, description, priority, dueDays)
-                },
-                enabled = selectedAsset != null && title.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                Text("حفظ أمر العمل", style = MaterialTheme.typography.titleMedium)
-            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 }
@@ -1093,26 +1065,58 @@ private fun CreateWorkOrderSheet(
 private fun PreventiveMaintenanceScreen(
     innerPadding: PaddingValues,
     pmItems: List<PreventiveMaintenanceEntity>,
+    assets: List<AssetEntity>,
     assetMap: Map<Long, AssetEntity>,
+    canManage: Boolean,
+    onSave: (PreventiveMaintenanceEntity) -> Unit,
+    onDelete: (PreventiveMaintenanceEntity) -> Unit,
     onDone: (PreventiveMaintenanceEntity) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            SectionHeader("جدول الصيانة الدورية")
-            Text("المهام مرتبة حسب أقرب تاريخ استحقاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<PreventiveMaintenanceEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<PreventiveMaintenanceEntity?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("جدول الصيانة الدورية")
+                Text("المهام مرتبة حسب أقرب تاريخ استحقاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("مهمة صيانة جديدة") { editing = null; showForm = true } }
+            }
+            if (pmItems.isEmpty()) {
+                item { EmptyState("لا توجد مهام صيانة دورية", Icons.Filled.EventRepeat) }
+            }
+            items(pmItems, key = { it.id }) { item ->
+                PreventiveMaintenanceCard(
+                    item = item,
+                    asset = assetMap[item.assetId],
+                    canManage = canManage,
+                    onDone = onDone,
+                    onEdit = { editing = item; showForm = true },
+                    onDelete = { deleteTarget = item }
+                )
+            }
         }
-        if (pmItems.isEmpty()) {
-            item { EmptyState("لا توجد مهام صيانة دورية", Icons.Filled.EventRepeat) }
-        }
-        items(pmItems, key = { it.id }) { item ->
-            PreventiveMaintenanceCard(item = item, asset = assetMap[item.assetId], onDone = onDone)
-        }
+    }
+
+    if (showForm) {
+        PmFormSheet(initial = editing, assets = assets, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف مهمة الصيانة",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
     }
 }
 
@@ -1120,7 +1124,10 @@ private fun PreventiveMaintenanceScreen(
 private fun PreventiveMaintenanceCard(
     item: PreventiveMaintenanceEntity,
     asset: AssetEntity?,
-    onDone: (PreventiveMaintenanceEntity) -> Unit
+    canManage: Boolean,
+    onDone: (PreventiveMaintenanceEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     val due = DateStrings.isDueOrOverdue(item.nextDueAt)
     ElevatedCard(
@@ -1145,6 +1152,7 @@ private fun PreventiveMaintenanceCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("تم التنفيذ")
             }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 }
@@ -1159,10 +1167,16 @@ private fun InventoryScreen(
     parts: List<SparePartEntity>,
     transactions: List<InventoryTransactionEntity>,
     canReceive: Boolean,
+    canManage: Boolean,
     onIssue: (SparePartEntity) -> Unit,
-    onReceive: (SparePartEntity) -> Unit
+    onReceive: (SparePartEntity) -> Unit,
+    onSave: (SparePartEntity) -> Unit,
+    onDelete: (SparePartEntity) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<SparePartEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<SparePartEntity?>(null) }
     val filtered = remember(query, parts) {
         if (query.isBlank()) parts else parts.filter { part ->
             val q = query.lowercase(Locale.getDefault())
@@ -1172,29 +1186,54 @@ private fun InventoryScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor") }
-        item { SectionHeader("قطع الغيار") }
-        if (filtered.isEmpty()) {
-            item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor") }
+            if (canManage) {
+                item { AddButton("قطعة غيار جديدة") { editing = null; showForm = true } }
+            }
+            item { SectionHeader("قطع الغيار") }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
+            }
+            items(filtered, key = { it.id }) { part ->
+                SparePartCard(
+                    part = part,
+                    canReceive = canReceive,
+                    canManage = canManage,
+                    onIssue = onIssue,
+                    onReceive = onReceive,
+                    onEdit = { editing = part; showForm = true },
+                    onDelete = { deleteTarget = part }
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                SectionHeader("آخر حركات المخزون")
+            }
+            if (transactions.isEmpty()) {
+                item { EmptyState("لا توجد حركات مخزون") }
+            }
+            items(transactions, key = { it.id }) { transaction -> TransactionCard(transaction = transaction) }
         }
-        items(filtered, key = { it.id }) { part ->
-            SparePartCard(part = part, canReceive = canReceive, onIssue = onIssue, onReceive = onReceive)
-        }
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            SectionHeader("آخر حركات المخزون")
-        }
-        if (transactions.isEmpty()) {
-            item { EmptyState("لا توجد حركات مخزون") }
-        }
-        items(transactions, key = { it.id }) { transaction -> TransactionCard(transaction = transaction) }
+    }
+
+    if (showForm) {
+        PartFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف القطعة",
+            text = "هل تريد حذف ${target.partNumber} - ${target.name}؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
     }
 }
 
@@ -1202,8 +1241,11 @@ private fun InventoryScreen(
 private fun SparePartCard(
     part: SparePartEntity,
     canReceive: Boolean,
+    canManage: Boolean,
     onIssue: (SparePartEntity) -> Unit,
-    onReceive: (SparePartEntity) -> Unit
+    onReceive: (SparePartEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     val lowStock = part.onHandQty <= part.minQty
     ElevatedCard(
@@ -1230,6 +1272,7 @@ private fun SparePartCard(
                     Button(onClick = { onReceive(part) }, modifier = Modifier.weight(1f)) { Text("استلام +1") }
                 }
             }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 }
@@ -1375,7 +1418,10 @@ private fun AdminScreen(
     users: List<UserEntity>,
     currentUser: UserEntity?,
     onAddTechnician: () -> Unit,
-    onResetSampleData: () -> Unit
+    onResetSampleData: () -> Unit,
+    onSave: (UserEntity) -> Unit,
+    onSetActive: (UserEntity, Boolean) -> Unit,
+    onDelete: (UserEntity) -> Unit
 ) {
     if (currentUser?.isAdmin != true) {
         Box(
@@ -1387,49 +1433,95 @@ private fun AdminScreen(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onAddTechnician, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("إضافة فني")
-                }
-                OutlinedButton(onClick = onResetSampleData, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("إعادة تعيين")
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<UserEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<UserEntity?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { AddButton("مستخدم جديد") { editing = null; showForm = true } }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = onAddTechnician, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("فني سريع")
+                    }
+                    OutlinedButton(onClick = onResetSampleData, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("إعادة تعيين")
+                    }
                 }
             }
+            item { SectionHeader("المستخدمون (${users.size})") }
+            items(users, key = { it.id }) { user ->
+                UserCard(
+                    user = user,
+                    isSelf = user.id == currentUser.id,
+                    onEdit = { editing = user; showForm = true },
+                    onToggleActive = { onSetActive(user, !user.isActive) },
+                    onDelete = { deleteTarget = user }
+                )
+            }
         }
-        item { SectionHeader("المستخدمون (${users.size})") }
-        items(users, key = { it.id }) { user -> UserCard(user) }
+    }
+
+    if (showForm) {
+        UserFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف المستخدم",
+            text = "هل تريد حذف ${target.name} (@${target.username})؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
     }
 }
 
 @Composable
-private fun UserCard(user: UserEntity) {
+private fun UserCard(
+    user: UserEntity,
+    isSelf: Boolean,
+    onEdit: () -> Unit,
+    onToggleActive: () -> Unit,
+    onDelete: () -> Unit
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CircleAvatar(initials = user.initials, size = 42)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(user.name, fontWeight = FontWeight.Bold)
-                LtrText("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircleAvatar(initials = user.initials, size = 42)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(user.name, fontWeight = FontWeight.Bold)
+                    LtrText("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(if (user.isActive) user.role else "معطّل", statusTone(if (!user.isActive) "neutral" else if (user.isAdmin) "info" else "running"))
             }
-            StatusBadge(user.role, statusTone(if (user.isAdmin) "info" else "neutral"))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("تعديل")
+                }
+                if (!isSelf) {
+                    OutlinedButton(onClick = onToggleActive, modifier = Modifier.weight(1f)) {
+                        Text(if (user.isActive) "تعطيل" else "تفعيل")
+                    }
+                    TextButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
+                        Text("حذف", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
         }
     }
 }
@@ -1449,4 +1541,36 @@ private fun SearchField(query: String, onChange: (String) -> Unit, placeholder: 
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+@Composable
+private fun AddButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(label, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun EditDeleteRow(onEdit: () -> Unit, onDelete: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("تعديل")
+        }
+        TextButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("حذف", color = MaterialTheme.colorScheme.error)
+        }
+    }
 }

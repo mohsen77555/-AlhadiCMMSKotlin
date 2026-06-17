@@ -27,6 +27,9 @@ interface AssetDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAsset(asset: AssetEntity): Long
 
+    @Query("DELETE FROM assets WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("DELETE FROM assets")
     suspend fun deleteAll()
 }

@@ -27,6 +27,9 @@ interface WorkOrderDao {
     @Query("UPDATE work_orders SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
 
+    @Query("DELETE FROM work_orders WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("DELETE FROM work_orders")
     suspend fun deleteAll()
 }

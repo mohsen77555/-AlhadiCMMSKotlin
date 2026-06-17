@@ -168,6 +168,27 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         repository.seedSampleData(replace = true)
     }
 
+    // ----- CRUD: Assets -----
+    fun saveAsset(asset: AssetEntity) = launchAction("تم حفظ الأصل") { repository.saveAsset(asset, actor()) }
+    fun deleteAsset(asset: AssetEntity) = launchAction("تم حذف الأصل") { repository.deleteAsset(asset, actor()) }
+
+    // ----- CRUD: Spare parts -----
+    fun savePart(part: SparePartEntity) = launchAction("تم حفظ القطعة") { repository.savePart(part, actor()) }
+    fun deletePart(part: SparePartEntity) = launchAction("تم حذف القطعة") { repository.deletePart(part, actor()) }
+
+    // ----- CRUD: Work orders -----
+    fun saveWorkOrder(workOrder: WorkOrderEntity) = launchAction("تم حفظ أمر العمل") { repository.saveWorkOrder(workOrder, actor()) }
+    fun deleteWorkOrder(workOrder: WorkOrderEntity) = launchAction("تم حذف أمر العمل") { repository.deleteWorkOrder(workOrder, actor()) }
+
+    // ----- CRUD: Preventive maintenance -----
+    fun savePreventiveMaintenance(item: PreventiveMaintenanceEntity) = launchAction("تم حفظ مهمة الصيانة") { repository.savePreventiveMaintenance(item, actor()) }
+    fun deletePreventiveMaintenance(item: PreventiveMaintenanceEntity) = launchAction("تم حذف مهمة الصيانة") { repository.deletePreventiveMaintenance(item, actor()) }
+
+    // ----- CRUD: Users -----
+    fun saveUser(user: UserEntity) = launchAction("تم حفظ المستخدم") { repository.saveUser(user, actor()) }
+    fun setUserActive(user: UserEntity, active: Boolean) = launchAction("تم تحديث حالة المستخدم") { repository.setUserActive(user, active, actor()) }
+    fun deleteUser(user: UserEntity) = launchAction("تم حذف المستخدم") { repository.deleteUser(user, actor()) }
+
     fun clearMessage() {
         _message.value = null
     }

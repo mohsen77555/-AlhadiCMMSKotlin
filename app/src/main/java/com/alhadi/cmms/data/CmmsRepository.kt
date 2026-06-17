@@ -261,4 +261,84 @@ class CmmsRepository(private val database: AppDatabase) {
         )
         recordAudit("Create", "User", "إضافة فني جديد tech$number", actor)
     }
+
+    // ---------------------------------------------------------------------
+    // CRUD — Assets
+    // ---------------------------------------------------------------------
+
+    suspend fun saveAsset(asset: AssetEntity, actor: String = "System") {
+        val isNew = asset.id == 0L
+        assetDao.insertAsset(asset)
+        recordAudit(if (isNew) "Create" else "Update", "Asset", "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code}", actor)
+    }
+
+    suspend fun deleteAsset(asset: AssetEntity, actor: String = "System") {
+        assetDao.deleteById(asset.id)
+        recordAudit("Delete", "Asset", "حذف أصل: ${asset.code}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // CRUD — Spare parts
+    // ---------------------------------------------------------------------
+
+    suspend fun savePart(part: SparePartEntity, actor: String = "System") {
+        val isNew = part.id == 0L
+        sparePartDao.insert(part)
+        recordAudit(if (isNew) "Create" else "Update", "Inventory", "${if (isNew) "إضافة" else "تعديل"} قطعة: ${part.partNumber}", actor)
+    }
+
+    suspend fun deletePart(part: SparePartEntity, actor: String = "System") {
+        sparePartDao.deleteById(part.id)
+        recordAudit("Delete", "Inventory", "حذف قطعة: ${part.partNumber}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // CRUD — Work orders (edit / delete)
+    // ---------------------------------------------------------------------
+
+    suspend fun saveWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
+        val isNew = workOrder.id == 0L
+        workOrderDao.insertWorkOrder(workOrder)
+        recordAudit(if (isNew) "Create" else "Update", "WorkOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر عمل: ${workOrder.title}", actor)
+    }
+
+    suspend fun deleteWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
+        workOrderDao.deleteById(workOrder.id)
+        recordAudit("Delete", "WorkOrder", "حذف أمر عمل: ${workOrder.title}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // CRUD — Preventive maintenance
+    // ---------------------------------------------------------------------
+
+    suspend fun savePreventiveMaintenance(item: PreventiveMaintenanceEntity, actor: String = "System") {
+        val isNew = item.id == 0L
+        pmDao.insert(item)
+        recordAudit(if (isNew) "Create" else "Update", "PreventiveMaintenance", "${if (isNew) "إضافة" else "تعديل"} صيانة دورية: ${item.title}", actor)
+    }
+
+    suspend fun deletePreventiveMaintenance(item: PreventiveMaintenanceEntity, actor: String = "System") {
+        pmDao.deleteById(item.id)
+        recordAudit("Delete", "PreventiveMaintenance", "حذف صيانة دورية: ${item.title}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // CRUD — Users
+    // ---------------------------------------------------------------------
+
+    suspend fun saveUser(user: UserEntity, actor: String = "System") {
+        val isNew = user.id == 0L
+        userDao.insert(user)
+        recordAudit(if (isNew) "Create" else "Update", "User", "${if (isNew) "إضافة" else "تعديل"} مستخدم: ${user.username}", actor)
+    }
+
+    suspend fun setUserActive(user: UserEntity, active: Boolean, actor: String = "System") {
+        userDao.setActive(user.id, active)
+        recordAudit("Update", "User", "${if (active) "تفعيل" else "تعطيل"} المستخدم: ${user.username}", actor)
+    }
+
+    suspend fun deleteUser(user: UserEntity, actor: String = "System") {
+        userDao.deleteById(user.id)
+        recordAudit("Delete", "User", "حذف المستخدم: ${user.username}", actor)
+    }
 }
