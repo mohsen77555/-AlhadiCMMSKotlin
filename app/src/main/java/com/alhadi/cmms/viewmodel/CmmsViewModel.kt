@@ -224,12 +224,12 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         repository.markPreventiveMaintenanceDone(item, actor())
     }
 
-    fun issuePart(part: SparePartEntity) = launchAction("تم صرف قطعة من المخزون") {
-        repository.issuePart(part, actor = actor())
+    fun issuePart(part: SparePartEntity, quantity: Int = 1) = launchAction("تم صرف $quantity من المخزون") {
+        repository.issuePart(part, quantity = quantity, actor = actor())
     }
 
-    fun receivePart(part: SparePartEntity) = launchAction("تم إضافة قطعة إلى المخزون") {
-        repository.receivePart(part, actor = actor())
+    fun receivePart(part: SparePartEntity, quantity: Int = 1) = launchAction("تم استلام $quantity إلى المخزون") {
+        repository.receivePart(part, quantity = quantity, actor = actor())
     }
 
     fun addTechnician() = launchAction("تمت إضافة فني تجريبي") {

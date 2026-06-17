@@ -475,7 +475,7 @@ internal fun WorkOrderFormSheet(
         LabeledField("الوصف", description, { description = it }, singleLine = false)
         AssetDropdown(assets, assetId) { assetId = it }
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
-        OptionDropdown("الحالة", listOf("Open", "In Progress", "Closed"), status) { status = it }
+        OptionDropdown("الحالة", listOf("Open", "In Progress", "Technically Completed", "Closed"), status) { status = it }
         LabeledField("المسؤول", assignedTo, { assignedTo = it })
         LabeledField("التكلفة التقديرية", cost, { cost = it }, numeric = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

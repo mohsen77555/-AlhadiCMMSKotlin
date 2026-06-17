@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -73,6 +74,7 @@ import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -115,6 +117,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -2786,8 +2789,8 @@ private fun InventoryScreen(
     transactions: List<InventoryTransactionEntity>,
     canReceive: Boolean,
     canManage: Boolean,
-    onIssue: (SparePartEntity) -> Unit,
-    onReceive: (SparePartEntity) -> Unit,
+    onIssue: (SparePartEntity, Int) -> Unit,
+    onReceive: (SparePartEntity, Int) -> Unit,
     onSave: (SparePartEntity) -> Unit,
     onDelete: (SparePartEntity) -> Unit
 ) {
@@ -2893,12 +2896,13 @@ private fun SparePartCard(
     part: SparePartEntity,
     canReceive: Boolean,
     canManage: Boolean,
-    onIssue: (SparePartEntity) -> Unit,
-    onReceive: (SparePartEntity) -> Unit,
+    onIssue: (SparePartEntity, Int) -> Unit,
+    onReceive: (SparePartEntity, Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val lowStock = part.onHandQty <= part.minQty
+    var moveMode by remember { mutableStateOf<String?>(null) } // "issue" | "receive"
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -2919,14 +2923,67 @@ private fun SparePartCard(
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
             InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = { onIssue(part) }, modifier = Modifier.weight(1f)) { Text("صرف -1") }
+                OutlinedButton(onClick = { moveMode = "issue" }, enabled = part.onHandQty > 0, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("صرف")
+                }
                 if (canReceive) {
-                    Button(onClick = { onReceive(part) }, modifier = Modifier.weight(1f)) { Text("استلام +1") }
+                    Button(onClick = { moveMode = "receive" }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("استلام")
+                    }
                 }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
+
+    moveMode?.let { mode ->
+        val isIssue = mode == "issue"
+        QuantityDialog(
+            title = if (isIssue) "صرف ${part.partNumber}" else "استلام ${part.partNumber}",
+            label = if (isIssue) "الكمية المصروفة (المتوفر ${part.onHandQty})" else "الكمية المستلمة",
+            maxValue = if (isIssue) part.onHandQty else null,
+            onConfirm = { qty ->
+                if (isIssue) onIssue(part, qty) else onReceive(part, qty)
+                moveMode = null
+            },
+            onDismiss = { moveMode = null }
+        )
+    }
+}
+
+@Composable
+private fun QuantityDialog(
+    title: String,
+    label: String,
+    maxValue: Int?,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf("1") }
+    val qty = text.toIntOrNull()
+    val valid = qty != null && qty > 0 && (maxValue == null || qty <= maxValue)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.filter { c -> c.isDigit() } },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = { TextButton(enabled = valid, onClick = { onConfirm(qty!!) }) { Text("تأكيد") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
 }
 
 @Composable

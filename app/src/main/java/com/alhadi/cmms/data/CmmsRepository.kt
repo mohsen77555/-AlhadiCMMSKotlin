@@ -403,6 +403,9 @@ class CmmsRepository(private val database: AppDatabase) {
     // ---------------------------------------------------------------------
 
     suspend fun issuePart(part: SparePartEntity, quantity: Int = 1, actor: String = "System") {
+        if (quantity > part.onHandQty) {
+            throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${part.onHandQty})")
+        }
         database.withTransaction {
             sparePartDao.adjustStock(part.id, -quantity)
             transactionDao.insert(
