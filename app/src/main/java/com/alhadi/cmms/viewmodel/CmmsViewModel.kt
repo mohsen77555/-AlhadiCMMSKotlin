@@ -23,6 +23,7 @@ import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
+import com.alhadi.cmms.data.entity.TrashEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
@@ -110,6 +111,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val auditLog: StateFlow<List<AuditLogEntity>> = repository.auditLog
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val trash: StateFlow<List<TrashEntity>> = repository.trash
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val measuringPoints: StateFlow<List<MeasuringPointEntity>> = repository.measuringPoints
@@ -420,6 +424,10 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
                 .onFailure { _message.value = "تعذّر تصدير PDF: ${it.message ?: "غير معروف"}" }
         }
     }
+
+    fun restoreTrash(item: TrashEntity) = launchAction("تم استرجاع العنصر") { repository.restoreTrash(item, actor()) }
+    fun purgeTrash(item: TrashEntity) = launchAction("تم الحذف نهائياً") { repository.purgeTrash(item, actor()) }
+    fun emptyTrash() = launchAction("تم تفريغ سلة المحذوفات") { repository.emptyTrash(actor()) }
 
     fun clearMessage() {
         _message.value = null

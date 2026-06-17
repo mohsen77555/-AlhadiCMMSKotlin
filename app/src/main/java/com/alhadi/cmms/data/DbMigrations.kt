@@ -31,11 +31,26 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 object DbMigrations {
 
+    /** v22 -> v23: adds the recycle-bin (soft delete) `trash` table. */
+    val MIGRATION_22_23 = object : Migration(22, 23) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `trash` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`entityType` TEXT NOT NULL, " +
+                    "`entityId` INTEGER NOT NULL, " +
+                    "`label` TEXT NOT NULL, " +
+                    "`payload` TEXT NOT NULL, " +
+                    "`deletedAt` TEXT NOT NULL, " +
+                    "`deletedBy` TEXT NOT NULL)"
+            )
+        }
+    }
+
     /**
-     * All migrations, in order. Empty while the schema is stable at the current version.
-     * Append new `Migration` objects here as the schema evolves.
+     * All migrations, in order. Append new `Migration` objects here as the schema evolves.
      */
-    val ALL: Array<Migration> = arrayOf()
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

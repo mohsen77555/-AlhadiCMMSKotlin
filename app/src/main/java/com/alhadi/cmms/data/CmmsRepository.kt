@@ -18,6 +18,7 @@ import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
+import com.alhadi.cmms.data.entity.TrashEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
@@ -52,6 +53,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val photoDao = database.workOrderPhotoDao()
     private val taskListDao = database.taskListDao()
     private val permitDao = database.workPermitDao()
+    private val trashDao = database.trashDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -77,6 +79,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val taskLists: Flow<List<TaskListEntity>> = taskListDao.observeTaskLists()
     val taskListOperations: Flow<List<TaskListOperationEntity>> = taskListDao.observeTaskListOperations()
     val workPermits: Flow<List<WorkPermitEntity>> = permitDao.observePermits()
+    val trash: Flow<List<TrashEntity>> = trashDao.observeTrash()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -116,6 +119,52 @@ class CmmsRepository(private val database: AppDatabase) {
     /** All inventory transactions linked to a specific work order (for PDF / traceability). */
     suspend fun transactionsForOrder(orderId: Long): List<InventoryTransactionEntity> =
         transactionDao.dumpAll().filter { it.workOrderId == orderId }
+
+    // ---------------------------------------------------------------------
+    // Recycle bin (soft delete / restore)
+    // ---------------------------------------------------------------------
+
+    private suspend fun moveToTrash(entityType: String, entityId: Long, label: String, payload: String, actor: String) {
+        trashDao.insert(
+            TrashEntity(
+                entityType = entityType,
+                entityId = entityId,
+                label = label,
+                payload = payload,
+                deletedAt = DateStrings.now(),
+                deletedBy = actor
+            )
+        )
+    }
+
+    /** Re-inserts a soft-deleted record from the recycle bin and removes its trash entry. */
+    suspend fun restoreTrash(item: TrashEntity, actor: String = "System") {
+        database.withTransaction {
+            when (item.entityType) {
+                "Asset" -> assetDao.insertAsset(backupJson.decodeFromString(AssetEntity.serializer(), item.payload))
+                "Inventory" -> sparePartDao.insert(backupJson.decodeFromString(SparePartEntity.serializer(), item.payload))
+                "WorkOrder" -> workOrderDao.insertWorkOrder(backupJson.decodeFromString(WorkOrderEntity.serializer(), item.payload))
+                "PM" -> pmDao.insert(backupJson.decodeFromString(PreventiveMaintenanceEntity.serializer(), item.payload))
+                "Location" -> locationDao.insert(backupJson.decodeFromString(FunctionalLocationEntity.serializer(), item.payload))
+                "CAPA" -> capaDao.insert(backupJson.decodeFromString(CapaEntity.serializer(), item.payload))
+                "User" -> userDao.insert(backupJson.decodeFromString(UserEntity.serializer(), item.payload))
+                "Notification" -> notificationDao.insert(backupJson.decodeFromString(MaintenanceNotificationEntity.serializer(), item.payload))
+                "TaskList" -> taskListDao.insertTaskList(backupJson.decodeFromString(TaskListEntity.serializer(), item.payload))
+            }
+            trashDao.deleteById(item.id)
+            recordAudit("Restore", item.entityType, "استرجاع: ${item.label}", actor)
+        }
+    }
+
+    suspend fun purgeTrash(item: TrashEntity, actor: String = "System") {
+        trashDao.deleteById(item.id)
+        recordAudit("Delete", "Trash", "حذف نهائي: ${item.label}", actor)
+    }
+
+    suspend fun emptyTrash(actor: String = "System") {
+        trashDao.deleteAll()
+        recordAudit("Delete", "Trash", "تفريغ سلة المحذوفات", actor)
+    }
 
     // ---------------------------------------------------------------------
     // Backup & restore (full database snapshot as portable JSON)
@@ -609,6 +658,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteAsset(asset: AssetEntity, actor: String = "System") {
+        moveToTrash("Asset", asset.id, "${asset.code} — ${asset.name}", backupJson.encodeToString(AssetEntity.serializer(), asset), actor)
         assetDao.deleteById(asset.id)
         recordAudit("Delete", "Asset", "حذف أصل: ${asset.code}", actor)
     }
@@ -629,6 +679,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deletePart(part: SparePartEntity, actor: String = "System") {
+        moveToTrash("Inventory", part.id, "${part.partNumber} — ${part.name}", backupJson.encodeToString(SparePartEntity.serializer(), part), actor)
         sparePartDao.deleteById(part.id)
         recordAudit("Delete", "Inventory", "حذف قطعة: ${part.partNumber}", actor)
     }
@@ -656,6 +707,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
+        moveToTrash("WorkOrder", workOrder.id, "أمر #${workOrder.id} — ${workOrder.title}", backupJson.encodeToString(WorkOrderEntity.serializer(), workOrder), actor)
         workOrderDao.deleteById(workOrder.id)
         recordAudit("Delete", "WorkOrder", "حذف أمر عمل: ${workOrder.title}", actor)
     }
@@ -671,6 +723,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deletePreventiveMaintenance(item: PreventiveMaintenanceEntity, actor: String = "System") {
+        moveToTrash("PM", item.id, item.title, backupJson.encodeToString(PreventiveMaintenanceEntity.serializer(), item), actor)
         pmDao.deleteById(item.id)
         recordAudit("Delete", "PreventiveMaintenance", "حذف صيانة دورية: ${item.title}", actor)
     }
@@ -701,6 +754,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteUser(user: UserEntity, actor: String = "System") {
+        moveToTrash("User", user.id, "${user.name} (@${user.username})", backupJson.encodeToString(UserEntity.serializer(), user), actor)
         userDao.deleteById(user.id)
         recordAudit("Delete", "User", "حذف المستخدم: ${user.username}", actor)
     }
@@ -758,6 +812,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
+        moveToTrash("Location", location.id, "${location.code} — ${location.name}", backupJson.encodeToString(FunctionalLocationEntity.serializer(), location), actor)
         locationDao.deleteById(location.id)
         recordAudit("Delete", "Location", "حذف موقع فني: ${location.code}", actor)
     }
@@ -783,6 +838,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteCapa(item: CapaEntity, actor: String = "System") {
+        moveToTrash("CAPA", item.id, "${item.code} — ${item.title}", backupJson.encodeToString(CapaEntity.serializer(), item), actor)
         capaDao.deleteById(item.id)
         recordAudit("Delete", "CAPA", "حذف إجراء: ${item.title}", actor)
     }
@@ -965,6 +1021,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteNotification(notification: MaintenanceNotificationEntity, actor: String = "System") {
+        moveToTrash("Notification", notification.id, "${notification.number} — ${notification.title}", backupJson.encodeToString(MaintenanceNotificationEntity.serializer(), notification), actor)
         notificationDao.deleteById(notification.id)
         recordAudit("Delete", "Notification", "حذف بلاغ: ${notification.title}", actor)
     }

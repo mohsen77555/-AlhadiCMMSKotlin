@@ -149,6 +149,7 @@ import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
+import com.alhadi.cmms.data.entity.TrashEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
@@ -189,7 +190,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures }
+private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
 
 private data class ScreenMeta(
     val title: String,
@@ -209,6 +210,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val users by viewModel.users.collectAsStateWithLifecycle()
     val auditLog by viewModel.auditLog.collectAsStateWithLifecycle()
+    val trash by viewModel.trash.collectAsStateWithLifecycle()
     val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
@@ -436,6 +438,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             pmItems = preventiveMaintenance
                         )
                         MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
+                        MoreRoute.Trash -> TrashScreen(
+                            innerPadding = innerPadding,
+                            items = trash,
+                            canManage = canManage,
+                            onRestore = viewModel::restoreTrash,
+                            onPurge = viewModel::purgeTrash,
+                            onEmpty = viewModel::emptyTrash
+                        )
                         MoreRoute.Meters -> MetersScreen(
                             innerPadding = innerPadding,
                             points = measuringPoints,
@@ -536,6 +546,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
         MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
         MoreRoute.Failures -> ScreenMeta("تحليل الأعطال", "MTTR و MTBF وتكرار الأعطال", Icons.Filled.TrendingUp, AccentRed)
+        MoreRoute.Trash -> ScreenMeta("سلة المحذوفات", "استرجاع أو حذف نهائي", Icons.Filled.Delete, AccentBrown)
     }
 }
 
@@ -1093,6 +1104,12 @@ private fun MoreGrid(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
                 ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("سلة المحذوفات", "استرجاع أو حذف نهائي", Icons.Filled.Delete, AccentBrown, Modifier.weight(1f)) { onOpen(MoreRoute.Trash) }
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
         if (isAdmin) {
@@ -3515,6 +3532,123 @@ private fun auditVisual(action: String): Pair<ImageVector, Color> = when (action
     "Attach" -> Icons.Filled.PhotoCamera to AccentTeal
     "Import" -> Icons.Filled.UploadFile to AccentGreen
     else -> Icons.Filled.History to AccentOrange
+}
+
+@Composable
+private fun TrashScreen(
+    innerPadding: PaddingValues,
+    items: List<TrashEntity>,
+    canManage: Boolean,
+    onRestore: (TrashEntity) -> Unit,
+    onPurge: (TrashEntity) -> Unit,
+    onEmpty: () -> Unit
+) {
+    var purgeTarget by remember { mutableStateOf<TrashEntity?>(null) }
+    var confirmEmpty by remember { mutableStateOf(false) }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionHeader("سلة المحذوفات (${items.size})")
+            Text("العناصر المحذوفة تبقى هنا قابلة للاسترجاع، أو الحذف نهائياً.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (canManage && items.isNotEmpty()) {
+            item {
+                OutlinedButton(onClick = { confirmEmpty = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("تفريغ السلة نهائياً")
+                }
+            }
+        }
+        if (items.isEmpty()) {
+            item { EmptyState("السلة فارغة", Icons.Filled.Delete) }
+        }
+        items(items, key = { it.id }) { item ->
+            TrashCard(
+                item = item,
+                canManage = canManage,
+                onRestore = { onRestore(item) },
+                onPurge = { purgeTarget = item }
+            )
+        }
+    }
+
+    purgeTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف نهائي",
+            text = "حذف \"${target.label}\" نهائياً؟ لا يمكن التراجع عن هذا الإجراء.",
+            onConfirm = { onPurge(target); purgeTarget = null },
+            onDismiss = { purgeTarget = null }
+        )
+    }
+    if (confirmEmpty) {
+        ConfirmDialog(
+            title = "تفريغ السلة",
+            text = "حذف كل العناصر في السلة نهائياً؟ لا يمكن التراجع.",
+            onConfirm = { onEmpty(); confirmEmpty = false },
+            onDismiss = { confirmEmpty = false }
+        )
+    }
+}
+
+@Composable
+private fun TrashCard(
+    item: TrashEntity,
+    canManage: Boolean,
+    onRestore: () -> Unit,
+    onPurge: () -> Unit
+) {
+    val (icon, color) = trashVisual(item.entityType)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconBubble(icon, color, color.copy(alpha = 0.14f), 40)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(item.label, fontWeight = FontWeight.Medium)
+                    Text("${trashTypeLabel(item.entityType)} • حُذف ${item.deletedAt} • ${item.deletedBy}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (canManage) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = onRestore, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("استرجاع")
+                    }
+                    TextButton(onClick = onPurge, modifier = Modifier.weight(1f)) {
+                        Text("حذف نهائي", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun trashTypeLabel(type: String): String = when (type) {
+    "Asset" -> "أصل"; "Inventory" -> "قطعة غيار"; "WorkOrder" -> "أمر عمل"; "PM" -> "صيانة دورية"
+    "Location" -> "موقع فني"; "CAPA" -> "إجراء CAPA"; "User" -> "مستخدم"; "Notification" -> "بلاغ"
+    "TaskList" -> "قالب عمل"; else -> type
+}
+
+private fun trashVisual(type: String): Pair<ImageVector, Color> = when (type) {
+    "Asset" -> Icons.Filled.PrecisionManufacturing to AccentNavy
+    "Inventory" -> Icons.Filled.Inventory2 to AccentPurple
+    "WorkOrder" -> Icons.Filled.Assignment to AccentBlue
+    "PM" -> Icons.Filled.EventRepeat to AccentTeal
+    "Location" -> Icons.Filled.AccountTree to AccentGreen
+    "CAPA" -> Icons.Filled.FactCheck to AccentOrange
+    "User" -> Icons.Filled.AdminPanelSettings to AccentOrange
+    "Notification" -> Icons.Filled.NotificationsActive to AccentRed
+    else -> Icons.Filled.Delete to AccentBrown
 }
 
 @Composable
