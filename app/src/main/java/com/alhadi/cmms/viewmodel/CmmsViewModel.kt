@@ -23,6 +23,7 @@ import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
+import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.util.DateStrings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -135,6 +136,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val workOrderConfirmations: StateFlow<List<WorkOrderConfirmationEntity>> = repository.workOrderConfirmations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val workOrderPhotos: StateFlow<List<WorkOrderPhotoEntity>> = repository.workOrderPhotos
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -292,6 +296,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun addConfirmation(confirmation: WorkOrderConfirmationEntity, operation: WorkOrderOperationEntity) =
         launchAction("تم تسجيل التأكيد") { repository.addConfirmation(confirmation, operation, actor()) }
     fun deleteConfirmation(confirmation: WorkOrderConfirmationEntity) = launchAction("تم حذف التأكيد") { repository.deleteConfirmation(confirmation, actor()) }
+
+    fun addWorkOrderPhoto(orderId: Long, path: String) = launchAction("تم إرفاق صورة الدليل") { repository.addWorkOrderPhoto(orderId, path, actor()) }
+    fun deleteWorkOrderPhoto(photo: WorkOrderPhotoEntity) = launchAction("تم حذف الصورة") { repository.deleteWorkOrderPhoto(photo, actor()) }
 
     // ----- CAPA -----
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }

@@ -20,6 +20,7 @@ import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
+import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.util.DateStrings
 import kotlinx.coroutines.flow.Flow
 
@@ -42,6 +43,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val notificationDao = database.maintenanceNotificationDao()
     private val operationDao = database.workOrderOperationDao()
     private val confirmationDao = database.workOrderConfirmationDao()
+    private val photoDao = database.workOrderPhotoDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -63,6 +65,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val notifications: Flow<List<MaintenanceNotificationEntity>> = notificationDao.observeNotifications()
     val workOrderOperations: Flow<List<WorkOrderOperationEntity>> = operationDao.observeOperations()
     val workOrderConfirmations: Flow<List<WorkOrderConfirmationEntity>> = confirmationDao.observeConfirmations()
+    val workOrderPhotos: Flow<List<WorkOrderPhotoEntity>> = photoDao.observePhotos()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -104,6 +107,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                photoDao.deleteAll()
                 confirmationDao.deleteAll()
                 operationDao.deleteAll()
                 notificationDao.deleteAll()
@@ -328,6 +332,10 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun updateWorkOrderStatus(id: Long, status: String, actor: String = "System") {
+        // Governance: a work order cannot be closed without photo evidence of the work.
+        if (status == "Closed" && photoDao.countForOrder(id) == 0) {
+            throw IllegalStateException("أرفق صورة دليل تنفيذ قبل إغلاق أمر العمل")
+        }
         workOrderDao.updateStatus(id, status)
         recordAudit("Update", "WorkOrder", "تحديث حالة أمر العمل #$id إلى $status", actor)
     }
@@ -828,5 +836,21 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteConfirmation(confirmation: WorkOrderConfirmationEntity, actor: String = "System") {
         confirmationDao.deleteById(confirmation.id)
         recordAudit("Delete", "Confirmation", "حذف تأكيد عملية #${confirmation.operationId}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Work order evidence photos (أدلة التنفيذ)
+    // ---------------------------------------------------------------------
+
+    suspend fun addWorkOrderPhoto(orderId: Long, path: String, actor: String = "System") {
+        photoDao.insert(
+            WorkOrderPhotoEntity(orderId = orderId, path = path, addedBy = actor, addedAt = DateStrings.now())
+        )
+        recordAudit("Attach", "WorkOrder", "إرفاق صورة دليل لأمر العمل #$orderId", actor)
+    }
+
+    suspend fun deleteWorkOrderPhoto(photo: WorkOrderPhotoEntity, actor: String = "System") {
+        photoDao.deleteById(photo.id)
+        recordAudit("Delete", "WorkOrder", "حذف صورة دليل لأمر العمل #${photo.orderId}", actor)
     }
 }

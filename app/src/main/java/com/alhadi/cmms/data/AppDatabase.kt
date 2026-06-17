@@ -22,6 +22,7 @@ import com.alhadi.cmms.data.dao.UserDao
 import com.alhadi.cmms.data.dao.WorkOrderConfirmationDao
 import com.alhadi.cmms.data.dao.WorkOrderDao
 import com.alhadi.cmms.data.dao.WorkOrderOperationDao
+import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -41,6 +42,7 @@ import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
+import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 
 @Database(
     entities = [
@@ -62,9 +64,10 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
         PmChecklistItemEntity::class,
         MaintenanceNotificationEntity::class,
         WorkOrderOperationEntity::class,
-        WorkOrderConfirmationEntity::class
+        WorkOrderConfirmationEntity::class,
+        WorkOrderPhotoEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -86,6 +89,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun maintenanceNotificationDao(): MaintenanceNotificationDao
     abstract fun workOrderOperationDao(): WorkOrderOperationDao
     abstract fun workOrderConfirmationDao(): WorkOrderConfirmationDao
+    abstract fun workOrderPhotoDao(): WorkOrderPhotoDao
 
     companion object {
         @Volatile

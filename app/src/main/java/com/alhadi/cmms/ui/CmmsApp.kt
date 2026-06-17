@@ -3,6 +3,8 @@ package com.alhadi.cmms.ui
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -57,6 +59,7 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
@@ -103,8 +106,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
@@ -132,6 +137,7 @@ import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
+import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.ui.theme.AccentBlue
 import com.alhadi.cmms.ui.theme.AccentBrown
 import com.alhadi.cmms.ui.theme.AccentGreen
@@ -148,6 +154,7 @@ import com.alhadi.cmms.ui.theme.StatusStoppedContainer
 import com.alhadi.cmms.ui.theme.priorityTone
 import com.alhadi.cmms.ui.theme.statusTone
 import com.alhadi.cmms.util.DateStrings
+import com.alhadi.cmms.util.ImageStore
 import com.alhadi.cmms.viewmodel.CmmsViewModel
 import com.alhadi.cmms.viewmodel.DashboardStats
 import java.util.Locale
@@ -197,6 +204,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
     val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
     val workOrderConfirmations by viewModel.workOrderConfirmations.collectAsStateWithLifecycle()
+    val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -279,6 +287,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         assetMap = assetMap,
                         operations = workOrderOperations,
                         confirmations = workOrderConfirmations,
+                        photos = workOrderPhotos,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveWorkOrder,
@@ -288,7 +297,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onSaveOperation = viewModel::saveOperation,
                         onSetOperationStatus = viewModel::setOperationStatus,
                         onDeleteOperation = viewModel::deleteOperation,
-                        onConfirmOperation = viewModel::addConfirmation
+                        onConfirmOperation = viewModel::addConfirmation,
+                        onAddPhoto = viewModel::addWorkOrderPhoto,
+                        onDeletePhoto = viewModel::deleteWorkOrderPhoto
                     )
 
                     BottomTab.Supervision -> PreventiveMaintenanceScreen(
@@ -1872,6 +1883,7 @@ private fun WorkOrdersScreen(
     assetMap: Map<Long, AssetEntity>,
     operations: List<WorkOrderOperationEntity>,
     confirmations: List<WorkOrderConfirmationEntity>,
+    photos: List<WorkOrderPhotoEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (WorkOrderEntity) -> Unit,
@@ -1881,7 +1893,9 @@ private fun WorkOrdersScreen(
     onSaveOperation: (WorkOrderOperationEntity) -> Unit,
     onSetOperationStatus: (WorkOrderOperationEntity, String) -> Unit,
     onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
-    onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit
+    onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
+    onAddPhoto: (Long, String) -> Unit,
+    onDeletePhoto: (WorkOrderPhotoEntity) -> Unit
 ) {
     val statusFilters = listOf("All", "Open", "In Progress", "Closed")
     val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
@@ -1967,6 +1981,7 @@ private fun WorkOrdersScreen(
                     asset = assetMap[workOrder.assetId],
                     operations = operations.filter { it.orderId == workOrder.id },
                     confirmations = confirmations.filter { it.orderId == workOrder.id },
+                    photos = photos.filter { it.orderId == workOrder.id },
                     canManage = canManage,
                     onUpdateStatus = onUpdateStatus,
                     onApprove = onApprove,
@@ -1974,6 +1989,8 @@ private fun WorkOrdersScreen(
                     onSetOperationStatus = onSetOperationStatus,
                     onDeleteOperation = onDeleteOperation,
                     onConfirmOperation = onConfirmOperation,
+                    onAddPhoto = onAddPhoto,
+                    onDeletePhoto = onDeletePhoto,
                     onEdit = { editing = workOrder; showForm = true },
                     onDelete = { deleteTarget = workOrder }
                 )
@@ -2006,6 +2023,7 @@ private fun WorkOrderCard(
     asset: AssetEntity?,
     operations: List<WorkOrderOperationEntity>,
     confirmations: List<WorkOrderConfirmationEntity>,
+    photos: List<WorkOrderPhotoEntity>,
     canManage: Boolean,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
@@ -2013,9 +2031,12 @@ private fun WorkOrderCard(
     onSetOperationStatus: (WorkOrderOperationEntity, String) -> Unit,
     onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
     onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
+    onAddPhoto: (Long, String) -> Unit,
+    onDeletePhoto: (WorkOrderPhotoEntity) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
     val pending = workOrder.approvalStatus == "Pending"
     val rejected = workOrder.approvalStatus == "Rejected"
     val blocked = workOrder.isBlockedByApproval()
@@ -2023,6 +2044,12 @@ private fun WorkOrderCard(
     var showAddOp by remember { mutableStateOf(false) }
     var confirmTarget by remember { mutableStateOf<WorkOrderOperationEntity?>(null) }
     val confirmedOps = operations.count { it.status == "Confirmed" }
+    val hasEvidence = photos.isNotEmpty()
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            ImageStore.copyToInternal(context, uri, workOrder.id)?.let { path -> onAddPhoto(workOrder.id, path) }
+        }
+    }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -2130,6 +2157,54 @@ private fun WorkOrderCard(
                     }
                 }
             }
+            if (workOrder.status != "Closed") {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentTeal)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("أدلة التنفيذ (${photos.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (canManage) {
+                        TextButton(onClick = { photoPicker.launch("image/*") }) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("إضافة صورة")
+                        }
+                    }
+                }
+                if (photos.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        photos.forEach { photo ->
+                            Box {
+                                val bmp = remember(photo.path) { ImageStore.decode(photo.path) }
+                                if (bmp != null) {
+                                    Image(
+                                        bitmap = bmp,
+                                        contentDescription = "دليل تنفيذ",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp))
+                                    )
+                                } else {
+                                    Box(modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Filled.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                if (canManage) {
+                                    Box(
+                                        modifier = Modifier.align(Alignment.TopEnd).size(22.dp).background(MaterialTheme.colorScheme.error, CircleShape).clickable { onDeletePhoto(photo) },
+                                        contentAlignment = Alignment.Center
+                                    ) { Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = Color.White, modifier = Modifier.size(14.dp)) }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text("لا توجد صور بعد — أرفق صورة دليل قبل الإغلاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
             if (blocked) {
                 Text(
                     if (pending) "يتطلّب اعتماد المشرف قبل البدء/الإغلاق." else "أمر العمل مرفوض — لا يمكن تنفيذه.",
@@ -2142,8 +2217,11 @@ private fun WorkOrderCard(
                         OutlinedButton(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
                     }
                     if (workOrder.status != "Closed") {
-                        Button(onClick = { onUpdateStatus(workOrder, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
+                        Button(onClick = { onUpdateStatus(workOrder, "Closed") }, enabled = hasEvidence, modifier = Modifier.weight(1f)) { Text("إغلاق") }
                     }
+                }
+                if (workOrder.status != "Closed" && !hasEvidence) {
+                    Text("الإغلاق يتطلّب إرفاق صورة دليل تنفيذ واحدة على الأقل.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
                 }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
