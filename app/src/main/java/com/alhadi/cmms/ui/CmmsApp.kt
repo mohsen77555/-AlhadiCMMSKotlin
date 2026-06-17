@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -1115,6 +1116,33 @@ private fun AssetDetailScreen(
                     InfoRow("الأهمية", asset.criticality)
                     InfoRow("تاريخ التركيب", asset.installedAt)
                     InfoRow("آخر فحص", asset.lastInspectionAt)
+                }
+            }
+        }
+
+        item {
+            val qr = rememberQrBitmap("ALHADI:${asset.code}")
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SectionHeader("رمز QR للأصل")
+                    if (qr != null) {
+                        Image(
+                            bitmap = qr,
+                            contentDescription = "QR ${asset.code}",
+                            modifier = Modifier
+                                .size(180.dp)
+                                .background(Color.White, RoundedCornerShape(8.dp))
+                                .padding(8.dp)
+                        )
+                    }
+                    LtrText("ALHADI:${asset.code}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("امسح الرمز للوصول إلى بطاقة الأصل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
