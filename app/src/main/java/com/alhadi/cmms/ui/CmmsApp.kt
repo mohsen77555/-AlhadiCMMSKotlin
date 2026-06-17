@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -99,6 +100,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -140,7 +142,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters, Locations }
+private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters, Locations, Capa }
 
 private data class ScreenMeta(
     val title: String,
@@ -163,6 +165,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
+    val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -319,6 +322,17 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onSave = viewModel::saveFunctionalLocation,
                             onDelete = viewModel::deleteFunctionalLocation
                         )
+                        MoreRoute.Capa -> CapaScreen(
+                            innerPadding = innerPadding,
+                            items = capaActions,
+                            assets = assets,
+                            assetMap = assetMap,
+                            canManage = canManage,
+                            defaultAssignee = actorName,
+                            onSave = viewModel::saveCapa,
+                            onUpdateStatus = viewModel::updateCapaStatus,
+                            onDelete = viewModel::deleteCapa
+                        )
                         MoreRoute.Admin -> AdminScreen(
                             innerPadding = innerPadding,
                             users = users,
@@ -361,6 +375,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.PreventiveMaintenance -> ScreenMeta("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal)
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
+        MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
     }
 }
 
@@ -641,7 +656,7 @@ private fun DashboardScreen(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 KpiTile("أصول حرجة", criticalAssets.toString(), AccentRed, Modifier.weight(1f))
-                KpiTile("CAPA", "0", AccentOrange, Modifier.weight(1f))
+                KpiTile("CAPA", stats.capa.toString(), AccentOrange, Modifier.weight(1f))
                 KpiTile("متأخرة", overdue.toString(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
                 KpiTile("أوامر مفتوحة", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f))
             }
@@ -804,7 +819,13 @@ private fun MoreGrid(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
+                ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
         if (isAdmin) {
@@ -2136,6 +2157,133 @@ private fun LocationDetailScreen(
                     StatusBadge(asset.status, statusTone(asset.status))
                 }
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CAPA
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun CapaScreen(
+    innerPadding: PaddingValues,
+    items: List<CapaEntity>,
+    assets: List<AssetEntity>,
+    assetMap: Map<Long, AssetEntity>,
+    canManage: Boolean,
+    defaultAssignee: String,
+    onSave: (CapaEntity) -> Unit,
+    onUpdateStatus: (CapaEntity, String) -> Unit,
+    onDelete: (CapaEntity) -> Unit
+) {
+    val filters = listOf("All", "Open", "In Progress", "Closed")
+    var selectedFilter by rememberSaveable { mutableStateOf("All") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<CapaEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<CapaEntity?>(null) }
+    val filtered = remember(selectedFilter, items) {
+        if (selectedFilter == "All") items else items.filter { it.status == selectedFilter }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("الإجراءات التصحيحية والوقائية")
+                Text("إجراءات لمعالجة الأعطال ومنع تكرارها.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filters.forEach { f ->
+                        FilterChip(selected = selectedFilter == f, onClick = { selectedFilter = f }, label = { Text(f) })
+                    }
+                }
+            }
+            if (canManage) {
+                item { AddButton("إجراء CAPA جديد") { editing = null; showForm = true } }
+            }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد إجراءات", Icons.Filled.FactCheck) }
+            }
+            items(filtered, key = { it.id }) { capa ->
+                CapaCard(
+                    capa = capa,
+                    asset = capa.assetId?.let { assetMap[it] },
+                    canManage = canManage,
+                    onUpdateStatus = onUpdateStatus,
+                    onEdit = { editing = capa; showForm = true },
+                    onDelete = { deleteTarget = capa }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        CapaFormSheet(
+            initial = editing,
+            assets = assets,
+            defaultAssignee = defaultAssignee,
+            onDismiss = { showForm = false },
+            onSave = { onSave(it); showForm = false }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف الإجراء",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun CapaCard(
+    capa: CapaEntity,
+    asset: AssetEntity?,
+    canManage: Boolean,
+    onUpdateStatus: (CapaEntity, String) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(capa.code, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(capa.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                }
+                StatusBadge(capa.status, statusTone(capa.status))
+            }
+            Text(capa.description, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusBadge(if (capa.type == "Preventive") "وقائي" else "تصحيحي", statusTone(if (capa.type == "Preventive") "info" else "warning"))
+                StatusBadge(capa.priority, priorityTone(capa.priority))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            if (asset != null) InfoRow("الأصل", "${asset.code} • ${asset.name}")
+            InfoRow("المسؤول", capa.assignedTo)
+            InfoRow("الاستحقاق", capa.dueAt)
+            if (capa.status != "Closed") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (capa.status == "Open") {
+                        OutlinedButton(onClick = { onUpdateStatus(capa, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
+                    }
+                    Button(onClick = { onUpdateStatus(capa, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
+                }
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 }

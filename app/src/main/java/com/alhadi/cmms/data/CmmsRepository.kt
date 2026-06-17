@@ -3,6 +3,7 @@ package com.alhadi.cmms.data
 import androidx.room.withTransaction
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -24,6 +25,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val auditLogDao = database.auditLogDao()
     private val measurementDao = database.measurementDao()
     private val locationDao = database.functionalLocationDao()
+    private val capaDao = database.capaDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -36,6 +38,9 @@ class CmmsRepository(private val database: AppDatabase) {
     val measuringPoints: Flow<List<MeasuringPointEntity>> = measurementDao.observePoints()
     val readings: Flow<List<MeasurementReadingEntity>> = measurementDao.observeReadings()
     val functionalLocations: Flow<List<FunctionalLocationEntity>> = locationDao.observeLocations()
+    val capaActions: Flow<List<CapaEntity>> = capaDao.observeCapa()
+
+    fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
     fun observeAssetCount(): Flow<Int> = assetDao.observeAssetCount()
     fun observeOpenWorkOrderCount(): Flow<Int> = workOrderDao.observeOpenCount()
@@ -75,6 +80,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                capaDao.deleteAll()
                 locationDao.deleteAll()
                 measurementDao.deleteAllReadings()
                 measurementDao.deleteAllPoints()
@@ -149,6 +155,12 @@ class CmmsRepository(private val database: AppDatabase) {
                 MeasuringPointEntity(5, 1, "Belt Tension", "N", false, 500.0, 410.0, today)
             )
 
+            val capaActions = listOf(
+                CapaEntity(1, "CAPA-001", "تكرار اهتزاز مطحنة الأسطوانات", "Corrective", "تحليل السبب الجذري للاهتزاز المتكرر على RM-01 ومعالجته.", 7, "High", "In Progress", "Maintenance Supervisor", DateStrings.daysFromToday(2), DateStrings.daysFromToday(-3)),
+                CapaEntity(2, "CAPA-002", "خطة وقائية لمروحة الصومعة", "Preventive", "وضع خطة فحص دوري لمنع تكرار توقف SF-030.", 4, "Medium", "Open", "Electrical Technician", DateStrings.daysFromToday(7), DateStrings.daysFromToday(-1)),
+                CapaEntity(3, "CAPA-003", "مراجعة معايرة الميزان", "Corrective", "انحراف في قراءات الميزان يتطلب إجراء تصحيحي وتوثيق.", 12, "Low", "Closed", "Mohsen Alhadi", DateStrings.daysFromToday(-10), DateStrings.daysFromToday(-20))
+            )
+
             val locations = listOf(
                 FunctionalLocationEntity(1, "FAC-01", "Flour Mill Factory", null, "المصنع الرئيسي"),
                 FunctionalLocationEntity(2, "SILO", "Silo Area", 1, "منطقة الصوامع"),
@@ -166,6 +178,7 @@ class CmmsRepository(private val database: AppDatabase) {
             transactionDao.insertAll(transactions)
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
+            capaDao.insertAll(capaActions)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -432,5 +445,30 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
         locationDao.deleteById(location.id)
         recordAudit("Delete", "Location", "حذف موقع فني: ${location.code}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // CAPA (corrective / preventive actions)
+    // ---------------------------------------------------------------------
+
+    suspend fun saveCapa(item: CapaEntity, actor: String = "System") {
+        val isNew = item.id == 0L
+        val toSave = if (isNew && item.code.isBlank()) {
+            item.copy(code = "CAPA-%03d".format(capaDao.countOnce() + 1))
+        } else {
+            item
+        }
+        capaDao.insert(toSave)
+        recordAudit(if (isNew) "Create" else "Update", "CAPA", "${if (isNew) "إنشاء" else "تعديل"} إجراء: ${toSave.title}", actor)
+    }
+
+    suspend fun updateCapaStatus(item: CapaEntity, status: String, actor: String = "System") {
+        capaDao.updateStatus(item.id, status)
+        recordAudit("Update", "CAPA", "تحديث حالة الإجراء ${item.code} إلى $status", actor)
+    }
+
+    suspend fun deleteCapa(item: CapaEntity, actor: String = "System") {
+        capaDao.deleteById(item.id)
+        recordAudit("Delete", "CAPA", "حذف إجراء: ${item.title}", actor)
     }
 }

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
@@ -187,6 +188,33 @@ private fun LocationDropdown(
                 DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
                 options.forEach { loc ->
                     DropdownMenuItem(text = { Text("${loc.code} • ${loc.name}") }, onClick = { onSelect(loc.id); open = false })
+                }
+            }
+        }
+    }
+}
+
+/** Optional asset picker (with a "none" option), used by CAPA. */
+@Composable
+private fun AssetDropdownOptional(assets: List<AssetEntity>, selectedId: Long?, onSelect: (Long?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val selected = assets.firstOrNull { it.id == selectedId }
+    Column {
+        Text("الأصل (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Box {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    selected?.let { "${it.code} • ${it.name}" } ?: "بدون",
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
+                assets.forEach { asset ->
+                    DropdownMenuItem(text = { Text("${asset.code} • ${asset.name}") }, onClick = { onSelect(asset.id); open = false })
                 }
             }
         }
@@ -537,6 +565,60 @@ internal fun ReadingDialog(point: MeasuringPointEntity, onSubmit: (Double, Strin
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
     )
+}
+
+// ---------------------------------------------------------------------------
+// CAPA form
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun CapaFormSheet(
+    initial: CapaEntity?,
+    assets: List<AssetEntity>,
+    defaultAssignee: String,
+    onDismiss: () -> Unit,
+    onSave: (CapaEntity) -> Unit
+) {
+    var title by remember { mutableStateOf(initial?.title ?: "") }
+    var type by remember { mutableStateOf(initial?.type ?: "Corrective") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var assetId by remember { mutableStateOf(initial?.assetId) }
+    var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
+    var status by remember { mutableStateOf(initial?.status ?: "Open") }
+    var assignedTo by remember { mutableStateOf(initial?.assignedTo ?: defaultAssignee) }
+    var dueDays by remember { mutableStateOf("7") }
+
+    FormSheet(if (initial == null) "إجراء تصحيحي/وقائي جديد" else "تعديل الإجراء", onDismiss) {
+        LabeledField("العنوان", title, { title = it })
+        OptionDropdown("النوع", listOf("Corrective", "Preventive"), type) { type = it }
+        LabeledField("الوصف", description, { description = it }, singleLine = false)
+        AssetDropdownOptional(assets, assetId) { assetId = it }
+        OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
+        OptionDropdown("الحالة", listOf("Open", "In Progress", "Closed"), status) { status = it }
+        LabeledField("المسؤول", assignedTo, { assignedTo = it })
+        if (initial == null) {
+            LabeledField("الاستحقاق خلال (أيام)", dueDays, { dueDays = it }, numeric = true)
+        }
+        SaveButton(title.isNotBlank()) {
+            val today = DateStrings.today()
+            val due = initial?.dueAt ?: DateStrings.daysFromToday(dueDays.toIntOrNull() ?: 7)
+            onSave(
+                CapaEntity(
+                    id = initial?.id ?: 0,
+                    code = initial?.code ?: "",
+                    title = title.trim(),
+                    type = type,
+                    description = description,
+                    assetId = assetId,
+                    priority = priority,
+                    status = status,
+                    assignedTo = assignedTo.ifBlank { defaultAssignee },
+                    dueAt = due,
+                    createdAt = initial?.createdAt ?: today
+                )
+            )
+        }
+    }
 }
 
 @Composable

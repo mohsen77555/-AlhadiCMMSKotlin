@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.alhadi.cmms.data.CmmsRepository
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -30,7 +31,8 @@ data class DashboardStats(
     val assets: Int = 0,
     val openWorkOrders: Int = 0,
     val duePm: Int = 0,
-    val lowStock: Int = 0
+    val lowStock: Int = 0,
+    val capa: Int = 0
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -58,13 +60,15 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         repository.observeAssetCount(),
         repository.observeOpenWorkOrderCount(),
         repository.observeDuePmCount(today),
-        repository.observeLowStockCount()
-    ) { assets, openWorkOrders, duePm, lowStock ->
+        repository.observeLowStockCount(),
+        repository.observeOpenCapaCount()
+    ) { assets, openWorkOrders, duePm, lowStock, capa ->
         DashboardStats(
             assets = assets,
             openWorkOrders = openWorkOrders,
             duePm = duePm,
-            lowStock = lowStock
+            lowStock = lowStock,
+            capa = capa
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardStats())
 
@@ -96,6 +100,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val functionalLocations: StateFlow<List<FunctionalLocationEntity>> = repository.functionalLocations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val capaActions: StateFlow<List<CapaEntity>> = repository.capaActions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -216,6 +223,11 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     // ----- Functional locations -----
     fun saveFunctionalLocation(location: FunctionalLocationEntity) = launchAction("تم حفظ الموقع الفني") { repository.saveFunctionalLocation(location, actor()) }
     fun deleteFunctionalLocation(location: FunctionalLocationEntity) = launchAction("تم حذف الموقع الفني") { repository.deleteFunctionalLocation(location, actor()) }
+
+    // ----- CAPA -----
+    fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }
+    fun updateCapaStatus(item: CapaEntity, status: String) = launchAction("تم تحديث حالة الإجراء") { repository.updateCapaStatus(item, status, actor()) }
+    fun deleteCapa(item: CapaEntity) = launchAction("تم حذف الإجراء") { repository.deleteCapa(item, actor()) }
 
     fun clearMessage() {
         _message.value = null
