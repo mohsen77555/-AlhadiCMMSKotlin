@@ -616,7 +616,7 @@ internal fun CapaFormSheet(
         LabeledField("العنوان", title, { title = it })
         OptionDropdown("النوع", listOf("Corrective", "Preventive"), type) { type = it }
         LabeledField("الوصف", description, { description = it }, singleLine = false)
-        AssetDropdownOptional(assets, assetId) { assetId = it }
+        AssetDropdownOptional(assets, assetId, onSelect = { assetId = it })
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
         OptionDropdown("الحالة", listOf("Open", "In Progress", "Closed"), status) { status = it }
         LabeledField("المسؤول", assignedTo, { assignedTo = it })
