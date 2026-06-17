@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
@@ -50,6 +51,8 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.Refresh
@@ -115,6 +118,7 @@ import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -180,6 +184,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
     val assetBom by viewModel.assetBom.collectAsStateWithLifecycle()
     val assetMovements by viewModel.assetMovements.collectAsStateWithLifecycle()
+    val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -270,9 +275,13 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         assets = assets,
                         assetMap = assetMap,
                         canManage = canManage,
+                        checklist = pmChecklist,
                         onSave = viewModel::savePreventiveMaintenance,
                         onDelete = viewModel::deletePreventiveMaintenance,
-                        onDone = viewModel::markPreventiveMaintenanceDone
+                        onDone = viewModel::markPreventiveMaintenanceDone,
+                        onSaveChecklistItem = viewModel::saveChecklistItem,
+                        onSetChecklistResult = viewModel::setChecklistResult,
+                        onDeleteChecklistItem = viewModel::deleteChecklistItem
                     )
 
                     BottomTab.Assets -> AssetsScreen(
@@ -380,9 +389,13 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             assets = assets,
                             assetMap = assetMap,
                             canManage = canManage,
+                            checklist = pmChecklist,
                             onSave = viewModel::savePreventiveMaintenance,
                             onDelete = viewModel::deletePreventiveMaintenance,
-                            onDone = viewModel::markPreventiveMaintenanceDone
+                            onDone = viewModel::markPreventiveMaintenanceDone,
+                            onSaveChecklistItem = viewModel::saveChecklistItem,
+                            onSetChecklistResult = viewModel::setChecklistResult,
+                            onDeleteChecklistItem = viewModel::deleteChecklistItem
                         )
                     }
                 }
@@ -1724,9 +1737,13 @@ private fun PreventiveMaintenanceScreen(
     assets: List<AssetEntity>,
     assetMap: Map<Long, AssetEntity>,
     canManage: Boolean,
+    checklist: List<PmChecklistItemEntity>,
     onSave: (PreventiveMaintenanceEntity) -> Unit,
     onDelete: (PreventiveMaintenanceEntity) -> Unit,
-    onDone: (PreventiveMaintenanceEntity) -> Unit
+    onDone: (PreventiveMaintenanceEntity) -> Unit,
+    onSaveChecklistItem: (PmChecklistItemEntity) -> Unit,
+    onSetChecklistResult: (PmChecklistItemEntity, String) -> Unit,
+    onDeleteChecklistItem: (PmChecklistItemEntity) -> Unit
 ) {
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<PreventiveMaintenanceEntity?>(null) }
@@ -1755,9 +1772,13 @@ private fun PreventiveMaintenanceScreen(
                     item = item,
                     asset = assetMap[item.assetId],
                     canManage = canManage,
+                    checklist = checklist.filter { it.pmId == item.id },
                     onDone = onDone,
                     onEdit = { editing = item; showForm = true },
-                    onDelete = { deleteTarget = item }
+                    onDelete = { deleteTarget = item },
+                    onSaveChecklistItem = onSaveChecklistItem,
+                    onSetChecklistResult = onSetChecklistResult,
+                    onDeleteChecklistItem = onDeleteChecklistItem
                 )
             }
         }
@@ -1781,11 +1802,18 @@ private fun PreventiveMaintenanceCard(
     item: PreventiveMaintenanceEntity,
     asset: AssetEntity?,
     canManage: Boolean,
+    checklist: List<PmChecklistItemEntity>,
     onDone: (PreventiveMaintenanceEntity) -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSaveChecklistItem: (PmChecklistItemEntity) -> Unit,
+    onSetChecklistResult: (PmChecklistItemEntity, String) -> Unit,
+    onDeleteChecklistItem: (PmChecklistItemEntity) -> Unit
 ) {
     val due = DateStrings.isDueOrOverdue(item.nextDueAt)
+    var showChecklist by remember { mutableStateOf(false) }
+    var showAddItem by remember { mutableStateOf(false) }
+    val doneCount = checklist.count { it.result == "OK" || it.result == "NA" }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -1803,6 +1831,53 @@ private fun PreventiveMaintenanceCard(
             InfoRow("آخر تنفيذ", item.lastDoneAt)
             InfoRow("التنفيذ القادم", item.nextDueAt)
             InfoRow("المدة المقدرة", "${item.estimatedDurationMinutes} دقيقة")
+
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showChecklist = !showChecklist },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentTeal)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("قائمة الفحص ($doneCount/${checklist.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                Icon(
+                    if (showChecklist) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null
+                )
+            }
+            if (showChecklist) {
+                if (checklist.isEmpty()) {
+                    Text("لا توجد بنود فحص.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                checklist.forEach { ci ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(ci.text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            if (canManage) {
+                                IconButton(onClick = { onDeleteChecklistItem(ci) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("OK" to "سليم", "NotOK" to "عطل", "NA" to "لا ينطبق").forEach { (value, label) ->
+                                FilterChip(
+                                    selected = ci.result == value,
+                                    onClick = { onSetChecklistResult(ci, if (ci.result == value) "" else value) },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+                }
+                if (canManage) {
+                    OutlinedButton(onClick = { showAddItem = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة بند فحص")
+                    }
+                }
+            }
+
             Button(onClick = { onDone(item) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -1810,6 +1885,15 @@ private fun PreventiveMaintenanceCard(
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
+    }
+
+    if (showAddItem) {
+        ChecklistItemFormSheet(
+            pmId = item.id,
+            nextOrder = (checklist.maxOfOrNull { it.orderIndex } ?: 0) + 1,
+            onDismiss = { showAddItem = false },
+            onSave = { onSaveChecklistItem(it); showAddItem = false }
+        )
     }
 }
 

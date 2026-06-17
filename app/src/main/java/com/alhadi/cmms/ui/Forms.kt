@@ -46,6 +46,7 @@ import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -749,6 +750,36 @@ internal fun DocumentFormSheet(
                     reference = reference.trim(),
                     uploadedBy = initial?.uploadedBy ?: "",
                     uploadedAt = initial?.uploadedAt ?: ""
+                )
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PM checklist item form
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun ChecklistItemFormSheet(
+    pmId: Long,
+    nextOrder: Int,
+    onDismiss: () -> Unit,
+    onSave: (PmChecklistItemEntity) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+
+    FormSheet("إضافة بند فحص", onDismiss) {
+        LabeledField("نص البند", text, { text = it }, singleLine = false)
+        SaveButton(text.isNotBlank()) {
+            onSave(
+                PmChecklistItemEntity(
+                    id = 0,
+                    pmId = pmId,
+                    text = text.trim(),
+                    result = "",
+                    note = "",
+                    orderIndex = nextOrder
                 )
             )
         }

@@ -12,6 +12,7 @@ import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -34,6 +35,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val characteristicDao = database.assetCharacteristicDao()
     private val bomDao = database.assetBomDao()
     private val movementDao = database.assetMovementDao()
+    private val checklistDao = database.pmChecklistDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -51,6 +53,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val assetCharacteristics: Flow<List<AssetCharacteristicEntity>> = characteristicDao.observeCharacteristics()
     val assetBom: Flow<List<AssetBomItemEntity>> = bomDao.observeBom()
     val assetMovements: Flow<List<AssetMovementEntity>> = movementDao.observeMovements()
+    val pmChecklist: Flow<List<PmChecklistItemEntity>> = checklistDao.observeItems()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -92,6 +95,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                checklistDao.deleteAll()
                 movementDao.deleteAll()
                 bomDao.deleteAll()
                 characteristicDao.deleteAll()
@@ -223,6 +227,16 @@ class CmmsRepository(private val database: AppDatabase) {
                 AssetMovementEntity(3, 4, MovementType.TRANSFER, 5, 3, "Utility Room", "Milling Floor", "نقل اللوحة الكهربائية", "Maintenance Supervisor", today)
             )
 
+            val checklist = listOf(
+                PmChecklistItemEntity(1, 2, "فحص اهتزاز وضجيج الأسطوانات", "", "", 1),
+                PmChecklistItemEntity(2, 2, "فحص شدّ السيور", "", "", 2),
+                PmChecklistItemEntity(3, 2, "تشحيم المحامل", "", "", 3),
+                PmChecklistItemEntity(4, 2, "تنظيف نقاط التغذية", "", "", 4),
+                PmChecklistItemEntity(5, 4, "فحص مستوى الزيت", "", "", 1),
+                PmChecklistItemEntity(6, 4, "تنظيف/تبديل فلتر الهواء", "", "", 2),
+                PmChecklistItemEntity(7, 4, "فحص تسريبات الهواء", "", "", 3)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
@@ -230,6 +244,7 @@ class CmmsRepository(private val database: AppDatabase) {
             characteristicDao.insertAll(characteristics)
             bomDao.insertAll(bomItems)
             movementDao.insertAll(movements)
+            checklistDao.insertAll(checklist)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -295,6 +310,7 @@ class CmmsRepository(private val database: AppDatabase) {
             doneAt = today,
             nextDueAt = DateStrings.addDays(today, item.frequencyDays)
         )
+        checklistDao.resetResults(item.id)
         recordAudit("Complete", "PreventiveMaintenance", "تنفيذ صيانة دورية: ${item.title}", actor)
     }
 
@@ -620,5 +636,25 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteAssetMovement(movement: AssetMovementEntity, actor: String = "System") {
         movementDao.deleteById(movement.id)
         recordAudit("Delete", "Movement", "حذف حركة (${MovementType.label(movement.eventType)})", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // PM inspection checklist
+    // ---------------------------------------------------------------------
+
+    suspend fun saveChecklistItem(item: PmChecklistItemEntity, actor: String = "System") {
+        val isNew = item.id == 0L
+        checklistDao.insert(item)
+        recordAudit(if (isNew) "Create" else "Update", "Checklist", "${if (isNew) "إضافة" else "تعديل"} بند فحص: ${item.text}", actor)
+    }
+
+    suspend fun setChecklistResult(item: PmChecklistItemEntity, result: String, actor: String = "System") {
+        checklistDao.insert(item.copy(result = result))
+        recordAudit("Update", "Checklist", "نتيجة بند الفحص \"${item.text}\": $result", actor)
+    }
+
+    suspend fun deleteChecklistItem(item: PmChecklistItemEntity, actor: String = "System") {
+        checklistDao.deleteById(item.id)
+        recordAudit("Delete", "Checklist", "حذف بند فحص: ${item.text}", actor)
     }
 }

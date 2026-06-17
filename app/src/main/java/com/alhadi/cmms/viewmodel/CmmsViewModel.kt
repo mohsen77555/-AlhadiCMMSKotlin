@@ -15,6 +15,7 @@ import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -119,6 +120,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val assetMovements: StateFlow<List<AssetMovementEntity>> = repository.assetMovements
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val pmChecklist: StateFlow<List<PmChecklistItemEntity>> = repository.pmChecklist
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -255,6 +259,10 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun performAssetMovement(asset: AssetEntity, eventType: String, toLocationId: Long?, toLocationName: String, notes: String) =
         launchAction("تم تسجيل الحركة") { repository.performAssetMovement(asset, eventType, toLocationId, toLocationName, notes, actor()) }
     fun deleteAssetMovement(movement: AssetMovementEntity) = launchAction("تم حذف الحركة") { repository.deleteAssetMovement(movement, actor()) }
+
+    fun saveChecklistItem(item: PmChecklistItemEntity) = launchAction("تم حفظ بند الفحص") { repository.saveChecklistItem(item, actor()) }
+    fun setChecklistResult(item: PmChecklistItemEntity, result: String) = launchAction("تم تحديث الفحص") { repository.setChecklistResult(item, result, actor()) }
+    fun deleteChecklistItem(item: PmChecklistItemEntity) = launchAction("تم حذف بند الفحص") { repository.deleteChecklistItem(item, actor()) }
 
     // ----- CAPA -----
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }
