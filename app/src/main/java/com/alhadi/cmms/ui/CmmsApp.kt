@@ -2033,15 +2033,20 @@ private fun InventoryScreen(
     onDelete: (SparePartEntity) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    var lowStockOnly by rememberSaveable { mutableStateOf(false) }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<SparePartEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<SparePartEntity?>(null) }
-    val filtered = remember(query, parts) {
-        if (query.isBlank()) parts else parts.filter { part ->
+    val lowStockCount = parts.count { it.onHandQty <= it.minQty }
+    val totalValue = parts.sumOf { it.onHandQty * it.lastPrice }
+    val filtered = remember(query, lowStockOnly, parts) {
+        parts.filter { part ->
             val q = query.lowercase(Locale.getDefault())
-            part.partNumber.lowercase(Locale.getDefault()).contains(q) ||
-                part.name.lowercase(Locale.getDefault()).contains(q) ||
-                part.equipmentGroup.lowercase(Locale.getDefault()).contains(q)
+            (!lowStockOnly || part.onHandQty <= part.minQty) &&
+                (q.isBlank() ||
+                    part.partNumber.lowercase(Locale.getDefault()).contains(q) ||
+                    part.name.lowercase(Locale.getDefault()).contains(q) ||
+                    part.equipmentGroup.lowercase(Locale.getDefault()).contains(q))
         }
     }
 
@@ -2053,11 +2058,31 @@ private fun InventoryScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MetricColumn("أصناف", parts.size.toString(), AccentBlue)
+                        MetricColumn("منخفض", lowStockCount.toString(), if (lowStockCount > 0) AccentRed else AccentGreen)
+                        MetricColumn("قيمة المخزون", money(totalValue), AccentTeal)
+                    }
+                }
+            }
             item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = !lowStockOnly, onClick = { lowStockOnly = false }, label = { Text("الكل") })
+                    FilterChip(
+                        selected = lowStockOnly,
+                        onClick = { lowStockOnly = true },
+                        label = { Text("منخفض المخزون ($lowStockCount)") },
+                        leadingIcon = { Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+            }
             if (canManage) {
                 item { AddButton("قطعة غيار جديدة") { editing = null; showForm = true } }
             }
-            item { SectionHeader("قطع الغيار") }
+            item { SectionHeader("قطع الغيار (${filtered.size})") }
             if (filtered.isEmpty()) {
                 item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
             }
@@ -2125,6 +2150,7 @@ private fun SparePartCard(
             InfoRow("الحد الأدنى", "${part.minQty} ${part.unit}")
             InfoRow("الموقع", part.location)
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
+            InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = { onIssue(part) }, modifier = Modifier.weight(1f)) { Text("صرف -1") }
                 if (canReceive) {
