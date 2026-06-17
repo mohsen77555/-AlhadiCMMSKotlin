@@ -12,13 +12,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -26,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +47,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alhadi.cmms.data.MovementType
@@ -126,6 +139,49 @@ private fun LabeledField(
         modifier = Modifier.fillMaxWidth()
     )
 }
+
+/** A read-only date field (YYYY-MM-DD) backed by a Material date picker instead of manual typing. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateField(label: String, value: String, onChange: (String) -> Unit) {
+    var showPicker by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        singleLine = true,
+        trailingIcon = {
+            IconButton(onClick = { showPicker = true }) {
+                Icon(Icons.Filled.CalendarMonth, contentDescription = "اختيار التاريخ")
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+    if (showPicker) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = parseDateMillis(value))
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { onChange(formatDateMillis(it)) }
+                    showPicker = false
+                }) { Text("تأكيد") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("إلغاء") } }
+        ) {
+            DatePicker(state = state)
+        }
+    }
+}
+
+private fun dateFormatterUtc() =
+    SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+
+private fun parseDateMillis(date: String): Long? =
+    runCatching { dateFormatterUtc().parse(date)?.time }.getOrNull()
+
+private fun formatDateMillis(millis: Long): String = dateFormatterUtc().format(Date(millis))
 
 @Composable
 private fun OptionDropdown(
@@ -330,11 +386,11 @@ internal fun AssetFormSheet(
         LabeledField("المورّد (Supplier)", supplier, { supplier = it })
         LabeledField("أمر الشراء (PO)", purchaseOrder, { purchaseOrder = it })
         LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
-        LabeledField("تاريخ الاقتناء (YYYY-MM-DD)", acquiredAt, { acquiredAt = it })
+        DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
         Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
-        LabeledField("بداية الضمان (YYYY-MM-DD)", warrantyStart, { warrantyStart = it })
-        LabeledField("نهاية الضمان (YYYY-MM-DD)", warrantyEnd, { warrantyEnd = it })
+        DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
+        DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
         SaveButton(code.isNotBlank() && name.isNotBlank()) {
             val today = DateStrings.today()
             onSave(
@@ -1087,7 +1143,7 @@ internal fun NotificationFormSheet(
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
         LabeledField("كود الضرر (اختياري)", damageCode, { damageCode = it })
         LabeledField("كود السبب (اختياري)", causeCode, { causeCode = it })
-        LabeledField("مطلوب الإنجاز قبل (YYYY-MM-DD)", requiredEnd, { requiredEnd = it })
+        DateField("مطلوب الإنجاز قبل", requiredEnd) { requiredEnd = it }
         SaveButton(title.isNotBlank()) {
             onSave(
                 MaintenanceNotificationEntity(
@@ -1170,14 +1226,28 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var username by remember { mutableStateOf(initial?.username ?: "") }
     var role by remember { mutableStateOf(initial?.role ?: "Technician") }
-    var password by remember { mutableStateOf(initial?.password ?: "1234") }
+    // Never pre-fill the stored (hashed) password. Blank means "keep current" when editing.
+    var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
     var active by remember { mutableStateOf(initial?.isActive ?: true) }
 
     FormSheet(if (initial == null) "إضافة مستخدم" else "تعديل المستخدم", onDismiss) {
         LabeledField("الاسم", name, { name = it })
         LabeledField("اسم المستخدم", username, { username = it })
         OptionDropdown("الدور", listOf("Admin", "Supervisor", "Technician"), role) { role = it }
-        LabeledField("كلمة المرور", password, { password = it })
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text(if (initial == null) "كلمة المرور" else "كلمة مرور جديدة (اتركها فارغة للإبقاء)") },
+            singleLine = true,
+            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { showPassword = !showPassword }) {
+                    Icon(if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = "إظهار/إخفاء")
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("مفعّل", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = active, onCheckedChange = { active = it })
@@ -1190,7 +1260,8 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
                     username = username.trim(),
                     role = role,
                     isActive = active,
-                    password = password.ifBlank { "1234" }
+                    // Blank is resolved by the repository (kept on edit, defaulted on create).
+                    password = password
                 )
             )
         }

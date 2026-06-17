@@ -30,6 +30,7 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
+import com.alhadi.cmms.util.PdfExporter
 import com.alhadi.cmms.util.XlsxReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -388,6 +390,34 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
                 }
             }.onSuccess { _message.value = "تمت الاستعادة بنجاح (${it.totalRecords} سجل)" }
                 .onFailure { _message.value = "تعذّر الاستعادة: ${it.message ?: "ملف غير صالح"}" }
+        }
+    }
+
+    /** Renders the given work order to a printable PDF at the chosen file location. */
+    fun exportWorkOrderPdf(context: Context, uri: Uri, order: WorkOrderEntity) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val asset = repository.assets.first().firstOrNull { it.id == order.assetId }
+                    val operations = repository.workOrderOperations.first().filter { it.orderId == order.id }
+                    val materials = repository.transactionsForOrder(order.id)
+                    val partsById = repository.spareParts.first().associateBy { it.id }
+                    val permits = repository.workPermits.first().filter { it.orderId == order.id }
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        PdfExporter.writeWorkOrder(
+                            out = out,
+                            order = order,
+                            asset = asset,
+                            operations = operations,
+                            materials = materials,
+                            partsById = partsById,
+                            permits = permits,
+                            generatedAt = DateStrings.now()
+                        )
+                    } ?: throw IllegalStateException("تعذّر إنشاء الملف")
+                }
+            }.onSuccess { _message.value = "تم تصدير أمر العمل PDF" }
+                .onFailure { _message.value = "تعذّر تصدير PDF: ${it.message ?: "غير معروف"}" }
         }
     }
 
