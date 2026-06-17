@@ -1821,6 +1821,13 @@ private fun notificationStatusLabel(status: String): String = when (status) {
     else -> status
 }
 
+private fun roleLabel(role: String): String = when (role.lowercase(Locale.getDefault())) {
+    "admin" -> "مدير"
+    "supervisor" -> "مشرف"
+    "technician" -> "فني"
+    else -> role
+}
+
 private fun workOrderStatusLabel(status: String): String = when (status) {
     "Open" -> "مفتوح"
     "In Progress" -> "قيد التنفيذ"
@@ -3204,18 +3211,43 @@ private fun AuditScreen(innerPadding: PaddingValues, auditLog: List<AuditLogEnti
 
 @Composable
 private fun AuditLogCard(log: AuditLogEntity) {
+    val (icon, color) = auditVisual(log.action)
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(log.details, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                StatusBadge(log.action, statusTone(log.action))
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconBubble(icon, color, color.copy(alpha = 0.14f), 40)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(log.details, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                Text("${log.performedBy} • ${log.createdAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("${log.performedBy} • ${log.createdAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            StatusBadge(auditActionLabel(log.action), statusTone(log.action))
         }
     }
+}
+
+private fun auditActionLabel(action: String): String = when (action) {
+    "Create" -> "إنشاء"; "Update" -> "تعديل"; "Delete" -> "حذف"; "Status" -> "حالة"
+    "Approval" -> "اعتماد"; "Login" -> "دخول"; "Issue" -> "صرف"; "Receive" -> "استلام"
+    "Confirm", "PartialConfirm" -> "تأكيد"; "Complete" -> "تنفيذ"; "Movement" -> "حركة"
+    "Reading" -> "قراءة"; "Attach" -> "إرفاق"; "Import" -> "استيراد"; "Generate" -> "توليد"
+    "Seed" -> "تهيئة"; else -> action
+}
+
+private fun auditVisual(action: String): Pair<ImageVector, Color> = when (action) {
+    "Create", "Generate" -> Icons.Filled.Add to AccentGreen
+    "Delete" -> Icons.Filled.Delete to AccentRed
+    "Approval" -> Icons.Filled.FactCheck to AccentTeal
+    "Status", "Update" -> Icons.Filled.Edit to AccentBlue
+    "Login" -> Icons.Filled.Verified to AccentNavy
+    "Issue", "Receive" -> Icons.Filled.Inventory2 to AccentPurple
+    "Confirm", "PartialConfirm", "Complete" -> Icons.Filled.CheckCircle to AccentGreen
+    "Movement" -> Icons.Filled.SwapHoriz to AccentBlue
+    "Reading" -> Icons.Filled.Speed to AccentPurple
+    "Attach" -> Icons.Filled.PhotoCamera to AccentTeal
+    "Import" -> Icons.Filled.UploadFile to AccentGreen
+    else -> Icons.Filled.History to AccentOrange
 }
 
 @Composable
@@ -3266,6 +3298,22 @@ private fun AdminScreen(
                     }
                 }
             }
+            item {
+                val admins = users.count { it.isAdmin }
+                val supervisors = users.count { it.role.equals("Supervisor", ignoreCase = true) }
+                val techs = users.size - admins - supervisors
+                val seg = listOf(
+                    ChartSegment("مدراء", admins, AccentRed),
+                    ChartSegment("مشرفون", supervisors, AccentOrange),
+                    ChartSegment("فنيون", techs.coerceAtLeast(0), AccentBlue)
+                )
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = users.size.toString(), centerLabel = "مستخدم")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
             item { SectionHeader("المستخدمون (${users.size})") }
             items(users, key = { it.id }) { user ->
                 UserCard(
@@ -3311,7 +3359,7 @@ private fun UserCard(
                     Text(user.name, fontWeight = FontWeight.Bold)
                     LtrText("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(if (user.isActive) user.role else "معطّل", statusTone(if (!user.isActive) "neutral" else if (user.isAdmin) "info" else "running"))
+                StatusBadge(if (user.isActive) roleLabel(user.role) else "معطّل", statusTone(if (!user.isActive) "neutral" else if (user.isAdmin) "info" else "running"))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
