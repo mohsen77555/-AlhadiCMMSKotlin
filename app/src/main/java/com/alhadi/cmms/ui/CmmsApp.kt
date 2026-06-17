@@ -127,6 +127,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.MovementType
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.notify.Reminders
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -463,6 +464,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onResetSampleData = viewModel::resetSampleData,
                             onExportBackup = { backupExportLauncher.launch("alhadi-cmms-backup-${DateStrings.today()}.json") },
                             onImportBackup = { backupImportLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                            onRunReminders = { Reminders.runNow(appContext) },
                             onSave = viewModel::saveUser,
                             onSetActive = viewModel::setUserActive,
                             onDelete = viewModel::deleteUser
@@ -3474,6 +3476,7 @@ private fun AdminScreen(
     onResetSampleData: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onRunReminders: () -> Unit,
     onSave: (UserEntity) -> Unit,
     onSetActive: (UserEntity, Boolean) -> Unit,
     onDelete: (UserEntity) -> Unit
@@ -3543,6 +3546,24 @@ private fun AdminScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error
                         )
+                    }
+                }
+            }
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconBubble(Icons.Filled.NotificationsActive, AccentOrange, AccentOrange.copy(alpha = 0.14f), 38)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("تذكيرات الصيانة", fontWeight = FontWeight.Bold)
+                                Text("فحص يومي تلقائي ينبّهك بالمستحقات والمتأخرات.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        OutlinedButton(onClick = onRunReminders, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.NotificationsActive, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("فحص التذكيرات الآن")
+                        }
                     }
                 }
             }
