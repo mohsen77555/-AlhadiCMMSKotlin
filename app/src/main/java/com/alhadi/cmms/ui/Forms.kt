@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.CapaEntity
@@ -590,6 +591,39 @@ internal fun ReadingDialog(point: MeasuringPointEntity, onSubmit: (Double, Strin
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
     )
+}
+
+// ---------------------------------------------------------------------------
+// Asset characteristic form
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun CharacteristicFormSheet(
+    initial: AssetCharacteristicEntity?,
+    assetId: Long,
+    onDismiss: () -> Unit,
+    onSave: (AssetCharacteristicEntity) -> Unit
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var value by remember { mutableStateOf(initial?.value ?: "") }
+    var unit by remember { mutableStateOf(initial?.unit ?: "") }
+
+    FormSheet(if (initial == null) "إضافة خاصية" else "تعديل الخاصية", onDismiss) {
+        LabeledField("اسم الخاصية", name, { name = it })
+        LabeledField("القيمة", value, { value = it })
+        LabeledField("الوحدة (اختياري)", unit, { unit = it })
+        SaveButton(name.isNotBlank() && value.isNotBlank()) {
+            onSave(
+                AssetCharacteristicEntity(
+                    id = initial?.id ?: 0,
+                    assetId = assetId,
+                    name = name.trim(),
+                    value = value.trim(),
+                    unit = unit.trim()
+                )
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

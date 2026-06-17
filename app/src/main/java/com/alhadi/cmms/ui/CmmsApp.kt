@@ -70,6 +70,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -102,6 +103,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
@@ -171,6 +173,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
+    val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -273,6 +276,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         pmItems = preventiveMaintenance,
                         locations = locations,
                         documents = assetDocuments,
+                        characteristics = assetCharacteristics,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveAsset,
@@ -281,7 +285,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onSaveWorkOrder = viewModel::saveWorkOrder,
                         onUpdateWorkOrderStatus = viewModel::updateWorkOrderStatus,
                         onSaveDocument = viewModel::saveAssetDocument,
-                        onDeleteDocument = viewModel::deleteAssetDocument
+                        onDeleteDocument = viewModel::deleteAssetDocument,
+                        onSaveCharacteristic = viewModel::saveCharacteristic,
+                        onDeleteCharacteristic = viewModel::deleteCharacteristic
                     )
 
                     BottomTab.More -> when (moreRoute) {
@@ -917,6 +923,7 @@ private fun AssetsScreen(
     pmItems: List<PreventiveMaintenanceEntity>,
     locations: List<FunctionalLocationEntity>,
     documents: List<AssetDocumentEntity>,
+    characteristics: List<AssetCharacteristicEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (AssetEntity) -> Unit,
@@ -925,7 +932,9 @@ private fun AssetsScreen(
     onSaveWorkOrder: (WorkOrderEntity) -> Unit,
     onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit,
     onSaveDocument: (AssetDocumentEntity) -> Unit,
-    onDeleteDocument: (AssetDocumentEntity) -> Unit
+    onDeleteDocument: (AssetDocumentEntity) -> Unit,
+    onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showForm by remember { mutableStateOf(false) }
@@ -944,6 +953,7 @@ private fun AssetsScreen(
             workOrders = workOrders.filter { it.assetId == detailAsset.id },
             pmItems = pmItems.filter { it.assetId == detailAsset.id },
             documents = documents.filter { it.assetId == detailAsset.id },
+            characteristics = characteristics.filter { it.assetId == detailAsset.id },
             locations = locations,
             canManage = canManage,
             defaultAssignee = defaultAssignee,
@@ -954,7 +964,9 @@ private fun AssetsScreen(
             onSaveWorkOrder = onSaveWorkOrder,
             onUpdateWorkOrderStatus = onUpdateWorkOrderStatus,
             onSaveDocument = onSaveDocument,
-            onDeleteDocument = onDeleteDocument
+            onDeleteDocument = onDeleteDocument,
+            onSaveCharacteristic = onSaveCharacteristic,
+            onDeleteCharacteristic = onDeleteCharacteristic
         )
         return
     }
@@ -1053,6 +1065,7 @@ private fun AssetDetailScreen(
     workOrders: List<WorkOrderEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
     documents: List<AssetDocumentEntity>,
+    characteristics: List<AssetCharacteristicEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
@@ -1063,11 +1076,16 @@ private fun AssetDetailScreen(
     onSaveWorkOrder: (WorkOrderEntity) -> Unit,
     onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit,
     onSaveDocument: (AssetDocumentEntity) -> Unit,
-    onDeleteDocument: (AssetDocumentEntity) -> Unit
+    onDeleteDocument: (AssetDocumentEntity) -> Unit,
+    onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit
 ) {
     var showDocForm by remember { mutableStateOf(false) }
     var editingDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
     var deleteDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
+    var showCharForm by remember { mutableStateOf(false) }
+    var editingChar by remember { mutableStateOf<AssetCharacteristicEntity?>(null) }
+    var deleteChar by remember { mutableStateOf<AssetCharacteristicEntity?>(null) }
     val locationLabel = asset.locationId?.let { id -> locations.firstOrNull { it.id == id }?.let { "${it.code} • ${it.name}" } } ?: "غير محدد"
     val today = DateStrings.today()
     val underWarranty = asset.isUnderWarranty(today)
@@ -1116,6 +1134,40 @@ private fun AssetDetailScreen(
                     InfoRow("الأهمية", asset.criticality)
                     InfoRow("تاريخ التركيب", asset.installedAt)
                     InfoRow("آخر فحص", asset.lastInspectionAt)
+                }
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("الخصائص الفنية (${characteristics.size})")
+                Spacer(modifier = Modifier.weight(1f))
+                if (canManage) {
+                    OutlinedButton(onClick = { editingChar = null; showCharForm = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة")
+                    }
+                }
+            }
+        }
+        if (characteristics.isEmpty()) {
+            item { EmptyState("لا توجد خصائص مسجّلة") }
+        }
+        items(characteristics, key = { "ch2-${it.id}" }) { ch ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(ch.name, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                    LtrText("${ch.value} ${ch.unit}".trim(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    if (canManage) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = { editingChar = ch; showCharForm = true }) {
+                            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = { deleteChar = ch }) {
+                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 }
             }
         }
@@ -1304,6 +1356,22 @@ private fun AssetDetailScreen(
         }
     }
 
+    if (showCharForm) {
+        CharacteristicFormSheet(
+            initial = editingChar,
+            assetId = asset.id,
+            onDismiss = { showCharForm = false },
+            onSave = { onSaveCharacteristic(it); showCharForm = false }
+        )
+    }
+    deleteChar?.let { target ->
+        ConfirmDialog(
+            title = "حذف الخاصية",
+            text = "هل تريد حذف \"${target.name}\"؟",
+            onConfirm = { onDeleteCharacteristic(target); deleteChar = null },
+            onDismiss = { deleteChar = null }
+        )
+    }
     if (showDocForm) {
         DocumentFormSheet(
             initial = editingDoc,
