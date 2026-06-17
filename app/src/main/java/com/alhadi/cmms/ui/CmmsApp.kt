@@ -258,7 +258,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         parts = spareParts,
                         pmItems = preventiveMaintenance,
                         onReports = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Reports },
-                        onGovernance = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Audit }
+                        onGovernance = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Audit },
+                        onOpenTab = { selectedTab = it; if (it != BottomTab.More) moreRoute = null },
+                        onOpenMore = { selectedTab = BottomTab.More; moreRoute = it }
                     )
 
                     BottomTab.WorkOrders -> WorkOrdersScreen(
@@ -684,15 +686,25 @@ private fun DashboardScreen(
     parts: List<SparePartEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
     onReports: () -> Unit,
-    onGovernance: () -> Unit
+    onGovernance: () -> Unit,
+    onOpenTab: (BottomTab) -> Unit,
+    onOpenMore: (MoreRoute) -> Unit
 ) {
     val today = DateStrings.today()
+    val soon = DateStrings.daysFromToday(30)
     val criticalAssets = assets.count { it.status != "Running" }
     val overdue = workOrders.count { it.status != "Closed" && it.dueAt < today }
     val inProgress = workOrders.count { it.status == "In Progress" }
     val urgent = workOrders.count { it.priority == "Critical" || it.priority == "High" }
     val assigned = workOrders.count { it.assignedTo.isNotBlank() }
     val governance = if (workOrders.isEmpty()) 100 else (assigned * 100 / workOrders.size)
+    val pendingApprovals = workOrders.filter { it.approvalStatus == "Pending" }
+    val expiringWarranty = assets.filter { it.warrantyEnd.isNotBlank() && it.warrantyEnd in today..soon }
+    val totalCost = workOrders.sumOf { it.totalCost() }
+    val failures = workOrders.filter { it.isFailure }
+    val downtime = failures.sumOf { it.downtimeHours }
+    val windowHours = (assets.size.coerceAtLeast(1)) * 30.0 * 24.0
+    val availability = ((windowHours - downtime) / windowHours * 100.0).coerceIn(0.0, 100.0)
 
     LazyColumn(
         modifier = Modifier
@@ -705,10 +717,10 @@ private fun DashboardScreen(
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                KpiTile("أصول حرجة", criticalAssets.toString(), AccentRed, Modifier.weight(1f))
-                KpiTile("CAPA", stats.capa.toString(), AccentOrange, Modifier.weight(1f))
-                KpiTile("متأخرة", overdue.toString(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
-                KpiTile("أوامر مفتوحة", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f))
+                KpiTile("أصول حرجة", criticalAssets.toString(), AccentRed, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.Assets) })
+                KpiTile("CAPA", stats.capa.toString(), AccentOrange, Modifier.weight(1f), onClick = { onOpenMore(MoreRoute.Capa) })
+                KpiTile("متأخرة", overdue.toString(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("أوامر مفتوحة", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
             }
         }
 
@@ -720,11 +732,24 @@ private fun DashboardScreen(
         }
 
         item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SectionHeader("نظرة عامة على الأداء")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MetricColumn("التوفّر", "${"%.0f".format(availability)}%", AccentGreen)
+                        MetricColumn("زمن التوقف", "${"%.0f".format(downtime)}س", AccentOrange)
+                        MetricColumn("التكلفة", money(totalCost), AccentBlue)
+                    }
+                }
+            }
+        }
+
+        item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                KpiTile("مفتوح", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f))
-                KpiTile("قيد التنفيذ", inProgress.toString(), AccentOrange, Modifier.weight(1f))
-                KpiTile("متأخر", overdue.toString(), AccentRed, Modifier.weight(1f))
-                KpiTile("طارئ", urgent.toString(), AccentPurple, Modifier.weight(1f))
+                KpiTile("مفتوح", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("قيد التنفيذ", inProgress.toString(), AccentOrange, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("متأخر", overdue.toString(), AccentRed, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("طارئ", urgent.toString(), AccentPurple, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
             }
         }
 
@@ -734,19 +759,35 @@ private fun DashboardScreen(
         val lowStockParts = parts.filter { it.onHandQty <= it.minQty }.take(4)
         val duePm = pmItems.filter { DateStrings.isDueOrOverdue(it.nextDueAt) }.take(4)
 
-        if (warningAssets.isEmpty() && lowStockParts.isEmpty() && duePm.isEmpty()) {
+        if (warningAssets.isEmpty() && lowStockParts.isEmpty() && duePm.isEmpty() &&
+            pendingApprovals.isEmpty() && expiringWarranty.isEmpty()
+        ) {
             item { CalmCard() }
         } else {
+            items(pendingApprovals.take(4), key = { "ap-${it.id}" }) { wo ->
+                AlertRow(Icons.Filled.FactCheck, AccentPurple, wo.title, "بانتظار اعتماد المشرف", onClick = { onOpenTab(BottomTab.WorkOrders) })
+            }
             items(warningAssets, key = { "a-${it.id}" }) { asset ->
-                AlertRow(Icons.Filled.Warning, statusTone(asset.status).content, "${asset.code} • ${asset.name}", "الحالة: ${asset.status} • ${asset.location}")
+                AlertRow(Icons.Filled.Warning, statusTone(asset.status).content, "${asset.code} • ${asset.name}", "الحالة: ${asset.status} • ${asset.location}", onClick = { onOpenTab(BottomTab.Assets) })
             }
             items(lowStockParts, key = { "p-${it.id}" }) { part ->
-                AlertRow(Icons.Filled.Inventory2, AccentRed, "${part.partNumber} • ${part.name}", "المتوفر ${part.onHandQty} • الحد الأدنى ${part.minQty}")
+                AlertRow(Icons.Filled.Inventory2, AccentRed, "${part.partNumber} • ${part.name}", "المتوفر ${part.onHandQty} • الحد الأدنى ${part.minQty}", onClick = { onOpenMore(MoreRoute.Inventory) })
             }
             items(duePm, key = { "m-${it.id}" }) { pm ->
-                AlertRow(Icons.Filled.EventRepeat, AccentOrange, pm.title, "مستحقة بتاريخ ${pm.nextDueAt}")
+                AlertRow(Icons.Filled.EventRepeat, AccentOrange, pm.title, "مستحقة بتاريخ ${pm.nextDueAt}", onClick = { onOpenTab(BottomTab.Supervision) })
+            }
+            items(expiringWarranty.take(4), key = { "w-${it.id}" }) { asset ->
+                AlertRow(Icons.Filled.Verified, AccentTeal, "${asset.code} • ${asset.name}", "ينتهي الضمان بتاريخ ${asset.warrantyEnd}", onClick = { onOpenTab(BottomTab.Assets) })
             }
         }
+    }
+}
+
+@Composable
+private fun MetricColumn(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -759,9 +800,9 @@ private fun DotSectionTitle(text: String, dot: Color) {
 }
 
 @Composable
-private fun KpiTile(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+private fun KpiTile(label: String, value: String, color: Color, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     ElevatedCard(
-        modifier = modifier.height(92.dp),
+        modifier = modifier.height(92.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
@@ -817,9 +858,9 @@ private fun CalmCard() {
 }
 
 @Composable
-private fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String) {
+private fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String, onClick: (() -> Unit)? = null) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
@@ -831,6 +872,9 @@ private fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String
             Column(modifier = Modifier.weight(1f)) {
                 LtrText(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (onClick != null) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -1621,17 +1665,28 @@ private fun WorkOrdersScreen(
     onApprove: (WorkOrderEntity, Boolean) -> Unit
 ) {
     val statusFilters = listOf("All", "Open", "In Progress", "Closed")
+    val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
+    var selectedPriority by rememberSaveable { mutableStateOf("All") }
+    var pendingOnly by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<WorkOrderEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<WorkOrderEntity?>(null) }
-    val filtered = remember(selectedFilter, query, workOrders) {
+    val filtered = remember(selectedFilter, selectedPriority, pendingOnly, query, workOrders, assetMap) {
+        val q = query.lowercase(Locale.getDefault())
         workOrders.filter { wo ->
+            val asset = assetMap[wo.assetId]
             (selectedFilter == "All" || wo.status == selectedFilter) &&
-                (query.isBlank() || wo.title.lowercase(Locale.getDefault()).contains(query.lowercase(Locale.getDefault())))
-        }
+                (selectedPriority == "All" || wo.priority == selectedPriority) &&
+                (!pendingOnly || wo.approvalStatus == "Pending") &&
+                (q.isBlank() ||
+                    wo.title.lowercase(Locale.getDefault()).contains(q) ||
+                    (asset?.code?.lowercase(Locale.getDefault())?.contains(q) == true) ||
+                    (asset?.name?.lowercase(Locale.getDefault())?.contains(q) == true))
+        }.sortedWith(compareBy({ it.status == "Closed" }, { it.dueAt }))
     }
+    val pendingCount = workOrders.count { it.approvalStatus == "Pending" }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -1641,7 +1696,7 @@ private fun WorkOrdersScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث في أوامر العمل…") }
+            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث بالعنوان أو الأصل…") }
             item {
                 Row(
                     modifier = Modifier
@@ -1653,6 +1708,33 @@ private fun WorkOrdersScreen(
                         FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter }, label = { Text(filter) })
                     }
                 }
+            }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    priorityFilters.forEach { p ->
+                        FilterChip(selected = selectedPriority == p, onClick = { selectedPriority = p }, label = { Text(p) })
+                    }
+                    if (pendingCount > 0) {
+                        FilterChip(
+                            selected = pendingOnly,
+                            onClick = { pendingOnly = !pendingOnly },
+                            label = { Text("بانتظار الاعتماد ($pendingCount)") },
+                            leadingIcon = { Icon(Icons.Filled.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+            }
+            item {
+                Text(
+                    "عرض ${filtered.size} من ${workOrders.size} أمر عمل",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             if (canManage) {
                 item { AddButton("أمر عمل جديد") { editing = null; showForm = true } }
