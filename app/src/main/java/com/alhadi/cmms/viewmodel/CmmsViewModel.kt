@@ -363,6 +363,34 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         }
     }
 
+    /** Writes a full JSON backup of the database to the user-chosen file. */
+    fun exportBackup(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val content = repository.exportBackup()
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
+                        ?: throw IllegalStateException("تعذّر إنشاء الملف")
+                }
+            }.onSuccess { _message.value = "تم حفظ النسخة الاحتياطية بنجاح" }
+                .onFailure { _message.value = "تعذّر التصدير: ${it.message ?: "غير معروف"}" }
+        }
+    }
+
+    /** Replaces all data with the contents of a chosen JSON backup file. */
+    fun importBackup(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val content = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+                        ?: throw IllegalStateException("تعذّر فتح الملف")
+                    repository.importBackup(content)
+                }
+            }.onSuccess { _message.value = "تمت الاستعادة بنجاح (${it.totalRecords} سجل)" }
+                .onFailure { _message.value = "تعذّر الاستعادة: ${it.message ?: "ملف غير صالح"}" }
+        }
+    }
+
     fun clearMessage() {
         _message.value = null
     }

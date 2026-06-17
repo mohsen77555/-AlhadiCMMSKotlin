@@ -26,6 +26,8 @@ import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
 
 class CmmsRepository(private val database: AppDatabase) {
     private val assetDao = database.assetDao()
@@ -105,6 +107,109 @@ class CmmsRepository(private val database: AppDatabase) {
                 createdAt = DateStrings.now()
             )
         )
+    }
+
+    // ---------------------------------------------------------------------
+    // Backup & restore (full database snapshot as portable JSON)
+    // ---------------------------------------------------------------------
+
+    private val backupJson = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    /** Serializes every table into a portable JSON backup string. */
+    suspend fun exportBackup(): String {
+        val bundle = BackupBundle(
+            appDbVersion = 22,
+            exportedAt = DateStrings.now(),
+            assets = assets.first(),
+            workOrders = workOrders.first(),
+            preventiveMaintenance = preventiveMaintenance.first(),
+            spareParts = spareParts.first(),
+            inventoryTransactions = transactionDao.dumpAll(),
+            users = users.first(),
+            auditLog = auditLogDao.dumpAll(),
+            measuringPoints = measuringPoints.first(),
+            measurementReadings = measurementDao.dumpAllReadings(),
+            functionalLocations = functionalLocations.first(),
+            capa = capaActions.first(),
+            assetDocuments = assetDocuments.first(),
+            assetCharacteristics = assetCharacteristics.first(),
+            assetBom = assetBom.first(),
+            assetMovements = assetMovements.first(),
+            pmChecklist = pmChecklist.first(),
+            notifications = notifications.first(),
+            operations = workOrderOperations.first(),
+            confirmations = workOrderConfirmations.first(),
+            photos = workOrderPhotos.first(),
+            taskLists = taskLists.first(),
+            taskListOperations = taskListOperations.first(),
+            permits = workPermits.first()
+        )
+        return backupJson.encodeToString(BackupBundle.serializer(), bundle)
+    }
+
+    /**
+     * Replaces ALL current data with the contents of a backup, atomically. Returns the parsed
+     * bundle so the caller can show a restore summary. Throws if the JSON is not a valid backup.
+     */
+    suspend fun importBackup(content: String): BackupBundle {
+        val bundle = backupJson.decodeFromString(BackupBundle.serializer(), content)
+        database.withTransaction {
+            // Clear everything first.
+            auditLogDao.deleteAll()
+            permitDao.deleteAll()
+            taskListDao.deleteAllOperations()
+            taskListDao.deleteAllTaskLists()
+            photoDao.deleteAll()
+            confirmationDao.deleteAll()
+            operationDao.deleteAll()
+            notificationDao.deleteAll()
+            checklistDao.deleteAll()
+            movementDao.deleteAll()
+            bomDao.deleteAll()
+            characteristicDao.deleteAll()
+            documentDao.deleteAll()
+            capaDao.deleteAll()
+            locationDao.deleteAll()
+            measurementDao.deleteAllReadings()
+            measurementDao.deleteAllPoints()
+            transactionDao.deleteAll()
+            pmDao.deleteAll()
+            workOrderDao.deleteAll()
+            sparePartDao.deleteAll()
+            userDao.deleteAll()
+            assetDao.deleteAll()
+
+            // Restore (parents first; REPLACE semantics make ordering otherwise safe).
+            assetDao.insertAssets(bundle.assets)
+            userDao.insertAll(bundle.users)
+            locationDao.insertAll(bundle.functionalLocations)
+            sparePartDao.insertAll(bundle.spareParts)
+            workOrderDao.insertWorkOrders(bundle.workOrders)
+            pmDao.insertAll(bundle.preventiveMaintenance)
+            checklistDao.insertAll(bundle.pmChecklist)
+            transactionDao.insertAll(bundle.inventoryTransactions)
+            measurementDao.insertPoints(bundle.measuringPoints)
+            measurementDao.insertReadings(bundle.measurementReadings)
+            capaDao.insertAll(bundle.capa)
+            documentDao.insertAll(bundle.assetDocuments)
+            characteristicDao.insertAll(bundle.assetCharacteristics)
+            bomDao.insertAll(bundle.assetBom)
+            movementDao.insertAll(bundle.assetMovements)
+            notificationDao.insertAll(bundle.notifications)
+            operationDao.insertAll(bundle.operations)
+            confirmationDao.insertAll(bundle.confirmations)
+            photoDao.insertAll(bundle.photos)
+            taskListDao.insertTaskLists(bundle.taskLists)
+            taskListDao.insertOperations(bundle.taskListOperations)
+            permitDao.insertAll(bundle.permits)
+
+            recordAudit("Import", "Backup", "تم استعادة نسخة احتياطية (${bundle.totalRecords} سجل)", "System")
+        }
+        return bundle
     }
 
     // ---------------------------------------------------------------------

@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -12,6 +14,7 @@ import androidx.room.PrimaryKey
     tableName = "capa_actions",
     indices = [Index(value = ["assetId"]), Index(value = ["status"])]
 )
+@Serializable
 data class CapaEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

@@ -45,6 +45,9 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
@@ -230,6 +233,12 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val appContext = LocalContext.current
     val excelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.importExcel(appContext, uri)
+    }
+    val backupExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) viewModel.exportBackup(appContext, uri)
+    }
+    val backupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importBackup(appContext, uri)
     }
 
     BackHandler(enabled = selectedTab == BottomTab.More && moreRoute != null) {
@@ -452,6 +461,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             currentUser = currentUser,
                             onAddTechnician = viewModel::addTechnician,
                             onResetSampleData = viewModel::resetSampleData,
+                            onExportBackup = { backupExportLauncher.launch("alhadi-cmms-backup-${DateStrings.today()}.json") },
+                            onImportBackup = { backupImportLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
                             onSave = viewModel::saveUser,
                             onSetActive = viewModel::setUserActive,
                             onDelete = viewModel::deleteUser
@@ -3461,6 +3472,8 @@ private fun AdminScreen(
     currentUser: UserEntity?,
     onAddTechnician: () -> Unit,
     onResetSampleData: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
     onSave: (UserEntity) -> Unit,
     onSetActive: (UserEntity, Boolean) -> Unit,
     onDelete: (UserEntity) -> Unit
@@ -3478,6 +3491,7 @@ private fun AdminScreen(
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<UserEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<UserEntity?>(null) }
+    var showRestoreConfirm by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -3499,6 +3513,36 @@ private fun AdminScreen(
                         Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("إعادة تعيين")
+                    }
+                }
+            }
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconBubble(Icons.Filled.Backup, AccentTeal, AccentTeal.copy(alpha = 0.14f), 38)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("النسخ الاحتياطي والاستعادة", fontWeight = FontWeight.Bold)
+                                Text("احفظ كل البيانات في ملف، أو استعدها على جهاز آخر.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = onExportBackup, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("نسخة احتياطية")
+                            }
+                            OutlinedButton(onClick = { showRestoreConfirm = true }, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("استعادة")
+                            }
+                        }
+                        Text(
+                            "تنبيه: الاستعادة تستبدل كل البيانات الحالية بمحتوى الملف.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
@@ -3540,6 +3584,14 @@ private fun AdminScreen(
             text = "هل تريد حذف ${target.name} (@${target.username})؟",
             onConfirm = { onDelete(target); deleteTarget = null },
             onDismiss = { deleteTarget = null }
+        )
+    }
+    if (showRestoreConfirm) {
+        ConfirmDialog(
+            title = "استعادة نسخة احتياطية",
+            text = "سيتم استبدال جميع البيانات الحالية بمحتوى الملف الذي ستختاره. هل تريد المتابعة؟",
+            onConfirm = { showRestoreConfirm = false; onImportBackup() },
+            onDismiss = { showRestoreConfirm = false }
         )
     }
 }

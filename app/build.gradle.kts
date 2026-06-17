@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("androidx.room")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -79,6 +80,7 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     implementation("com.google.zxing:core:3.5.3")
 

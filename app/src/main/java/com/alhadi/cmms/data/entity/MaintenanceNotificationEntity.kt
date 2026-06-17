@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -16,6 +18,7 @@ import androidx.room.PrimaryKey
     tableName = "maintenance_notifications",
     indices = [Index(value = ["assetId"]), Index(value = ["status"])]
 )
+@Serializable
 data class MaintenanceNotificationEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

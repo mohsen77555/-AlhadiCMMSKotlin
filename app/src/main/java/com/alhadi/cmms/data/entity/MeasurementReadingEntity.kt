@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -8,6 +10,7 @@ import androidx.room.PrimaryKey
     tableName = "measurement_readings",
     indices = [Index(value = ["pointId"]), Index(value = ["assetId"])]
 )
+@Serializable
 data class MeasurementReadingEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

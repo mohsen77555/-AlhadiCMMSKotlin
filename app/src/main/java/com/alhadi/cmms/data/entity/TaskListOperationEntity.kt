@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -9,6 +11,7 @@ import androidx.room.PrimaryKey
     tableName = "task_list_operations",
     indices = [Index(value = ["taskListId"])]
 )
+@Serializable
 data class TaskListOperationEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

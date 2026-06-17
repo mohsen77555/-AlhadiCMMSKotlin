@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -13,6 +15,7 @@ import androidx.room.PrimaryKey
     tableName = "work_permits",
     indices = [Index(value = ["orderId"])]
 )
+@Serializable
 data class WorkPermitEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

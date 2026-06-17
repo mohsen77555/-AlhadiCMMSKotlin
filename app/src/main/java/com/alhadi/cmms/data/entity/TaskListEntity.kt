@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -9,6 +11,7 @@ import androidx.room.PrimaryKey
  * from a linked preventive-maintenance plan.
  */
 @Entity(tableName = "task_lists")
+@Serializable
 data class TaskListEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

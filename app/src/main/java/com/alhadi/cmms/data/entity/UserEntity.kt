@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -8,6 +10,7 @@ import androidx.room.PrimaryKey
     tableName = "users",
     indices = [Index(value = ["username"], unique = true)]
 )
+@Serializable
 data class UserEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

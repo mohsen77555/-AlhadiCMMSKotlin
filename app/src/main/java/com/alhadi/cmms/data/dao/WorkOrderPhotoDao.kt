@@ -18,6 +18,9 @@ interface WorkOrderPhotoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(photo: WorkOrderPhotoEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(photos: List<WorkOrderPhotoEntity>)
+
     @Query("DELETE FROM work_order_photos WHERE id = :id")
     suspend fun deleteById(id: Long)
 
