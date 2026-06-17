@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
@@ -98,6 +99,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MeasurementReadingEntity
+import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -135,7 +138,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance }
+private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters }
 
 private data class ScreenMeta(
     val title: String,
@@ -155,6 +158,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val users by viewModel.users.collectAsStateWithLifecycle()
     val auditLog by viewModel.auditLog.collectAsStateWithLifecycle()
+    val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
+    val readings by viewModel.readings.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -290,6 +295,17 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             pmItems = preventiveMaintenance
                         )
                         MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
+                        MoreRoute.Meters -> MetersScreen(
+                            innerPadding = innerPadding,
+                            points = measuringPoints,
+                            readings = readings,
+                            assetMap = assetMap,
+                            assets = assets,
+                            canManage = canManage,
+                            onSavePoint = viewModel::saveMeasuringPoint,
+                            onDeletePoint = viewModel::deleteMeasuringPoint,
+                            onAddReading = viewModel::addReading
+                        )
                         MoreRoute.Admin -> AdminScreen(
                             innerPadding = innerPadding,
                             users = users,
@@ -330,6 +346,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
         MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
         MoreRoute.PreventiveMaintenance -> ScreenMeta("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal)
+        MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
     }
 }
 
@@ -767,7 +784,13 @@ private fun MoreGrid(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal, Modifier.weight(1f)) { onOpen(MoreRoute.PreventiveMaintenance) }
+                ModuleCard("العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Meters) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
         if (isAdmin) {
@@ -1706,6 +1729,137 @@ private fun UserCard(
                     }
                 }
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Meters & readings
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun MetersScreen(
+    innerPadding: PaddingValues,
+    points: List<MeasuringPointEntity>,
+    readings: List<MeasurementReadingEntity>,
+    assetMap: Map<Long, AssetEntity>,
+    assets: List<AssetEntity>,
+    canManage: Boolean,
+    onSavePoint: (MeasuringPointEntity) -> Unit,
+    onDeletePoint: (MeasuringPointEntity) -> Unit,
+    onAddReading: (MeasuringPointEntity, Double, String) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<MeasuringPointEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<MeasuringPointEntity?>(null) }
+    var readingTarget by remember { mutableStateOf<MeasuringPointEntity?>(null) }
+    val grouped = points.groupBy { it.assetId }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("نقاط القياس")
+                Text("تابع أداء الأصول وسجّل القراءات.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("نقطة قياس جديدة") { editing = null; showForm = true } }
+            }
+            if (points.isEmpty()) {
+                item { EmptyState("لا توجد نقاط قياس", Icons.Filled.Speed) }
+            }
+            grouped.forEach { (assetId, assetPoints) ->
+                val asset = assetMap[assetId]
+                item { SectionHeader(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #$assetId") }
+                items(assetPoints, key = { it.id }) { point ->
+                    MeterCard(
+                        point = point,
+                        canManage = canManage,
+                        onAddReading = { readingTarget = point },
+                        onEdit = { editing = point; showForm = true },
+                        onDelete = { deleteTarget = point }
+                    )
+                }
+            }
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                SectionHeader("آخر القراءات")
+            }
+            if (readings.isEmpty()) {
+                item { EmptyState("لا توجد قراءات بعد") }
+            }
+            items(readings.take(30), key = { it.id }) { reading ->
+                val point = points.firstOrNull { it.id == reading.pointId }
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        IconBubble(Icons.Filled.Speed, AccentPurple, AccentPurple.copy(alpha = 0.14f), 40)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("${point?.name ?: "Point #${reading.pointId}"}: ${reading.value} ${point?.unit ?: ""}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            Text("${reading.createdAt} • ${reading.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showForm) {
+        MeterFormSheet(initial = editing, assets = assets, onDismiss = { showForm = false }, onSave = { onSavePoint(it); showForm = false })
+    }
+    readingTarget?.let { target ->
+        ReadingDialog(point = target, onSubmit = { v, note -> onAddReading(target, v, note); readingTarget = null }, onDismiss = { readingTarget = null })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف نقطة القياس",
+            text = "هل تريد حذف \"${target.name}\"؟",
+            onConfirm = { onDeletePoint(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun MeterCard(
+    point: MeasuringPointEntity,
+    canManage: Boolean,
+    onAddReading: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val overLimit = point.upperLimit != null && point.lastReading > point.upperLimit
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(point.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${point.lastReading} ${point.unit}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (overLimit) StatusStopped else MaterialTheme.colorScheme.primary
+                    )
+                }
+                StatusBadge(if (point.isCounter) "عداد" else "قراءة", statusTone("info"))
+            }
+            if (point.upperLimit != null) {
+                InfoRow("الحد الأعلى", "${point.upperLimit} ${point.unit}")
+            }
+            InfoRow("آخر تحديث", point.lastReadingAt)
+            if (overLimit) {
+                Text("تجاوز الحد الأعلى!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            }
+            Button(onClick = onAddReading, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("تسجيل قراءة")
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 }

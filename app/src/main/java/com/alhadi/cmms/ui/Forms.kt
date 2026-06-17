@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -373,6 +374,81 @@ internal fun PmFormSheet(
 // ---------------------------------------------------------------------------
 // User form
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Measuring point form + reading dialog
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun MeterFormSheet(
+    initial: MeasuringPointEntity?,
+    assets: List<AssetEntity>,
+    onDismiss: () -> Unit,
+    onSave: (MeasuringPointEntity) -> Unit
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var unit by remember { mutableStateOf(initial?.unit ?: "") }
+    var assetId by remember { mutableStateOf(initial?.assetId ?: assets.firstOrNull()?.id ?: 0L) }
+    var isCounter by remember { mutableStateOf(initial?.isCounter ?: false) }
+    var limit by remember { mutableStateOf(initial?.upperLimit?.toString() ?: "") }
+
+    FormSheet(if (initial == null) "إضافة نقطة قياس" else "تعديل نقطة القياس", onDismiss) {
+        LabeledField("اسم النقطة", name, { name = it })
+        LabeledField("الوحدة (hr / °C / mm/s ...)", unit, { unit = it })
+        AssetDropdown(assets, assetId) { assetId = it }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("عداد تراكمي", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = isCounter, onCheckedChange = { isCounter = it })
+        }
+        LabeledField("الحد الأعلى للتنبيه (اختياري)", limit, { limit = it }, numeric = true)
+        SaveButton(name.isNotBlank() && unit.isNotBlank() && assetId != 0L) {
+            val today = DateStrings.today()
+            onSave(
+                MeasuringPointEntity(
+                    id = initial?.id ?: 0,
+                    assetId = assetId,
+                    name = name.trim(),
+                    unit = unit.trim(),
+                    isCounter = isCounter,
+                    upperLimit = limit.toDoubleOrNull(),
+                    lastReading = initial?.lastReading ?: 0.0,
+                    lastReadingAt = initial?.lastReadingAt ?: today
+                )
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ReadingDialog(point: MeasuringPointEntity, onSubmit: (Double, String) -> Unit, onDismiss: () -> Unit) {
+    var value by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تسجيل قراءة — ${point.name}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("آخر قراءة: ${point.lastReading} ${point.unit}", style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    label = { Text("القراءة (${point.unit})") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("ملاحظة (اختياري)") }, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = value.toDoubleOrNull() != null,
+                onClick = { value.toDoubleOrNull()?.let { onSubmit(it, note) } }
+            ) { Text("تسجيل") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
+}
 
 @Composable
 internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: (UserEntity) -> Unit) {

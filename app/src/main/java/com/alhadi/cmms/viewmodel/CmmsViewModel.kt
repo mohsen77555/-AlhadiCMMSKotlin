@@ -7,6 +7,8 @@ import com.alhadi.cmms.data.CmmsRepository
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MeasurementReadingEntity
+import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -84,6 +86,12 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val auditLog: StateFlow<List<AuditLogEntity>> = repository.auditLog
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val measuringPoints: StateFlow<List<MeasuringPointEntity>> = repository.measuringPoints
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val readings: StateFlow<List<MeasurementReadingEntity>> = repository.readings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -189,6 +197,17 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun saveUser(user: UserEntity) = launchAction("تم حفظ المستخدم") { repository.saveUser(user, actor()) }
     fun setUserActive(user: UserEntity, active: Boolean) = launchAction("تم تحديث حالة المستخدم") { repository.setUserActive(user, active, actor()) }
     fun deleteUser(user: UserEntity) = launchAction("تم حذف المستخدم") { repository.deleteUser(user, actor()) }
+
+    // ----- Meters & readings -----
+    fun saveMeasuringPoint(point: MeasuringPointEntity) = launchAction("تم حفظ نقطة القياس") { repository.saveMeasuringPoint(point, actor()) }
+    fun deleteMeasuringPoint(point: MeasuringPointEntity) = launchAction("تم حذف نقطة القياس") { repository.deleteMeasuringPoint(point, actor()) }
+    fun addReading(point: MeasuringPointEntity, value: Double, note: String) {
+        viewModelScope.launch {
+            runCatching { repository.addReading(point, value, note, actor()) }
+                .onSuccess { warning -> _message.value = warning ?: "تم تسجيل القراءة" }
+                .onFailure { _message.value = "حدث خطأ: ${it.message ?: "غير معروف"}" }
+        }
+    }
 
     fun clearMessage() {
         _message.value = null

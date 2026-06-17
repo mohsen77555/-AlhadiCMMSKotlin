@@ -4,6 +4,8 @@ import androidx.room.withTransaction
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MeasurementReadingEntity
+import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -19,6 +21,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val transactionDao = database.inventoryTransactionDao()
     private val userDao = database.userDao()
     private val auditLogDao = database.auditLogDao()
+    private val measurementDao = database.measurementDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -28,6 +31,8 @@ class CmmsRepository(private val database: AppDatabase) {
     val users: Flow<List<UserEntity>> = userDao.observeUsers()
     val currentUser: Flow<UserEntity?> = userDao.observeCurrentUser()
     val auditLog: Flow<List<AuditLogEntity>> = auditLogDao.observeRecent()
+    val measuringPoints: Flow<List<MeasuringPointEntity>> = measurementDao.observePoints()
+    val readings: Flow<List<MeasurementReadingEntity>> = measurementDao.observeReadings()
 
     fun observeAssetCount(): Flow<Int> = assetDao.observeAssetCount()
     fun observeOpenWorkOrderCount(): Flow<Int> = workOrderDao.observeOpenCount()
@@ -67,6 +72,8 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                measurementDao.deleteAllReadings()
+                measurementDao.deleteAllPoints()
                 transactionDao.deleteAll()
                 pmDao.deleteAll()
                 workOrderDao.deleteAll()
@@ -130,12 +137,21 @@ class CmmsRepository(private val database: AppDatabase) {
                 InventoryTransactionEntity(3, 5, null, "Receive", 4, DateStrings.daysFromToday(-8), "Store Keeper", "Monthly purchase receipt.")
             )
 
+            val measuringPoints = listOf(
+                MeasuringPointEntity(1, 7, "Running Hours", "hr", true, 12000.0, 8450.0, today),
+                MeasuringPointEntity(2, 7, "Bearing Vibration", "mm/s", false, 11.0, 6.4, today),
+                MeasuringPointEntity(3, 10, "Compressor Hours", "hr", true, 20000.0, 15230.0, today),
+                MeasuringPointEntity(4, 4, "Motor Temperature", "°C", false, 80.0, 72.0, today),
+                MeasuringPointEntity(5, 1, "Belt Tension", "N", false, 500.0, 410.0, today)
+            )
+
             assetDao.insertAssets(assets)
             userDao.insertAll(users)
             workOrderDao.insertWorkOrders(workOrders)
             pmDao.insertAll(preventiveMaintenance)
             sparePartDao.insertAll(spareParts)
             transactionDao.insertAll(transactions)
+            measurementDao.insertPoints(measuringPoints)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -346,4 +362,45 @@ class CmmsRepository(private val database: AppDatabase) {
         userDao.deleteById(user.id)
         recordAudit("Delete", "User", "حذف المستخدم: ${user.username}", actor)
     }
-}
+
+    // ---------------------------------------------------------------------
+    // Meters & readings
+    // ---------------------------------------------------------------------
+
+    suspend fun saveMeasuringPoint(point: MeasuringPointEntity, actor: String = "System") {
+        val isNew = point.id == 0L
+        measurementDao.insertPoint(point)
+        recordAudit(if (isNew) "Create" else "Update", "Meter", "${if (isNew) "إضافة" else "تعديل"} نقطة قياس: ${point.name}", actor)
+    }
+
+    suspend fun deleteMeasuringPoint(point: MeasuringPointEntity, actor: String = "System") {
+        measurementDao.deletePointById(point.id)
+        recordAudit("Delete", "Meter", "حذف نقطة قياس: ${point.name}", actor)
+    }
+
+    /**
+     * Records a reading. Returns an optional warning message (counter decrease /
+     * over-limit) for the UI to surface. Cumulative counters may not decrease.
+     */
+    suspend fun addReading(point: MeasuringPointEntity, value: Double, note: String, actor: String = "System"): String? {
+        if (point.isCounter && value < point.lastReading) {
+            return "لا يمكن أن تقل قراءة العداد التراكمي عن ${point.lastReading}"
+        }
+        val now = DateStrings.now()
+        database.withTransaction {
+            measurementDao.insertReading(
+                MeasurementReadingEntity(
+                    pointId = point.id,
+                    assetId = point.assetId,
+                    value = value,
+                    createdAt = now,
+                    createdBy = actor,
+                    note = note
+                )
+            )
+            measurementDao.updateLastReading(point.id, value, now)
+            recordAudit("Reading", "Meter", "قراءة ${point.name}: $value ${point.unit}", actor)
+        }
+        val limit = point.upperLimit
+        return if (limit != null && value > limit) "تنبيه: تجاوزت القراءة الحد الأعلى ($limit ${point.unit})" else null
+    }
