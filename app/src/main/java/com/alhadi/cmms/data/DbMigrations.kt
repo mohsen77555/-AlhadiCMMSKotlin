@@ -1,0 +1,44 @@
+package com.alhadi.cmms.data
+
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+/**
+ * Database migrations for [AppDatabase].
+ *
+ * IMPORTANT (data safety): the database is the user's real maintenance record. It must NOT be
+ * wiped on app upgrades. Therefore the builder no longer uses destructive migration on upgrade —
+ * every schema change MUST ship a [Migration] here.
+ *
+ * Process for any future schema change:
+ *  1. Edit the entity/DAO.
+ *  2. Bump `version` in [AppDatabase] by 1 (e.g. 22 -> 23).
+ *  3. Add a `Migration(old, new)` below that applies the exact SQL change, then register it in [ALL].
+ *  4. Build once; the exported schema JSON under `app/schemas` updates. Commit it.
+ *
+ * Common patterns:
+ *  - Add a nullable column:  ALTER TABLE x ADD COLUMN c TEXT
+ *  - Add a NOT NULL column:  ALTER TABLE x ADD COLUMN c INTEGER NOT NULL DEFAULT 0
+ *  - Add an index:           CREATE INDEX IF NOT EXISTS idx_x_c ON x(c)
+ *
+ * Example (kept for reference; uncomment and adapt when needed):
+ *
+ *   val MIGRATION_22_23 = object : Migration(22, 23) {
+ *       override fun migrate(db: SupportSQLiteDatabase) {
+ *           db.execSQL("ALTER TABLE spare_parts ADD COLUMN reorderQty INTEGER NOT NULL DEFAULT 0")
+ *       }
+ *   }
+ */
+object DbMigrations {
+
+    /**
+     * All migrations, in order. Empty while the schema is stable at the current version.
+     * Append new `Migration` objects here as the schema evolves.
+     */
+    val ALL: Array<Migration> = arrayOf()
+}
+
+/** Tiny helper so migration SQL reads a little cleaner. */
+internal fun SupportSQLiteDatabase.exec(vararg statements: String) {
+    statements.forEach { execSQL(it) }
+}

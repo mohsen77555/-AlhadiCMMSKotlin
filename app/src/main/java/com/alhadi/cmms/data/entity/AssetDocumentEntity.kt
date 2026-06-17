@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -12,6 +14,7 @@ import androidx.room.PrimaryKey
     tableName = "asset_documents",
     indices = [Index(value = ["assetId"])]
 )
+@Serializable
 data class AssetDocumentEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

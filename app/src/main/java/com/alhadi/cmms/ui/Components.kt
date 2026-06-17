@@ -69,6 +69,12 @@ internal fun StatusBadge(text: String, tone: StatusTone, modifier: Modifier = Mo
     }
 }
 
+/** True when the text's first strong character is Latin/digit (so it should render LTR). */
+private fun isLatinish(text: String): Boolean {
+    val c = text.trim().firstOrNull { !it.isWhitespace() } ?: return false
+    return c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9'
+}
+
 @Composable
 internal fun InfoRow(label: String, value: String) {
     Row(
@@ -82,12 +88,23 @@ internal fun InfoRow(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(110.dp)
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
+        if (isLatinish(value)) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 

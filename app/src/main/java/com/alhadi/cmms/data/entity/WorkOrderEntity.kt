@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -8,6 +10,7 @@ import androidx.room.PrimaryKey
     tableName = "work_orders",
     indices = [Index(value = ["assetId"]), Index(value = ["status"]), Index(value = ["priority"])]
 )
+@Serializable
 data class WorkOrderEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
@@ -27,7 +30,8 @@ data class WorkOrderEntity(
     val laborRate: Double = 0.0,
     val partsCost: Double = 0.0,
     val approvalStatus: String = "NotRequired",
-    val approvedBy: String = ""
+    val approvedBy: String = "",
+    val requiresPermit: Boolean = false
 ) {
     /** Recorded labour cost (hours × rate). */
     fun laborCost(): Double = laborHours * laborRate

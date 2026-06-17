@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -9,6 +11,7 @@ import androidx.room.PrimaryKey
  * review "who did what, and when".
  */
 @Entity(tableName = "audit_log")
+@Serializable
 data class AuditLogEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

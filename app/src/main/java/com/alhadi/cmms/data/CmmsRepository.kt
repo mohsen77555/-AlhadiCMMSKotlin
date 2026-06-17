@@ -23,8 +23,11 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
 
 class CmmsRepository(private val database: AppDatabase) {
     private val assetDao = database.assetDao()
@@ -47,6 +50,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val confirmationDao = database.workOrderConfirmationDao()
     private val photoDao = database.workOrderPhotoDao()
     private val taskListDao = database.taskListDao()
+    private val permitDao = database.workPermitDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -71,6 +75,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val workOrderPhotos: Flow<List<WorkOrderPhotoEntity>> = photoDao.observePhotos()
     val taskLists: Flow<List<TaskListEntity>> = taskListDao.observeTaskLists()
     val taskListOperations: Flow<List<TaskListOperationEntity>> = taskListDao.observeTaskListOperations()
+    val workPermits: Flow<List<WorkPermitEntity>> = permitDao.observePermits()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -105,6 +110,109 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     // ---------------------------------------------------------------------
+    // Backup & restore (full database snapshot as portable JSON)
+    // ---------------------------------------------------------------------
+
+    private val backupJson = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    /** Serializes every table into a portable JSON backup string. */
+    suspend fun exportBackup(): String {
+        val bundle = BackupBundle(
+            appDbVersion = 22,
+            exportedAt = DateStrings.now(),
+            assets = assets.first(),
+            workOrders = workOrders.first(),
+            preventiveMaintenance = preventiveMaintenance.first(),
+            spareParts = spareParts.first(),
+            inventoryTransactions = transactionDao.dumpAll(),
+            users = users.first(),
+            auditLog = auditLogDao.dumpAll(),
+            measuringPoints = measuringPoints.first(),
+            measurementReadings = measurementDao.dumpAllReadings(),
+            functionalLocations = functionalLocations.first(),
+            capa = capaActions.first(),
+            assetDocuments = assetDocuments.first(),
+            assetCharacteristics = assetCharacteristics.first(),
+            assetBom = assetBom.first(),
+            assetMovements = assetMovements.first(),
+            pmChecklist = pmChecklist.first(),
+            notifications = notifications.first(),
+            operations = workOrderOperations.first(),
+            confirmations = workOrderConfirmations.first(),
+            photos = workOrderPhotos.first(),
+            taskLists = taskLists.first(),
+            taskListOperations = taskListOperations.first(),
+            permits = workPermits.first()
+        )
+        return backupJson.encodeToString(BackupBundle.serializer(), bundle)
+    }
+
+    /**
+     * Replaces ALL current data with the contents of a backup, atomically. Returns the parsed
+     * bundle so the caller can show a restore summary. Throws if the JSON is not a valid backup.
+     */
+    suspend fun importBackup(content: String): BackupBundle {
+        val bundle = backupJson.decodeFromString(BackupBundle.serializer(), content)
+        database.withTransaction {
+            // Clear everything first.
+            auditLogDao.deleteAll()
+            permitDao.deleteAll()
+            taskListDao.deleteAllOperations()
+            taskListDao.deleteAllTaskLists()
+            photoDao.deleteAll()
+            confirmationDao.deleteAll()
+            operationDao.deleteAll()
+            notificationDao.deleteAll()
+            checklistDao.deleteAll()
+            movementDao.deleteAll()
+            bomDao.deleteAll()
+            characteristicDao.deleteAll()
+            documentDao.deleteAll()
+            capaDao.deleteAll()
+            locationDao.deleteAll()
+            measurementDao.deleteAllReadings()
+            measurementDao.deleteAllPoints()
+            transactionDao.deleteAll()
+            pmDao.deleteAll()
+            workOrderDao.deleteAll()
+            sparePartDao.deleteAll()
+            userDao.deleteAll()
+            assetDao.deleteAll()
+
+            // Restore (parents first; REPLACE semantics make ordering otherwise safe).
+            assetDao.insertAssets(bundle.assets)
+            userDao.insertAll(bundle.users)
+            locationDao.insertAll(bundle.functionalLocations)
+            sparePartDao.insertAll(bundle.spareParts)
+            workOrderDao.insertWorkOrders(bundle.workOrders)
+            pmDao.insertAll(bundle.preventiveMaintenance)
+            checklistDao.insertAll(bundle.pmChecklist)
+            transactionDao.insertAll(bundle.inventoryTransactions)
+            measurementDao.insertPoints(bundle.measuringPoints)
+            measurementDao.insertReadings(bundle.measurementReadings)
+            capaDao.insertAll(bundle.capa)
+            documentDao.insertAll(bundle.assetDocuments)
+            characteristicDao.insertAll(bundle.assetCharacteristics)
+            bomDao.insertAll(bundle.assetBom)
+            movementDao.insertAll(bundle.assetMovements)
+            notificationDao.insertAll(bundle.notifications)
+            operationDao.insertAll(bundle.operations)
+            confirmationDao.insertAll(bundle.confirmations)
+            photoDao.insertAll(bundle.photos)
+            taskListDao.insertTaskLists(bundle.taskLists)
+            taskListDao.insertOperations(bundle.taskListOperations)
+            permitDao.insertAll(bundle.permits)
+
+            recordAudit("Import", "Backup", "تم استعادة نسخة احتياطية (${bundle.totalRecords} سجل)", "System")
+        }
+        return bundle
+    }
+
+    // ---------------------------------------------------------------------
     // Sample data
     // ---------------------------------------------------------------------
 
@@ -112,6 +220,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                permitDao.deleteAll()
                 taskListDao.deleteAllOperations()
                 taskListDao.deleteAllTaskLists()
                 photoDao.deleteAll()
@@ -162,7 +271,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
             val workOrders = listOf(
                 WorkOrderEntity(1, 7, "Check rollermill vibration", "Inspect bearings, belts, and abnormal noise on RM-01.", "High", "Open", "Mechanical Technician", today, DateStrings.daysFromToday(1), 120.0),
-                WorkOrderEntity(2, 4, "Silo fan not starting", "Check overload, contactor, motor insulation, and fan impeller.", "High", "In Progress", "Electrical Technician", DateStrings.daysFromToday(-1), today, 250.0, isFailure = true, downtimeHours = 6.0),
+                WorkOrderEntity(2, 4, "Silo fan not starting", "Check overload, contactor, motor insulation, and fan impeller.", "High", "In Progress", "Electrical Technician", DateStrings.daysFromToday(-1), today, 250.0, isFailure = true, downtimeHours = 6.0, requiresPermit = true),
                 WorkOrderEntity(3, 11, "Packing machine bag sensor alarm", "Clean and align sensor, verify signal in control panel.", "Medium", "Open", "Electrical Technician", today, DateStrings.daysFromToday(2), 1500.0, approvalStatus = "Pending"),
                 WorkOrderEntity(4, 2, "Chain conveyor lubrication", "Lubricate chain and inspect tension.", "Low", "Closed", "Mechanical Technician", DateStrings.daysFromToday(-7), DateStrings.daysFromToday(-5), 30.0, "Completed and tested."),
                 WorkOrderEntity(5, 4, "Silo fan bearing failure", "Replaced damaged fan bearing.", "High", "Closed", "Mechanical Technician", DateStrings.daysFromToday(-45), DateStrings.daysFromToday(-44), 180.0, "Bearing replaced.", isFailure = true, downtimeHours = 8.0, laborHours = 6.0, laborRate = 25.0, partsCost = 90.0),
@@ -287,6 +396,10 @@ class CmmsRepository(private val database: AppDatabase) {
                 TaskListOperationEntity(3, 1, "0030", "فحص شدّ السيور وضبطها", "Mechanical", 0.5)
             )
 
+            val permits = listOf(
+                WorkPermitEntity(1, 2, "LOTO", "طاقة كهربائية مخزّنة، أجزاء دوّارة", "قفازات عازلة، نظارة واقية", "Approved", "Maintenance Supervisor", DateStrings.daysFromToday(2), "Mohsen Alhadi", today)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
@@ -300,6 +413,7 @@ class CmmsRepository(private val database: AppDatabase) {
             confirmationDao.insertAll(confirmations)
             taskListDao.insertTaskLists(taskLists)
             taskListDao.insertOperations(taskListOps)
+            permitDao.insertAll(permits)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -350,6 +464,12 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun updateWorkOrderStatus(id: Long, status: String, actor: String = "System") {
+        // Governance: hazardous work cannot start without an approved, valid permit (SAFE-002).
+        if (status == "In Progress" && workOrderDao.requiresPermit(id) == true &&
+            permitDao.countValid(id, DateStrings.today()) == 0
+        ) {
+            throw IllegalStateException("يتطلّب تصريح عمل ساري المفعول قبل بدء التنفيذ")
+        }
         // Governance: no technical completion before every required operation is confirmed (TC-001).
         if (status == "Technically Completed") {
             if (operationDao.countForOrder(id) == 0) {
@@ -388,6 +508,9 @@ class CmmsRepository(private val database: AppDatabase) {
     // ---------------------------------------------------------------------
 
     suspend fun issuePart(part: SparePartEntity, quantity: Int = 1, actor: String = "System") {
+        if (quantity > part.onHandQty) {
+            throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${part.onHandQty})")
+        }
         database.withTransaction {
             sparePartDao.adjustStock(part.id, -quantity)
             transactionDao.insert(
@@ -402,6 +525,32 @@ class CmmsRepository(private val database: AppDatabase) {
                 )
             )
             recordAudit("Issue", "Inventory", "صرف $quantity من ${part.partNumber}", actor)
+        }
+    }
+
+    /**
+     * Issues a spare part against a specific work order: decrements stock, records a transaction
+     * linked to the order, and rolls the consumed value into the order's parts cost (MAT-ORD-007).
+     */
+    suspend fun issuePartToWorkOrder(order: WorkOrderEntity, part: SparePartEntity, quantity: Int, actor: String = "System") {
+        if (quantity > part.onHandQty) {
+            throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${part.onHandQty})")
+        }
+        database.withTransaction {
+            sparePartDao.adjustStock(part.id, -quantity)
+            transactionDao.insert(
+                InventoryTransactionEntity(
+                    partId = part.id,
+                    workOrderId = order.id,
+                    transactionType = "Issue",
+                    quantity = quantity,
+                    createdAt = DateStrings.today(),
+                    createdBy = actor,
+                    note = "صرف لأمر العمل: ${order.title}"
+                )
+            )
+            workOrderDao.insertWorkOrder(order.copy(partsCost = order.partsCost + quantity * part.lastPrice))
+            recordAudit("Issue", "Inventory", "صرف $quantity من ${part.partNumber} لأمر العمل #${order.id}", actor)
         }
     }
 
@@ -882,6 +1031,28 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     // ---------------------------------------------------------------------
+    // Work permits (تصاريح العمل / السلامة)
+    // ---------------------------------------------------------------------
+
+    suspend fun savePermit(permit: WorkPermitEntity, actor: String = "System") {
+        val isNew = permit.id == 0L
+        val toSave = if (isNew) permit.copy(createdBy = actor, createdAt = DateStrings.now(), status = "Pending") else permit
+        permitDao.insert(toSave)
+        recordAudit(if (isNew) "Create" else "Update", "Permit", "${if (isNew) "إصدار" else "تعديل"} تصريح (${permit.type}) لأمر العمل #${permit.orderId}", actor)
+    }
+
+    suspend fun setPermitStatus(permit: WorkPermitEntity, approved: Boolean, actor: String = "System") {
+        val status = if (approved) "Approved" else "Rejected"
+        permitDao.insert(permit.copy(status = status, approvedBy = actor))
+        recordAudit("Approval", "Permit", "${if (approved) "اعتماد" else "رفض"} تصريح العمل #${permit.id}", actor)
+    }
+
+    suspend fun deletePermit(permit: WorkPermitEntity, actor: String = "System") {
+        permitDao.deleteById(permit.id)
+        recordAudit("Delete", "Permit", "حذف تصريح عمل #${permit.id}", actor)
+    }
+
+    // ---------------------------------------------------------------------
     // Task lists (قوالب العمل) + generation of orders from PM plans
     // ---------------------------------------------------------------------
 
@@ -906,6 +1077,121 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteTaskListOperation(operation: TaskListOperationEntity, actor: String = "System") {
         taskListDao.deleteOperationById(operation.id)
         recordAudit("Delete", "TaskList", "حذف عملية قالب ${operation.operationNumber}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Excel (maintenance-kit) import
+    // ---------------------------------------------------------------------
+
+    private fun frequencyDaysFor(text: String): Int = when {
+        text.contains("يومي") -> 1
+        text.contains("أسبوعي") -> 7
+        text.contains("شهري") && !text.contains("نصف") && !text.contains("ربع") -> 30
+        text.contains("ربع") -> 90
+        text.contains("نصف") -> 180
+        text.contains("سنوي") || text.contains("سنوى") -> 365
+        else -> 30
+    }
+
+    private fun sheetByKey(sheets: Map<String, List<List<String>>>, key: String): List<List<String>> =
+        sheets.entries.firstOrNull { it.key.contains(key) }?.value ?: emptyList()
+
+    /**
+     * Imports a machine maintenance-kit workbook (the FVV template) and populates the relevant
+     * modules: asset + characteristics, preventive-maintenance plans, a reusable task list with
+     * its operations, the spare-parts catalogue, and a generated work order. Returns a summary.
+     */
+    suspend fun importMachineKit(sheets: Map<String, List<List<String>>>, actor: String = "System"): String {
+        return database.withTransaction {
+            val today = DateStrings.today()
+
+            // --- Technical data → asset + characteristics ---
+            val tech = sheetByKey(sheets, "البيانات الفنية")
+            val techRows = tech.drop(1).filter { it.size >= 2 && it[0].isNotBlank() }
+            val model = techRows.firstOrNull { it[0].contains("موديل") || it[0].contains("Model") }
+                ?.getOrNull(1)?.trim().orEmpty().ifBlank { "Imported Machine" }
+            val code = model.trim().replace(Regex("\\s+"), "-").uppercase().ifBlank { "IMPORT-${System.currentTimeMillis() % 100000}" }
+
+            val existing = assetDao.findByCode(code)
+            val asset = (existing ?: AssetEntity(
+                id = 0, code = code, name = model, groupName = "Vibro Finishers",
+                location = "Milling Floor", manufacturer = "OCRIM", model = model,
+                status = "Running", criticality = "High", installedAt = today, lastInspectionAt = today
+            )).copy(name = model, manufacturer = "OCRIM", model = model)
+            val assetId = if (existing != null) { assetDao.insertAsset(asset); existing.id } else assetDao.insertAsset(asset)
+
+            characteristicDao.deleteForAsset(assetId)
+            val characteristics = techRows
+                .filter { it.size >= 2 && it[1].isNotBlank() && !it[0].contains("البند") }
+                .map { AssetCharacteristicEntity(0, assetId, it[0].trim(), it[1].trim(), "") }
+            if (characteristics.isNotEmpty()) characteristicDao.insertAll(characteristics)
+
+            // --- Maintenance plan → PM plans ---
+            pmDao.deleteForAsset(assetId)
+            val planRows = sheetByKey(sheets, "خطة الصيانة").drop(1).filter { it.size >= 2 && it[1].isNotBlank() }
+            var plansCount = 0
+            planRows.forEach { row ->
+                val freq = frequencyDaysFor(row[0])
+                pmDao.insert(
+                    PreventiveMaintenanceEntity(
+                        id = 0, assetId = assetId, title = row[1].trim().take(120),
+                        frequencyDays = freq, lastDoneAt = today,
+                        nextDueAt = DateStrings.addDays(today, freq), status = "Scheduled",
+                        estimatedDurationMinutes = 30
+                    )
+                )
+                plansCount++
+            }
+
+            // --- Procedures → task list + template operations ---
+            val procRows = sheetByKey(sheets, "إجراءات الصيانة").drop(1).filter { it.isNotEmpty() && it[0].isNotBlank() }
+            val taskListId = taskListDao.insertTaskList(
+                TaskListEntity(0, "إجراءات صيانة $model", "مستورد من ملف صيانة الآلة", "Mechanical")
+            )
+            val templateOps = procRows.mapIndexed { i, row ->
+                TaskListOperationEntity(0, taskListId, "%04d".format((i + 1) * 10), row[0].trim().take(120), "Mechanical", 1.0)
+            }
+            if (templateOps.isNotEmpty()) taskListDao.insertOperations(templateOps)
+
+            // --- Spare parts catalogue ---
+            val partRows = sheetByKey(sheets, "قطع الغيار").drop(1)
+            var partsCount = 0
+            val parts = partRows.mapNotNull { row ->
+                val partNumber = row.getOrNull(1)?.trim().orEmpty()
+                if (partNumber.isBlank() || partNumber == "—" || partNumber == "Code") return@mapNotNull null
+                partsCount++
+                SparePartEntity(
+                    id = 0, partNumber = partNumber, name = row.getOrNull(2)?.trim().orEmpty(),
+                    equipmentGroup = code, unit = "pcs", onHandQty = 0, minQty = 0,
+                    location = "Store", lastPrice = 0.0
+                )
+            }
+            if (parts.isNotEmpty()) sparePartDao.insertAll(parts)
+
+            // --- Generate a work order from the imported task list ---
+            val orderId = workOrderDao.insertWorkOrder(
+                WorkOrderEntity(
+                    assetId = assetId, title = "صيانة شاملة — $model",
+                    description = "أمر عمل مُولّد من ملف الصيانة المستورد", priority = "Medium",
+                    status = "Open", assignedTo = actor, createdAt = today,
+                    dueAt = DateStrings.addDays(today, 7), estimatedCost = 0.0
+                )
+            )
+            if (templateOps.isNotEmpty()) {
+                operationDao.insertAll(
+                    templateOps.map {
+                        WorkOrderOperationEntity(
+                            orderId = orderId, operationNumber = it.operationNumber,
+                            description = it.description, workCenter = it.workCenter,
+                            plannedHours = it.plannedHours, requiresConfirmation = true, status = "Open"
+                        )
+                    }
+                )
+            }
+
+            recordAudit("Import", "System", "استيراد ملف صيانة: $model", actor)
+            "تم استيراد $model — ${characteristics.size} خاصية، $plansCount خطة، $partsCount قطعة، قالب عمل (${templateOps.size} عملية)، وأمر عمل."
+        }
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.alhadi.cmms.data.entity
 
+import kotlinx.serialization.Serializable
+
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -12,6 +14,7 @@ import androidx.room.PrimaryKey
     tableName = "pm_checklist_items",
     indices = [Index(value = ["pmId"])]
 )
+@Serializable
 data class PmChecklistItemEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

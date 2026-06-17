@@ -12,6 +12,9 @@ interface InventoryTransactionDao {
     @Query("SELECT * FROM inventory_transactions ORDER BY createdAt DESC, id DESC LIMIT 50")
     fun observeRecentTransactions(): Flow<List<InventoryTransactionEntity>>
 
+    @Query("SELECT * FROM inventory_transactions ORDER BY id ASC")
+    suspend fun dumpAll(): List<InventoryTransactionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(transactions: List<InventoryTransactionEntity>)
 

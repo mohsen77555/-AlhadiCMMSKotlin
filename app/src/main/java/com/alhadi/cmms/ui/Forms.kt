@@ -56,6 +56,7 @@ import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
 
 // ---------------------------------------------------------------------------
@@ -246,7 +247,7 @@ private fun AssetDropdownOptional(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -467,13 +468,14 @@ internal fun WorkOrderFormSheet(
     var laborHours by remember { mutableStateOf((initial?.laborHours ?: 0.0).toString()) }
     var laborRate by remember { mutableStateOf((initial?.laborRate ?: 0.0).toString()) }
     var partsCost by remember { mutableStateOf((initial?.partsCost ?: 0.0).toString()) }
+    var requiresPermit by remember { mutableStateOf(initial?.requiresPermit ?: false) }
 
     FormSheet(if (initial == null) "إنشاء أمر عمل" else "تعديل أمر العمل", onDismiss) {
         LabeledField("العنوان", title, { title = it })
         LabeledField("الوصف", description, { description = it }, singleLine = false)
         AssetDropdown(assets, assetId) { assetId = it }
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
-        OptionDropdown("الحالة", listOf("Open", "In Progress", "Closed"), status) { status = it }
+        OptionDropdown("الحالة", listOf("Open", "In Progress", "Technically Completed", "Closed"), status) { status = it }
         LabeledField("المسؤول", assignedTo, { assignedTo = it })
         LabeledField("التكلفة التقديرية", cost, { cost = it }, numeric = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -487,6 +489,10 @@ internal fun WorkOrderFormSheet(
         }
         if (isFailure) {
             LabeledField("مدة التوقف (ساعات)", downtime, { downtime = it }, numeric = true)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("يتطلّب تصريح عمل (خطر)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = requiresPermit, onCheckedChange = { requiresPermit = it })
         }
         if (initial == null) {
             LabeledField("الاستحقاق خلال (أيام)", dueDays, { dueDays = it }, numeric = true)
@@ -511,7 +517,49 @@ internal fun WorkOrderFormSheet(
                     downtimeHours = if (isFailure) downtime.toDoubleOrNull() ?: 0.0 else 0.0,
                     laborHours = laborHours.toDoubleOrNull() ?: 0.0,
                     laborRate = laborRate.toDoubleOrNull() ?: 0.0,
-                    partsCost = partsCost.toDoubleOrNull() ?: 0.0
+                    partsCost = partsCost.toDoubleOrNull() ?: 0.0,
+                    approvalStatus = initial?.approvalStatus ?: "NotRequired",
+                    approvedBy = initial?.approvedBy ?: "",
+                    requiresPermit = requiresPermit
+                )
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Work permit form (تصريح عمل)
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun PermitFormSheet(
+    orderId: Long,
+    onDismiss: () -> Unit,
+    onSave: (WorkPermitEntity) -> Unit
+) {
+    var type by remember { mutableStateOf("LOTO") }
+    var hazards by remember { mutableStateOf("") }
+    var ppe by remember { mutableStateOf("") }
+    var validDays by remember { mutableStateOf("1") }
+
+    FormSheet("إصدار تصريح عمل", onDismiss) {
+        OptionDropdown("نوع التصريح", listOf("LOTO", "Hot Work", "Confined Space", "Electrical", "Working at Height", "General"), type) { type = it }
+        LabeledField("المخاطر", hazards, { hazards = it }, singleLine = false)
+        LabeledField("معدات الوقاية المطلوبة", ppe, { ppe = it }, singleLine = false)
+        LabeledField("صلاحية التصريح (أيام)", validDays, { validDays = it }, numeric = true)
+        SaveButton(true) {
+            onSave(
+                WorkPermitEntity(
+                    id = 0,
+                    orderId = orderId,
+                    type = type,
+                    hazards = hazards.trim(),
+                    ppe = ppe.trim(),
+                    status = "Pending",
+                    approvedBy = "",
+                    validUntil = DateStrings.daysFromToday(validDays.toIntOrNull() ?: 1),
+                    createdBy = "",
+                    createdAt = ""
                 )
             )
         }

@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -44,6 +45,9 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
@@ -53,6 +57,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
@@ -69,8 +74,10 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -113,12 +120,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.MovementType
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.notify.Reminders
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -140,6 +149,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.ui.theme.AccentBlue
 import com.alhadi.cmms.ui.theme.AccentBrown
 import com.alhadi.cmms.ui.theme.AccentGreen
@@ -207,6 +217,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
     val workOrderConfirmations by viewModel.workOrderConfirmations.collectAsStateWithLifecycle()
     val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
+    val workPermits by viewModel.workPermits.collectAsStateWithLifecycle()
     val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
     val taskListOperations by viewModel.taskListOperations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
@@ -219,6 +230,17 @@ fun CmmsApp(viewModel: CmmsViewModel) {
 
     val isAdmin = currentUser?.isAdmin == true
     val canManage = currentUser?.canManage == true
+
+    val appContext = LocalContext.current
+    val excelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importExcel(appContext, uri)
+    }
+    val backupExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) viewModel.exportBackup(appContext, uri)
+    }
+    val backupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importBackup(appContext, uri)
+    }
 
     BackHandler(enabled = selectedTab == BottomTab.More && moreRoute != null) {
         moreRoute = null
@@ -292,8 +314,13 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         operations = workOrderOperations,
                         confirmations = workOrderConfirmations,
                         photos = workOrderPhotos,
+                        permits = workPermits,
+                        parts = spareParts,
+                        transactions = transactions,
+                        bom = assetBom,
                         canManage = canManage,
                         defaultAssignee = actorName,
+                        onIssueMaterial = viewModel::issuePartToWorkOrder,
                         onSave = viewModel::saveWorkOrder,
                         onDelete = viewModel::deleteWorkOrder,
                         onUpdateStatus = viewModel::updateWorkOrderStatus,
@@ -303,7 +330,10 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onDeleteOperation = viewModel::deleteOperation,
                         onConfirmOperation = viewModel::addConfirmation,
                         onAddPhoto = viewModel::addWorkOrderPhoto,
-                        onDeletePhoto = viewModel::deleteWorkOrderPhoto
+                        onDeletePhoto = viewModel::deleteWorkOrderPhoto,
+                        onSavePermit = viewModel::savePermit,
+                        onSetPermitStatus = viewModel::setPermitStatus,
+                        onDeletePermit = viewModel::deletePermit
                     )
 
                     BottomTab.Supervision -> PreventiveMaintenanceScreen(
@@ -354,7 +384,10 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         null -> MoreGrid(
                             innerPadding = innerPadding,
                             isAdmin = isAdmin,
+                            canManage = canManage,
                             onOpen = { moreRoute = it },
+                            onImportBundled = { viewModel.importBundledKit(appContext) },
+                            onPickExcel = { excelPicker.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream", "*/*")) },
                             onLogout = viewModel::logout
                         )
                         MoreRoute.Notifications -> NotificationsScreen(
@@ -429,6 +462,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             currentUser = currentUser,
                             onAddTechnician = viewModel::addTechnician,
                             onResetSampleData = viewModel::resetSampleData,
+                            onExportBackup = { backupExportLauncher.launch("alhadi-cmms-backup-${DateStrings.today()}.json") },
+                            onImportBackup = { backupImportLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                            onRunReminders = { Reminders.runNow(appContext) },
                             onSave = viewModel::saveUser,
                             onSetActive = viewModel::setUserActive,
                             onDelete = viewModel::deleteUser
@@ -763,6 +799,19 @@ private fun DashboardScreen(
     val downtime = failures.sumOf { it.downtimeHours }
     val windowHours = (assets.size.coerceAtLeast(1)) * 30.0 * 24.0
     val availability = ((windowHours - downtime) / windowHours * 100.0).coerceIn(0.0, 100.0)
+    val woOpen = workOrders.count { it.status == "Open" }
+    val woProgress = workOrders.count { it.status == "In Progress" }
+    val woTech = workOrders.count { it.status == "Technically Completed" }
+    val woClosed = workOrders.count { it.status == "Closed" }
+    val statusSegments = listOf(
+        ChartSegment("مفتوح", woOpen, AccentBlue),
+        ChartSegment("قيد التنفيذ", woProgress, AccentOrange),
+        ChartSegment("مكتمل فنياً", woTech, AccentTeal),
+        ChartSegment("مغلق", woClosed, AccentGreen)
+    )
+    val laborCost = workOrders.sumOf { it.laborCost() }
+    val partsCostTotal = workOrders.sumOf { it.partsCost }
+    val maxCost = listOf(laborCost, partsCostTotal, 1.0).max()
 
     LazyColumn(
         modifier = Modifier
@@ -791,12 +840,29 @@ private fun DashboardScreen(
 
         item {
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SectionHeader("نظرة عامة على الأداء")
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        MetricColumn("التوفّر", "${"%.0f".format(availability)}%", AccentGreen)
-                        MetricColumn("زمن التوقف", "${"%.0f".format(downtime)}س", AccentOrange)
-                        MetricColumn("التكلفة", money(totalCost), AccentBlue)
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionHeader("توزيع أوامر العمل")
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(
+                            segments = statusSegments,
+                            centerValue = workOrders.size.toString(),
+                            centerLabel = "أمر عمل"
+                        )
+                        ChartLegend(statusSegments, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    RingGauge(percent = availability.toFloat(), color = AccentGreen, centerLabel = "التوفّر")
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SectionHeader("الأداء والتكاليف")
+                        BarMeter("تكلفة العمالة", (laborCost / maxCost).toFloat(), AccentBlue, money(laborCost))
+                        BarMeter("تكلفة قطع الغيار", (partsCostTotal / maxCost).toFloat(), AccentPurple, money(partsCostTotal))
+                        InfoRow("زمن التوقف", "${"%.0f".format(downtime)} ساعة")
                     }
                 }
             }
@@ -952,7 +1018,10 @@ private fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String
 private fun MoreGrid(
     innerPadding: PaddingValues,
     isAdmin: Boolean,
+    canManage: Boolean,
     onOpen: (MoreRoute) -> Unit,
+    onImportBundled: () -> Unit,
+    onPickExcel: () -> Unit,
     onLogout: () -> Unit
 ) {
     LazyColumn(
@@ -962,6 +1031,25 @@ private fun MoreGrid(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (canManage) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            IconBubble(Icons.Filled.UploadFile, AccentGreen, AccentGreen.copy(alpha = 0.14f), 40)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("استيراد من Excel", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("حوّل ملف صيانة الآلة إلى أصل وخطط وقطع غيار وأمر عمل تلقائياً.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = onImportBundled, modifier = Modifier.weight(1f)) { Text("استيراد قالب FVV المرفق") }
+                            OutlinedButton(onClick = onPickExcel, modifier = Modifier.weight(1f)) { Text("رفع ملف Excel") }
+                        }
+                    }
+                }
+            }
+        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Notifications) }
@@ -1148,6 +1236,26 @@ private fun AssetsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (query.isBlank() && assets.isNotEmpty()) {
+                item {
+                    val running = assets.count { it.status == "Running" }
+                    val stopped = assets.count { it.status == "Stopped" || it.status == "Retired" }
+                    val warning = assets.count { it.status == "Warning" || it.status == "Under Maintenance" }
+                    val other = assets.size - running - stopped - warning
+                    val seg = listOf(
+                        ChartSegment("تعمل", running, AccentGreen),
+                        ChartSegment("تحذير/صيانة", warning, AccentOrange),
+                        ChartSegment("متوقفة/متقاعدة", stopped, AccentRed),
+                        ChartSegment("أخرى", other.coerceAtLeast(0), AccentNavy)
+                    )
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = assets.size.toString(), centerLabel = "أصل")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
             item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill") }
             if (canManage) {
                 item { AddButton("أصل جديد") { editing = null; showForm = true } }
@@ -1198,18 +1306,21 @@ private fun AssetCard(
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val tone = statusTone(asset.status)
+                IconBubble(Icons.Filled.PrecisionManufacturing, tone.content, tone.container, 44)
                 Column(modifier = Modifier.weight(1f)) {
                     LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(asset.status, statusTone(asset.status))
+                StatusBadge(asset.status, tone)
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-            InfoRow("المجموعة", asset.groupName)
-            InfoRow("الموقع", asset.location)
-            InfoRow("الأهمية", asset.criticality)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusBadge(asset.criticality, priorityTone(asset.criticality))
+                AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
+            }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
@@ -1528,6 +1639,21 @@ private fun AssetDetailScreen(
         item { SectionHeader("أوامر العمل المرتبطة (${workOrders.size})") }
         if (workOrders.isEmpty()) {
             item { EmptyState("لا توجد أوامر عمل لهذا الأصل") }
+        } else {
+            item {
+                val seg = listOf(
+                    ChartSegment("مفتوح", workOrders.count { it.status == "Open" }, AccentBlue),
+                    ChartSegment("قيد التنفيذ", workOrders.count { it.status == "In Progress" }, AccentOrange),
+                    ChartSegment("مكتمل فنياً", workOrders.count { it.status == "Technically Completed" }, AccentTeal),
+                    ChartSegment("مغلق", workOrders.count { it.status == "Closed" }, AccentGreen)
+                )
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = workOrders.size.toString(), centerLabel = "أمر")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
         }
         items(workOrders, key = { "wo-${it.id}" }) { wo ->
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -1730,6 +1856,13 @@ private fun notificationStatusLabel(status: String): String = when (status) {
     else -> status
 }
 
+private fun roleLabel(role: String): String = when (role.lowercase(Locale.getDefault())) {
+    "admin" -> "مدير"
+    "supervisor" -> "مشرف"
+    "technician" -> "فني"
+    else -> role
+}
+
 private fun workOrderStatusLabel(status: String): String = when (status) {
     "Open" -> "مفتوح"
     "In Progress" -> "قيد التنفيذ"
@@ -1780,11 +1913,16 @@ private fun NotificationsScreen(
                 Text("نقطة بداية كل عمل صيانة — تُراجع وتُعتمد ثم تتحول إلى أوامر عمل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item {
+                val seg = listOf(
+                    ChartSegment("جديدة/مراجعة", notifications.count { it.status == "New" || it.status == "Screened" }, AccentOrange),
+                    ChartSegment("معتمدة", notifications.count { it.status == "Approved" }, AccentTeal),
+                    ChartSegment("تحوّلت لأمر", notifications.count { it.status == "OrderCreated" }, AccentGreen),
+                    ChartSegment("مرفوضة/مغلقة", notifications.count { it.status == "Rejected" || it.status == "Closed" }, AccentRed)
+                )
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        MetricColumn("الإجمالي", notifications.size.toString(), AccentBlue)
-                        MetricColumn("مفتوحة", openCount.toString(), if (openCount > 0) AccentOrange else AccentGreen)
-                        MetricColumn("معتمدة", notifications.count { it.status == "Approved" }.toString(), AccentTeal)
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = notifications.size.toString(), centerLabel = "بلاغ")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -1910,8 +2048,13 @@ private fun WorkOrdersScreen(
     operations: List<WorkOrderOperationEntity>,
     confirmations: List<WorkOrderConfirmationEntity>,
     photos: List<WorkOrderPhotoEntity>,
+    permits: List<WorkPermitEntity>,
+    parts: List<SparePartEntity>,
+    transactions: List<InventoryTransactionEntity>,
+    bom: List<AssetBomItemEntity>,
     canManage: Boolean,
     defaultAssignee: String,
+    onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
     onSave: (WorkOrderEntity) -> Unit,
     onDelete: (WorkOrderEntity) -> Unit,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
@@ -1921,8 +2064,12 @@ private fun WorkOrdersScreen(
     onDeleteOperation: (WorkOrderOperationEntity) -> Unit,
     onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
     onAddPhoto: (Long, String) -> Unit,
-    onDeletePhoto: (WorkOrderPhotoEntity) -> Unit
+    onDeletePhoto: (WorkOrderPhotoEntity) -> Unit,
+    onSavePermit: (WorkPermitEntity) -> Unit,
+    onSetPermitStatus: (WorkPermitEntity, Boolean) -> Unit,
+    onDeletePermit: (WorkPermitEntity) -> Unit
 ) {
+    val partMap = remember(parts) { parts.associateBy { it.id } }
     val statusFilters = listOf("All", "Open", "In Progress", "Technically Completed", "Closed")
     val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
@@ -1955,6 +2102,22 @@ private fun WorkOrdersScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (workOrders.isNotEmpty()) {
+                item {
+                    val seg = listOf(
+                        ChartSegment("مفتوح", workOrders.count { it.status == "Open" }, AccentBlue),
+                        ChartSegment("قيد التنفيذ", workOrders.count { it.status == "In Progress" }, AccentOrange),
+                        ChartSegment("مكتمل فنياً", workOrders.count { it.status == "Technically Completed" }, AccentTeal),
+                        ChartSegment("مغلق", workOrders.count { it.status == "Closed" }, AccentGreen)
+                    )
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = workOrders.size.toString(), centerLabel = "أمر")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
             item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث بالعنوان أو الأصل…") }
             item {
                 Row(
@@ -2008,6 +2171,12 @@ private fun WorkOrdersScreen(
                     operations = operations.filter { it.orderId == workOrder.id },
                     confirmations = confirmations.filter { it.orderId == workOrder.id },
                     photos = photos.filter { it.orderId == workOrder.id },
+                    permits = permits.filter { it.orderId == workOrder.id },
+                    materials = transactions.filter { it.workOrderId == workOrder.id },
+                    catalog = parts,
+                    bomPartIds = bom.filter { it.assetId == workOrder.assetId }.map { it.partId }.toSet(),
+                    partMap = partMap,
+                    onIssueMaterial = onIssueMaterial,
                     canManage = canManage,
                     onUpdateStatus = onUpdateStatus,
                     onApprove = onApprove,
@@ -2017,6 +2186,9 @@ private fun WorkOrdersScreen(
                     onConfirmOperation = onConfirmOperation,
                     onAddPhoto = onAddPhoto,
                     onDeletePhoto = onDeletePhoto,
+                    onSavePermit = onSavePermit,
+                    onSetPermitStatus = onSetPermitStatus,
+                    onDeletePermit = onDeletePermit,
                     onEdit = { editing = workOrder; showForm = true },
                     onDelete = { deleteTarget = workOrder }
                 )
@@ -2050,6 +2222,12 @@ private fun WorkOrderCard(
     operations: List<WorkOrderOperationEntity>,
     confirmations: List<WorkOrderConfirmationEntity>,
     photos: List<WorkOrderPhotoEntity>,
+    permits: List<WorkPermitEntity>,
+    materials: List<InventoryTransactionEntity>,
+    catalog: List<SparePartEntity>,
+    bomPartIds: Set<Long>,
+    partMap: Map<Long, SparePartEntity>,
+    onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
     canManage: Boolean,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
@@ -2059,17 +2237,26 @@ private fun WorkOrderCard(
     onConfirmOperation: (WorkOrderConfirmationEntity, WorkOrderOperationEntity) -> Unit,
     onAddPhoto: (Long, String) -> Unit,
     onDeletePhoto: (WorkOrderPhotoEntity) -> Unit,
+    onSavePermit: (WorkPermitEntity) -> Unit,
+    onSetPermitStatus: (WorkPermitEntity, Boolean) -> Unit,
+    onDeletePermit: (WorkPermitEntity) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
+    val today = DateStrings.today()
+    var showMaterialPicker by remember { mutableStateOf(false) }
+    var materialTarget by remember { mutableStateOf<SparePartEntity?>(null) }
     val pending = workOrder.approvalStatus == "Pending"
     val rejected = workOrder.approvalStatus == "Rejected"
     val blocked = workOrder.isBlockedByApproval()
     var showOperations by remember { mutableStateOf(false) }
     var showAddOp by remember { mutableStateOf(false) }
+    var showAddPermit by remember { mutableStateOf(false) }
     var confirmTarget by remember { mutableStateOf<WorkOrderOperationEntity?>(null) }
     val confirmedOps = operations.count { it.status == "Confirmed" }
+    val hasValidPermit = permits.any { it.isValidOn(today) }
+    val permitBlocked = workOrder.requiresPermit && !hasValidPermit
     val hasEvidence = photos.isNotEmpty()
     var pendingPhotoPath by remember { mutableStateOf<String?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -2174,6 +2361,34 @@ private fun WorkOrderCard(
                 }
             }
 
+            run {
+                val materialsCost = materials.sumOf { (partMap[it.partId]?.lastPrice ?: 0.0) * it.quantity }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentPurple)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("المواد المستهلكة (${materials.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (materialsCost > 0) Text(money(materialsCost), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = AccentPurple)
+                }
+                materials.forEach { tx ->
+                    val p = partMap[tx.partId]
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("×${tx.quantity}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = AccentPurple)
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(p?.partNumber ?: "Part #${tx.partId}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            Text(p?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                if (canManage && workOrder.status != "Closed") {
+                    OutlinedButton(onClick = { showMaterialPicker = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("صرف قطعة للأمر")
+                    }
+                }
+            }
+
             if (canManage && (pending || rejected)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     if (pending) {
@@ -2236,6 +2451,62 @@ private fun WorkOrderCard(
                 }
             }
 
+            if (workOrder.status != "Closed" && (workOrder.requiresPermit || permits.isNotEmpty())) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.HealthAndSafety, contentDescription = null, modifier = Modifier.size(18.dp), tint = if (permitBlocked) AccentRed else AccentGreen)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("تصاريح العمل (${permits.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (canManage) {
+                        TextButton(onClick = { showAddPermit = true }) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("إصدار تصريح")
+                        }
+                    }
+                }
+                permits.forEach { permit ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(permitTypeLabel(permit.type), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            val valid = permit.isValidOn(today)
+                            StatusBadge(
+                                when {
+                                    permit.status == "Approved" && valid -> "ساري"
+                                    permit.status == "Approved" -> "منتهٍ"
+                                    permit.status == "Rejected" -> "مرفوض"
+                                    else -> "بانتظار الاعتماد"
+                                },
+                                statusTone(if (permit.status == "Approved" && valid) "running" else if (permit.status == "Rejected") "stopped" else "overdue")
+                            )
+                        }
+                        if (permit.hazards.isNotBlank()) Text("المخاطر: ${permit.hazards}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (permit.ppe.isNotBlank()) Text("الوقاية: ${permit.ppe}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (permit.validUntil.isNotBlank()) Text("صالح حتى: ${permit.validUntil}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (canManage) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                if (permit.status == "Pending") {
+                                    Button(onClick = { onSetPermitStatus(permit, true) }, modifier = Modifier.weight(1f)) { Text("اعتماد", style = MaterialTheme.typography.labelMedium) }
+                                    OutlinedButton(onClick = { onSetPermitStatus(permit, false) }, modifier = Modifier.weight(1f)) { Text("رفض", style = MaterialTheme.typography.labelMedium) }
+                                }
+                                IconButton(onClick = { onDeletePermit(permit) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (permitBlocked) {
+                    Text("هذا العمل خطر — يلزم تصريح عمل ساري قبل البدء.", style = MaterialTheme.typography.bodySmall, color = AccentRed, fontWeight = FontWeight.Bold)
+                }
+            }
+
             if (blocked) {
                 Text(
                     if (pending) "يتطلّب اعتماد المشرف قبل البدء/الإغلاق." else "أمر العمل مرفوض — لا يمكن تنفيذه.",
@@ -2247,7 +2518,7 @@ private fun WorkOrderCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     when (workOrder.status) {
                         "Open" -> {
-                            Button(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
+                            Button(onClick = { onUpdateStatus(workOrder, "In Progress") }, enabled = !permitBlocked, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
                         }
                         "In Progress" -> {
                             Button(onClick = { onUpdateStatus(workOrder, "Technically Completed") }, enabled = allConfirmed, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
@@ -2284,6 +2555,78 @@ private fun WorkOrderCard(
             onSave = { onConfirmOperation(it, op); confirmTarget = null }
         )
     }
+    if (showAddPermit) {
+        PermitFormSheet(
+            orderId = workOrder.id,
+            onDismiss = { showAddPermit = false },
+            onSave = { onSavePermit(it); showAddPermit = false }
+        )
+    }
+    if (showMaterialPicker) {
+        MaterialPickerSheet(
+            catalog = catalog,
+            bomPartIds = bomPartIds,
+            onDismiss = { showMaterialPicker = false },
+            onPick = { materialTarget = it; showMaterialPicker = false }
+        )
+    }
+    materialTarget?.let { part ->
+        QuantityDialog(
+            title = "صرف ${part.partNumber} لأمر العمل",
+            label = "الكمية (المتوفر ${part.onHandQty})",
+            maxValue = part.onHandQty,
+            onConfirm = { qty -> onIssueMaterial(workOrder, part, qty); materialTarget = null },
+            onDismiss = { materialTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun MaterialPickerSheet(
+    catalog: List<SparePartEntity>,
+    bomPartIds: Set<Long>,
+    onDismiss: () -> Unit,
+    onPick: (SparePartEntity) -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(query, catalog, bomPartIds) {
+        val q = query.lowercase(Locale.getDefault())
+        catalog
+            .filter { it.onHandQty > 0 && (q.isBlank() || it.partNumber.lowercase(Locale.getDefault()).contains(q) || it.name.lowercase(Locale.getDefault()).contains(q)) }
+            .sortedByDescending { it.id in bomPartIds }
+    }
+    FormSheet("اختر قطعة للصرف", onDismiss) {
+        SearchField(query = query, onChange = { query = it }, placeholder = "بحث في القطع…")
+        if (filtered.isEmpty()) {
+            Text("لا توجد قطع متوفرة مطابقة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        filtered.take(30).forEach { part ->
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().clickable { onPick(part) },
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(part.partNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(part.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (part.id in bomPartIds) StatusBadge("ضمن BOM", statusTone("info"))
+                    StatusBadge("متوفر ${part.onHandQty}", statusTone("running"))
+                }
+            }
+        }
+    }
+}
+
+/** Arabic label for a permit type. */
+private fun permitTypeLabel(type: String): String = when (type) {
+    "Hot Work" -> "أعمال ساخنة"
+    "Confined Space" -> "أماكن مغلقة"
+    "Electrical" -> "أعمال كهربائية"
+    "Working at Height" -> "العمل على ارتفاع"
+    "LOTO" -> "عزل الطاقة (LOTO)"
+    "General" -> "تصريح عام"
+    else -> type
 }
 
 // ---------------------------------------------------------------------------
@@ -2323,6 +2666,21 @@ private fun PreventiveMaintenanceScreen(
             item {
                 SectionHeader("جدول الصيانة الدورية")
                 Text("المهام مرتبة حسب أقرب تاريخ استحقاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (pmItems.isNotEmpty()) {
+                item {
+                    val due = pmItems.count { DateStrings.isDueOrOverdue(it.nextDueAt) }
+                    val seg = listOf(
+                        ChartSegment("مستحقة", due, AccentOrange),
+                        ChartSegment("مجدولة", pmItems.size - due, AccentGreen)
+                    )
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = pmItems.size.toString(), centerLabel = "مهمة")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             }
             if (canManage) {
                 item { AddButton("مهمة صيانة جديدة") { editing = null; showForm = true } }
@@ -2410,6 +2768,14 @@ private fun PreventiveMaintenanceCard(
                 Icon(
                     if (showChecklist) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                     contentDescription = null
+                )
+            }
+            if (checklist.isNotEmpty()) {
+                BarMeter(
+                    label = "إنجاز الفحص",
+                    fraction = doneCount.toFloat() / checklist.size,
+                    color = if (doneCount == checklist.size) AccentGreen else AccentTeal,
+                    valueLabel = "$doneCount/${checklist.size}"
                 )
             }
             if (showChecklist) {
@@ -2608,8 +2974,8 @@ private fun InventoryScreen(
     transactions: List<InventoryTransactionEntity>,
     canReceive: Boolean,
     canManage: Boolean,
-    onIssue: (SparePartEntity) -> Unit,
-    onReceive: (SparePartEntity) -> Unit,
+    onIssue: (SparePartEntity, Int) -> Unit,
+    onReceive: (SparePartEntity, Int) -> Unit,
     onSave: (SparePartEntity) -> Unit,
     onDelete: (SparePartEntity) -> Unit
 ) {
@@ -2640,11 +3006,19 @@ private fun InventoryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
+                val healthy = (parts.size - lowStockCount).coerceAtLeast(0)
+                val healthPct = if (parts.isEmpty()) 100f else healthy.toFloat() / parts.size * 100f
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        MetricColumn("أصناف", parts.size.toString(), AccentBlue)
-                        MetricColumn("منخفض", lowStockCount.toString(), if (lowStockCount > 0) AccentRed else AccentGreen)
-                        MetricColumn("قيمة المخزون", money(totalValue), AccentTeal)
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        RingGauge(percent = healthPct, color = if (lowStockCount > 0) AccentOrange else AccentGreen, centerLabel = "متوفر")
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SectionHeader("حالة المخزون")
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                MetricColumn("أصناف", parts.size.toString(), AccentBlue)
+                                MetricColumn("منخفض", lowStockCount.toString(), if (lowStockCount > 0) AccentRed else AccentGreen)
+                            }
+                            InfoRow("قيمة المخزون", money(totalValue))
+                        }
                     }
                 }
             }
@@ -2667,16 +3041,24 @@ private fun InventoryScreen(
             if (filtered.isEmpty()) {
                 item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
             }
-            items(filtered, key = { it.id }) { part ->
-                SparePartCard(
-                    part = part,
-                    canReceive = canReceive,
-                    canManage = canManage,
-                    onIssue = onIssue,
-                    onReceive = onReceive,
-                    onEdit = { editing = part; showForm = true },
-                    onDelete = { deleteTarget = part }
-                )
+            filtered.groupBy { it.equipmentGroup.ifBlank { "عام" } }.forEach { (group, groupParts) ->
+                item(key = "grp-$group") {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(modifier = Modifier.size(7.dp).background(AccentPurple, CircleShape))
+                        LtrText("$group (${groupParts.size})", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                items(groupParts, key = { it.id }) { part ->
+                    SparePartCard(
+                        part = part,
+                        canReceive = canReceive,
+                        canManage = canManage,
+                        onIssue = onIssue,
+                        onReceive = onReceive,
+                        onEdit = { editing = part; showForm = true },
+                        onDelete = { deleteTarget = part }
+                    )
+                }
             }
             item {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -2685,7 +3067,9 @@ private fun InventoryScreen(
             if (transactions.isEmpty()) {
                 item { EmptyState("لا توجد حركات مخزون") }
             }
-            items(transactions, key = { it.id }) { transaction -> TransactionCard(transaction = transaction) }
+            items(transactions, key = { it.id }) { transaction ->
+                TransactionCard(transaction = transaction, partNumber = parts.firstOrNull { it.id == transaction.partId }?.partNumber)
+            }
         }
     }
 
@@ -2707,12 +3091,13 @@ private fun SparePartCard(
     part: SparePartEntity,
     canReceive: Boolean,
     canManage: Boolean,
-    onIssue: (SparePartEntity) -> Unit,
-    onReceive: (SparePartEntity) -> Unit,
+    onIssue: (SparePartEntity, Int) -> Unit,
+    onReceive: (SparePartEntity, Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val lowStock = part.onHandQty <= part.minQty
+    var moveMode by remember { mutableStateOf<String?>(null) } // "issue" | "receive"
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -2733,18 +3118,71 @@ private fun SparePartCard(
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
             InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = { onIssue(part) }, modifier = Modifier.weight(1f)) { Text("صرف -1") }
+                OutlinedButton(onClick = { moveMode = "issue" }, enabled = part.onHandQty > 0, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("صرف")
+                }
                 if (canReceive) {
-                    Button(onClick = { onReceive(part) }, modifier = Modifier.weight(1f)) { Text("استلام +1") }
+                    Button(onClick = { moveMode = "receive" }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("استلام")
+                    }
                 }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
+
+    moveMode?.let { mode ->
+        val isIssue = mode == "issue"
+        QuantityDialog(
+            title = if (isIssue) "صرف ${part.partNumber}" else "استلام ${part.partNumber}",
+            label = if (isIssue) "الكمية المصروفة (المتوفر ${part.onHandQty})" else "الكمية المستلمة",
+            maxValue = if (isIssue) part.onHandQty else null,
+            onConfirm = { qty ->
+                if (isIssue) onIssue(part, qty) else onReceive(part, qty)
+                moveMode = null
+            },
+            onDismiss = { moveMode = null }
+        )
+    }
 }
 
 @Composable
-private fun TransactionCard(transaction: InventoryTransactionEntity) {
+private fun QuantityDialog(
+    title: String,
+    label: String,
+    maxValue: Int?,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf("1") }
+    val qty = text.toIntOrNull()
+    val valid = qty != null && qty > 0 && (maxValue == null || qty <= maxValue)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.filter { c -> c.isDigit() } },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = { TextButton(enabled = valid, onClick = { onConfirm(qty!!) }) { Text("تأكيد") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
+}
+
+@Composable
+private fun TransactionCard(transaction: InventoryTransactionEntity, partNumber: String?) {
     val isIssue = transaction.transactionType == "Issue"
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -2767,8 +3205,11 @@ private fun TransactionCard(transaction: InventoryTransactionEntity) {
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleSmall
                 )
-                LtrText("Part #${transaction.partId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LtrText(partNumber ?: "Part #${transaction.partId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("${transaction.createdAt} • ${transaction.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (transaction.workOrderId != null) {
+                StatusBadge("أمر #${transaction.workOrderId}", statusTone("info"))
             }
         }
     }
@@ -2841,6 +3282,34 @@ private fun ReportsScreen(
             }
         }
         item {
+            val seg = listOf(
+                ChartSegment("مفتوح", workOrders.count { it.status == "Open" }, AccentBlue),
+                ChartSegment("قيد التنفيذ", workOrders.count { it.status == "In Progress" }, AccentOrange),
+                ChartSegment("مكتمل فنياً", workOrders.count { it.status == "Technically Completed" }, AccentTeal),
+                ChartSegment("مغلق", closed, AccentGreen)
+            )
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    DonutChart(segments = seg, centerValue = workOrders.size.toString(), centerLabel = "أمر عمل")
+                    ChartLegend(seg, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        item {
+            val maxC = listOf(laborCost, partsCost, openCost, 1.0).max()
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    RingGauge(percent = availability.toFloat(), color = AccentGreen, centerLabel = "التوفّر")
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SectionHeader("التكاليف")
+                        BarMeter("عمالة", (laborCost / maxC).toFloat(), AccentBlue, money(laborCost))
+                        BarMeter("قطع غيار", (partsCost / maxC).toFloat(), AccentPurple, money(partsCost))
+                        BarMeter("تقديرية مفتوحة", (openCost / maxC).toFloat(), AccentOrange, money(openCost))
+                    }
+                }
+            }
+        }
+        item {
             ReportCard("التوفّر والأعطال", listOf(
                 "نسبة التوفّر (30 يوم): ${"%.1f".format(availability)}%",
                 "عدد الأعطال: ${failures.size}",
@@ -2870,7 +3339,20 @@ private fun ReportsScreen(
                 "تكلفة العمالة: ${money(laborCost)}",
                 "تكلفة قطع الغيار: ${money(partsCost)}",
                 "تكلفة تقديرية مفتوحة: ${money(openCost)}"
-            ) + topCostAssets.map { "الأعلى تكلفة — ${assetName[it.key] ?: it.key}: ${money(it.value)}" })
+            ))
+        }
+        if (topCostAssets.isNotEmpty()) {
+            item {
+                val maxCost = (topCostAssets.maxOfOrNull { it.value } ?: 1.0).coerceAtLeast(1.0)
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SectionHeader("الأصول الأعلى تكلفة")
+                        topCostAssets.forEach {
+                            BarMeter(assetName[it.key] ?: "#${it.key}", (it.value / maxCost).toFloat(), AccentRed, money(it.value))
+                        }
+                    }
+                }
+            }
         }
         item {
             ReportCard("الصيانة الدورية", listOf(
@@ -2913,6 +3395,15 @@ private fun ReportCard(title: String, lines: List<String>) {
 
 @Composable
 private fun AuditScreen(innerPadding: PaddingValues, auditLog: List<AuditLogEntity>) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val filtered = remember(query, auditLog) {
+        if (query.isBlank()) auditLog else auditLog.filter {
+            val q = query.lowercase(Locale.getDefault())
+            it.details.lowercase(Locale.getDefault()).contains(q) ||
+                it.performedBy.lowercase(Locale.getDefault()).contains(q) ||
+                it.action.lowercase(Locale.getDefault()).contains(q)
+        }
+    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -2924,27 +3415,56 @@ private fun AuditScreen(innerPadding: PaddingValues, auditLog: List<AuditLogEnti
             SectionHeader("سجل التدقيق")
             Text("تتبّع كامل لكل إجراء: من فعل ماذا ومتى.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (auditLog.isEmpty()) {
-            item { EmptyState("لا توجد سجلات بعد", Icons.Filled.History) }
+        item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث في السجل (إجراء/مستخدم/تفاصيل)…") }
+        item {
+            Text("عرض ${filtered.size} من ${auditLog.size} سجل", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        items(auditLog, key = { it.id }) { log -> AuditLogCard(log) }
+        if (filtered.isEmpty()) {
+            item { EmptyState("لا توجد سجلات مطابقة", Icons.Filled.History) }
+        }
+        items(filtered, key = { it.id }) { log -> AuditLogCard(log) }
     }
 }
 
 @Composable
 private fun AuditLogCard(log: AuditLogEntity) {
+    val (icon, color) = auditVisual(log.action)
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(log.details, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                StatusBadge(log.action, statusTone(log.action))
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconBubble(icon, color, color.copy(alpha = 0.14f), 40)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(log.details, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                Text("${log.performedBy} • ${log.createdAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("${log.performedBy} • ${log.createdAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            StatusBadge(auditActionLabel(log.action), statusTone(log.action))
         }
     }
+}
+
+private fun auditActionLabel(action: String): String = when (action) {
+    "Create" -> "إنشاء"; "Update" -> "تعديل"; "Delete" -> "حذف"; "Status" -> "حالة"
+    "Approval" -> "اعتماد"; "Login" -> "دخول"; "Issue" -> "صرف"; "Receive" -> "استلام"
+    "Confirm", "PartialConfirm" -> "تأكيد"; "Complete" -> "تنفيذ"; "Movement" -> "حركة"
+    "Reading" -> "قراءة"; "Attach" -> "إرفاق"; "Import" -> "استيراد"; "Generate" -> "توليد"
+    "Seed" -> "تهيئة"; else -> action
+}
+
+private fun auditVisual(action: String): Pair<ImageVector, Color> = when (action) {
+    "Create", "Generate" -> Icons.Filled.Add to AccentGreen
+    "Delete" -> Icons.Filled.Delete to AccentRed
+    "Approval" -> Icons.Filled.FactCheck to AccentTeal
+    "Status", "Update" -> Icons.Filled.Edit to AccentBlue
+    "Login" -> Icons.Filled.Verified to AccentNavy
+    "Issue", "Receive" -> Icons.Filled.Inventory2 to AccentPurple
+    "Confirm", "PartialConfirm", "Complete" -> Icons.Filled.CheckCircle to AccentGreen
+    "Movement" -> Icons.Filled.SwapHoriz to AccentBlue
+    "Reading" -> Icons.Filled.Speed to AccentPurple
+    "Attach" -> Icons.Filled.PhotoCamera to AccentTeal
+    "Import" -> Icons.Filled.UploadFile to AccentGreen
+    else -> Icons.Filled.History to AccentOrange
 }
 
 @Composable
@@ -2954,6 +3474,9 @@ private fun AdminScreen(
     currentUser: UserEntity?,
     onAddTechnician: () -> Unit,
     onResetSampleData: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
+    onRunReminders: () -> Unit,
     onSave: (UserEntity) -> Unit,
     onSetActive: (UserEntity, Boolean) -> Unit,
     onDelete: (UserEntity) -> Unit
@@ -2971,6 +3494,7 @@ private fun AdminScreen(
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<UserEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<UserEntity?>(null) }
+    var showRestoreConfirm by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -2992,6 +3516,70 @@ private fun AdminScreen(
                         Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("إعادة تعيين")
+                    }
+                }
+            }
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconBubble(Icons.Filled.Backup, AccentTeal, AccentTeal.copy(alpha = 0.14f), 38)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("النسخ الاحتياطي والاستعادة", fontWeight = FontWeight.Bold)
+                                Text("احفظ كل البيانات في ملف، أو استعدها على جهاز آخر.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = onExportBackup, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("نسخة احتياطية")
+                            }
+                            OutlinedButton(onClick = { showRestoreConfirm = true }, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("استعادة")
+                            }
+                        }
+                        Text(
+                            "تنبيه: الاستعادة تستبدل كل البيانات الحالية بمحتوى الملف.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconBubble(Icons.Filled.NotificationsActive, AccentOrange, AccentOrange.copy(alpha = 0.14f), 38)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("تذكيرات الصيانة", fontWeight = FontWeight.Bold)
+                                Text("فحص يومي تلقائي ينبّهك بالمستحقات والمتأخرات.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        OutlinedButton(onClick = onRunReminders, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.NotificationsActive, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("فحص التذكيرات الآن")
+                        }
+                    }
+                }
+            }
+            item {
+                val admins = users.count { it.isAdmin }
+                val supervisors = users.count { it.role.equals("Supervisor", ignoreCase = true) }
+                val techs = users.size - admins - supervisors
+                val seg = listOf(
+                    ChartSegment("مدراء", admins, AccentRed),
+                    ChartSegment("مشرفون", supervisors, AccentOrange),
+                    ChartSegment("فنيون", techs.coerceAtLeast(0), AccentBlue)
+                )
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = users.size.toString(), centerLabel = "مستخدم")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -3019,6 +3607,14 @@ private fun AdminScreen(
             onDismiss = { deleteTarget = null }
         )
     }
+    if (showRestoreConfirm) {
+        ConfirmDialog(
+            title = "استعادة نسخة احتياطية",
+            text = "سيتم استبدال جميع البيانات الحالية بمحتوى الملف الذي ستختاره. هل تريد المتابعة؟",
+            onConfirm = { showRestoreConfirm = false; onImportBackup() },
+            onDismiss = { showRestoreConfirm = false }
+        )
+    }
 }
 
 @Composable
@@ -3040,7 +3636,7 @@ private fun UserCard(
                     Text(user.name, fontWeight = FontWeight.Bold)
                     LtrText("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(if (user.isActive) user.role else "معطّل", statusTone(if (!user.isActive) "neutral" else if (user.isAdmin) "info" else "running"))
+                StatusBadge(if (user.isActive) roleLabel(user.role) else "معطّل", statusTone(if (!user.isActive) "neutral" else if (user.isAdmin) "info" else "running"))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
@@ -3094,6 +3690,21 @@ private fun MetersScreen(
             item {
                 SectionHeader("نقاط القياس")
                 Text("تابع أداء الأصول وسجّل القراءات.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (points.isNotEmpty()) {
+                item {
+                    val over = points.count { it.upperLimit != null && it.lastReading > it.upperLimit }
+                    val seg = listOf(
+                        ChartSegment("ضمن الحد", points.size - over, AccentGreen),
+                        ChartSegment("متجاوزة الحد", over, AccentRed)
+                    )
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = points.size.toString(), centerLabel = "نقطة")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             }
             if (canManage) {
                 item { AddButton("نقطة قياس جديدة") { editing = null; showForm = true } }
@@ -3197,10 +3808,10 @@ private fun MeterCard(
             }
             InfoRow("آخر تحديث", point.lastReadingAt)
             if (recentReadings.size >= 2) {
-                LtrText(
-                    "آخر القراءات: " + recentReadings.take(6).joinToString(" ← ") { "${it.value}" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                Text("اتجاه آخر القراءات", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Sparkline(
+                    values = recentReadings.take(8).reversed().map { it.value.toFloat() },
+                    color = if (overLimit) AccentRed else AccentPurple
                 )
             }
             if (overLimit) {
@@ -3472,12 +4083,16 @@ private fun CapaScreen(
                 val today = DateStrings.today()
                 val open = items.count { it.status == "Open" }
                 val inProg = items.count { it.status == "In Progress" }
-                val overdue = items.count { it.status != "Closed" && it.dueAt < today }
+                val closed = items.count { it.status == "Closed" }
+                val seg = listOf(
+                    ChartSegment("مفتوح", open, AccentBlue),
+                    ChartSegment("قيد التنفيذ", inProg, AccentOrange),
+                    ChartSegment("مغلق", closed, AccentGreen)
+                )
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        MetricColumn("مفتوح", open.toString(), AccentBlue)
-                        MetricColumn("قيد التنفيذ", inProg.toString(), AccentOrange)
-                        MetricColumn("متأخر", overdue.toString(), if (overdue > 0) AccentRed else AccentGreen)
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = items.size.toString(), centerLabel = "إجراء")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -3608,6 +4223,9 @@ private fun FailureAnalysisScreen(
         val d = failures.map { it.downtimeHours }.filter { it > 0.0 }
         if (d.isEmpty()) 0.0 else d.average()
     }
+    val palette = listOf(AccentRed, AccentOrange, AccentBlue, AccentPurple, AccentTeal, AccentNavy)
+    val maxMttr = (stats.maxOfOrNull { it.mttrHours } ?: 1.0).coerceAtLeast(0.1)
+    val maxMtbf = (stats.mapNotNull { it.mtbfDays }.maxOrNull() ?: 1.0).coerceAtLeast(0.1)
 
     LazyColumn(
         modifier = Modifier
@@ -3628,6 +4246,20 @@ private fun FailureAnalysisScreen(
             }
         }
 
+        if (stats.isNotEmpty()) {
+            item {
+                val seg = stats.take(6).mapIndexed { i, s ->
+                    ChartSegment(assetMap[s.assetId]?.code ?: "#${s.assetId}", s.failures, palette[i % palette.size])
+                }
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = failures.size.toString(), centerLabel = "عطل")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
         item { SectionHeader("حسب الأصل") }
         if (stats.isEmpty()) {
             item { EmptyState("لا توجد أعطال مسجّلة بعد", Icons.Filled.TrendingUp) }
@@ -3635,7 +4267,7 @@ private fun FailureAnalysisScreen(
         items(stats, key = { it.assetId }) { stat ->
             val asset = assetMap[stat.assetId]
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
                             LtrText(asset?.code ?: "Asset #${stat.assetId}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -3644,8 +4276,8 @@ private fun FailureAnalysisScreen(
                         StatusBadge("أعطال: ${stat.failures}", statusTone(if (stat.failures >= 3) "stopped" else "warning"))
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                    InfoRow("MTTR", "%.1f ساعة".format(stat.mttrHours))
-                    InfoRow("MTBF", stat.mtbfDays?.let { "%.0f يوم".format(it) } ?: "—")
+                    BarMeter("MTTR", (stat.mttrHours / maxMttr).toFloat(), AccentOrange, "%.1f ساعة".format(stat.mttrHours))
+                    BarMeter("MTBF", ((stat.mtbfDays ?: 0.0) / maxMtbf).toFloat(), AccentGreen, stat.mtbfDays?.let { "%.0f يوم".format(it) } ?: "—")
                 }
             }
         }

@@ -15,6 +15,9 @@ interface AssetDao {
     @Query("SELECT * FROM assets WHERE id = :id LIMIT 1")
     suspend fun getAssetById(id: Long): AssetEntity?
 
+    @Query("SELECT * FROM assets WHERE code = :code LIMIT 1")
+    suspend fun findByCode(code: String): AssetEntity?
+
     @Query("SELECT COUNT(*) FROM assets")
     fun observeAssetCount(): Flow<Int>
 

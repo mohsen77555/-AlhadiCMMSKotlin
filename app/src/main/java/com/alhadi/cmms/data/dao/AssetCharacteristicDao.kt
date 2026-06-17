@@ -21,6 +21,9 @@ interface AssetCharacteristicDao {
     @Query("DELETE FROM asset_characteristics WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM asset_characteristics WHERE assetId = :assetId")
+    suspend fun deleteForAsset(assetId: Long)
+
     @Query("DELETE FROM asset_characteristics")
     suspend fun deleteAll()
 }

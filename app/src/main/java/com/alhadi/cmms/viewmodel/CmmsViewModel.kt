@@ -1,5 +1,7 @@
 package com.alhadi.cmms.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -26,7 +28,10 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
+import com.alhadi.cmms.util.XlsxReader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -37,6 +42,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class DashboardStats(
     val assets: Int = 0,
@@ -149,6 +155,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     val taskListOperations: StateFlow<List<TaskListOperationEntity>> = repository.taskListOperations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val workPermits: StateFlow<List<WorkPermitEntity>> = repository.workPermits
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
@@ -215,13 +224,16 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         repository.markPreventiveMaintenanceDone(item, actor())
     }
 
-    fun issuePart(part: SparePartEntity) = launchAction("تم صرف قطعة من المخزون") {
-        repository.issuePart(part, actor = actor())
+    fun issuePart(part: SparePartEntity, quantity: Int = 1) = launchAction("تم صرف $quantity من المخزون") {
+        repository.issuePart(part, quantity = quantity, actor = actor())
     }
 
-    fun receivePart(part: SparePartEntity) = launchAction("تم إضافة قطعة إلى المخزون") {
-        repository.receivePart(part, actor = actor())
+    fun receivePart(part: SparePartEntity, quantity: Int = 1) = launchAction("تم استلام $quantity إلى المخزون") {
+        repository.receivePart(part, quantity = quantity, actor = actor())
     }
+
+    fun issuePartToWorkOrder(order: WorkOrderEntity, part: SparePartEntity, quantity: Int) =
+        launchAction("تم صرف المادة لأمر العمل") { repository.issuePartToWorkOrder(order, part, quantity, actor()) }
 
     fun addTechnician() = launchAction("تمت إضافة فني تجريبي") {
         repository.addTechnician(actor())
@@ -314,10 +326,70 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun deleteTaskListOperation(operation: TaskListOperationEntity) = launchAction("تم حذف عملية القالب") { repository.deleteTaskListOperation(operation, actor()) }
     fun generateWorkOrderFromPm(pm: PreventiveMaintenanceEntity) = launchAction("تم توليد أمر عمل من الخطة") { repository.generateWorkOrderFromPm(pm, actor()) }
 
+    fun savePermit(permit: WorkPermitEntity) = launchAction("تم حفظ التصريح") { repository.savePermit(permit, actor()) }
+    fun setPermitStatus(permit: WorkPermitEntity, approved: Boolean) =
+        launchAction(if (approved) "تم اعتماد التصريح" else "تم رفض التصريح") { repository.setPermitStatus(permit, approved, actor()) }
+    fun deletePermit(permit: WorkPermitEntity) = launchAction("تم حذف التصريح") { repository.deletePermit(permit, actor()) }
+
     // ----- CAPA -----
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }
     fun updateCapaStatus(item: CapaEntity, status: String) = launchAction("تم تحديث حالة الإجراء") { repository.updateCapaStatus(item, status, actor()) }
     fun deleteCapa(item: CapaEntity) = launchAction("تم حذف الإجراء") { repository.deleteCapa(item, actor()) }
+
+    /** Imports a maintenance-kit workbook the user picked (content URI). */
+    fun importExcel(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val sheets = context.contentResolver.openInputStream(uri)?.use { XlsxReader.read(it) }
+                        ?: throw IllegalStateException("تعذّر فتح الملف")
+                    repository.importMachineKit(sheets, actor())
+                }
+            }.onSuccess { _message.value = it }
+                .onFailure { _message.value = "تعذّر الاستيراد: ${it.message ?: "ملف غير صالح"}" }
+        }
+    }
+
+    /** Imports the maintenance-kit workbook bundled with the app (assets/). */
+    fun importBundledKit(context: Context, assetFile: String = "FVV_maintenance_kit.xlsx") {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val sheets = context.assets.open(assetFile).use { XlsxReader.read(it) }
+                    repository.importMachineKit(sheets, actor())
+                }
+            }.onSuccess { _message.value = it }
+                .onFailure { _message.value = "تعذّر استيراد القالب المرفق: ${it.message ?: "غير معروف"}" }
+        }
+    }
+
+    /** Writes a full JSON backup of the database to the user-chosen file. */
+    fun exportBackup(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val content = repository.exportBackup()
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
+                        ?: throw IllegalStateException("تعذّر إنشاء الملف")
+                }
+            }.onSuccess { _message.value = "تم حفظ النسخة الاحتياطية بنجاح" }
+                .onFailure { _message.value = "تعذّر التصدير: ${it.message ?: "غير معروف"}" }
+        }
+    }
+
+    /** Replaces all data with the contents of a chosen JSON backup file. */
+    fun importBackup(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val content = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+                        ?: throw IllegalStateException("تعذّر فتح الملف")
+                    repository.importBackup(content)
+                }
+            }.onSuccess { _message.value = "تمت الاستعادة بنجاح (${it.totalRecords} سجل)" }
+                .onFailure { _message.value = "تعذّر الاستعادة: ${it.message ?: "ملف غير صالح"}" }
+        }
+    }
 
     fun clearMessage() {
         _message.value = null

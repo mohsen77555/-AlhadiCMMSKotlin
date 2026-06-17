@@ -31,6 +31,9 @@ interface MeasurementDao {
     @Query("SELECT * FROM measurement_readings ORDER BY id DESC LIMIT 200")
     fun observeReadings(): Flow<List<MeasurementReadingEntity>>
 
+    @Query("SELECT * FROM measurement_readings ORDER BY id ASC")
+    suspend fun dumpAllReadings(): List<MeasurementReadingEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReading(reading: MeasurementReadingEntity): Long
 
