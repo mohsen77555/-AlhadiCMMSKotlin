@@ -40,7 +40,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
         FunctionalLocationEntity::class,
         CapaEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

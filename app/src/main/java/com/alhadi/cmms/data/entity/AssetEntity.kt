@@ -24,7 +24,8 @@ data class AssetEntity(
     val locationId: Long? = null,
     val warrantyProvider: String = "",
     val warrantyStart: String = "",
-    val warrantyEnd: String = ""
+    val warrantyEnd: String = "",
+    val parentAssetId: Long? = null
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

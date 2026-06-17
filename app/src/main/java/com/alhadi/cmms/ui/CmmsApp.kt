@@ -930,12 +930,14 @@ private fun AssetsScreen(
         AssetDetailScreen(
             innerPadding = innerPadding,
             asset = detailAsset,
+            allAssets = assets,
             workOrders = workOrders.filter { it.assetId == detailAsset.id },
             pmItems = pmItems.filter { it.assetId == detailAsset.id },
             locations = locations,
             canManage = canManage,
             defaultAssignee = defaultAssignee,
             onBack = { detailId = null },
+            onOpenAsset = { detailId = it },
             onSaveAsset = onSave,
             onChangeStatus = onChangeStatus,
             onSaveWorkOrder = onSaveWorkOrder,
@@ -986,7 +988,7 @@ private fun AssetsScreen(
     }
 
     if (showForm) {
-        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations)
+        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations, allAssets = assets)
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
@@ -1034,12 +1036,14 @@ private fun AssetCard(
 private fun AssetDetailScreen(
     innerPadding: PaddingValues,
     asset: AssetEntity,
+    allAssets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onBack: () -> Unit,
+    onOpenAsset: (Long) -> Unit,
     onSaveAsset: (AssetEntity) -> Unit,
     onChangeStatus: (AssetEntity, String) -> Unit,
     onSaveWorkOrder: (WorkOrderEntity) -> Unit,
@@ -1049,6 +1053,8 @@ private fun AssetDetailScreen(
     val today = DateStrings.today()
     val underWarranty = asset.isUnderWarranty(today)
     val hasWarranty = asset.warrantyEnd.isNotBlank()
+    val parent = asset.parentAssetId?.let { id -> allAssets.firstOrNull { it.id == id } }
+    val children = allAssets.filter { it.parentAssetId == asset.id }
     var showEdit by remember { mutableStateOf(false) }
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
@@ -1086,6 +1092,7 @@ private fun AssetDetailScreen(
                     InfoRow("المجموعة", asset.groupName)
                     InfoRow("الموقع", asset.location)
                     InfoRow("الموقع الفني", locationLabel)
+                    InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
                     InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
                     InfoRow("الأهمية", asset.criticality)
                     InfoRow("تاريخ التركيب", asset.installedAt)
@@ -1147,6 +1154,31 @@ private fun AssetDetailScreen(
             }
         }
 
+        if (parent != null || children.isNotEmpty()) {
+            item { SectionHeader("الأصول الفرعية (${children.size})") }
+            items(children, key = { "ch-${it.id}" }) { child ->
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenAsset(child.id) },
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconBubble(Icons.Filled.PrecisionManufacturing, AccentGreen, AccentGreen.copy(alpha = 0.14f), 36)
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(child.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LtrText(child.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusBadge(child.status, statusTone(child.status))
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (children.isEmpty()) {
+                item { EmptyState("لا توجد أصول فرعية") }
+            }
+        }
+
         item { SectionHeader("أوامر العمل المرتبطة (${workOrders.size})") }
         if (workOrders.isEmpty()) {
             item { EmptyState("لا توجد أوامر عمل لهذا الأصل") }
@@ -1189,7 +1221,7 @@ private fun AssetDetailScreen(
     }
 
     if (showEdit) {
-        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations)
+        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations, allAssets = allAssets)
     }
     if (showStatus) {
         StatusPickerDialog(

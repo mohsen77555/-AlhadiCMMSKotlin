@@ -194,13 +194,20 @@ private fun LocationDropdown(
     }
 }
 
-/** Optional asset picker (with a "none" option), used by CAPA. */
+/** Optional asset picker (with a "none" option). */
 @Composable
-private fun AssetDropdownOptional(assets: List<AssetEntity>, selectedId: Long?, onSelect: (Long?) -> Unit) {
+private fun AssetDropdownOptional(
+    assets: List<AssetEntity>,
+    selectedId: Long?,
+    onSelect: (Long?) -> Unit,
+    label: String = "الأصل (اختياري)",
+    excludeId: Long? = null
+) {
     var open by remember { mutableStateOf(false) }
+    val options = assets.filter { it.id != excludeId }
     val selected = assets.firstOrNull { it.id == selectedId }
     Column {
-        Text("الأصل (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         Box {
             OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -213,7 +220,7 @@ private fun AssetDropdownOptional(assets: List<AssetEntity>, selectedId: Long?, 
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
-                assets.forEach { asset ->
+                options.forEach { asset ->
                     DropdownMenuItem(text = { Text("${asset.code} • ${asset.name}") }, onClick = { onSelect(asset.id); open = false })
                 }
             }
@@ -262,7 +269,8 @@ internal fun AssetFormSheet(
     initial: AssetEntity?,
     onDismiss: () -> Unit,
     onSave: (AssetEntity) -> Unit,
-    locations: List<FunctionalLocationEntity> = emptyList()
+    locations: List<FunctionalLocationEntity> = emptyList(),
+    allAssets: List<AssetEntity> = emptyList()
 ) {
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
@@ -273,6 +281,7 @@ internal fun AssetFormSheet(
     var status by remember { mutableStateOf(initial?.status ?: "Running") }
     var criticality by remember { mutableStateOf(initial?.criticality ?: "Medium") }
     var locationId by remember { mutableStateOf(initial?.locationId) }
+    var parentAssetId by remember { mutableStateOf(initial?.parentAssetId) }
     var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
     var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
     var warrantyEnd by remember { mutableStateOf(initial?.warrantyEnd ?: "") }
@@ -284,6 +293,9 @@ internal fun AssetFormSheet(
         LabeledField("الموقع النصّي (Location)", location, { location = it })
         if (locations.isNotEmpty()) {
             LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+        }
+        if (allAssets.isNotEmpty()) {
+            AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
         }
         LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
         LabeledField("الموديل (Model)", model, { model = it })
@@ -311,7 +323,8 @@ internal fun AssetFormSheet(
                     locationId = locationId,
                     warrantyProvider = warrantyProvider.trim(),
                     warrantyStart = warrantyStart.trim(),
-                    warrantyEnd = warrantyEnd.trim()
+                    warrantyEnd = warrantyEnd.trim(),
+                    parentAssetId = parentAssetId
                 )
             )
         }
