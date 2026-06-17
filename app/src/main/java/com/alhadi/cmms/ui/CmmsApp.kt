@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PrecisionManufacturing
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
@@ -86,6 +87,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -128,6 +130,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.MovementType
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.notify.Reminders
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -1180,6 +1184,24 @@ private fun AssetsScreen(
     var deleteTarget by remember { mutableStateOf<AssetEntity?>(null) }
     var detailId by remember { mutableStateOf<Long?>(null) }
 
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val raw = result.contents
+        if (raw != null) {
+            val code = raw.removePrefix("ALHADI:").trim()
+            val match = assets.firstOrNull { it.code.equals(code, ignoreCase = true) }
+            if (match != null) detailId = match.id else query = code
+        }
+    }
+    fun launchScan() {
+        scanLauncher.launch(
+            ScanOptions()
+                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                .setPrompt("وجّه الكاميرا إلى رمز الأصل")
+                .setBeepEnabled(false)
+                .setOrientationLocked(false)
+        )
+    }
+
     // Detail view (re-resolved from the live list so edits/status changes reflect).
     val detailAsset = detailId?.let { id -> assets.firstOrNull { it.id == id } }
     if (detailAsset != null) {
@@ -1256,7 +1278,16 @@ private fun AssetsScreen(
                     }
                 }
             }
-            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill")
+                    }
+                    FilledTonalIconButton(onClick = { launchScan() }) {
+                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "مسح رمز الأصل")
+                    }
+                }
+            }
             if (canManage) {
                 item { AddButton("أصل جديد") { editing = null; showForm = true } }
             }
