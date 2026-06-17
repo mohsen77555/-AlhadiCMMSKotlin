@@ -22,5 +22,17 @@ data class WorkOrderEntity(
     val estimatedCost: Double,
     val closeNotes: String = "",
     val isFailure: Boolean = false,
-    val downtimeHours: Double = 0.0
-)
+    val downtimeHours: Double = 0.0,
+    val laborHours: Double = 0.0,
+    val laborRate: Double = 0.0,
+    val partsCost: Double = 0.0
+) {
+    /** Recorded labour cost (hours × rate). */
+    fun laborCost(): Double = laborHours * laborRate
+
+    /**
+     * Realised total cost: actual labour + parts when recorded, otherwise the
+     * estimate so historical/seed orders still contribute to per-asset rollups.
+     */
+    fun totalCost(): Double = (laborCost() + partsCost).let { if (it > 0.0) it else estimatedCost }
+}

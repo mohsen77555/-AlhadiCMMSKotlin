@@ -439,6 +439,9 @@ internal fun WorkOrderFormSheet(
     var dueDays by remember { mutableStateOf("3") }
     var isFailure by remember { mutableStateOf(initial?.isFailure ?: false) }
     var downtime by remember { mutableStateOf((initial?.downtimeHours ?: 0.0).toString()) }
+    var laborHours by remember { mutableStateOf((initial?.laborHours ?: 0.0).toString()) }
+    var laborRate by remember { mutableStateOf((initial?.laborRate ?: 0.0).toString()) }
+    var partsCost by remember { mutableStateOf((initial?.partsCost ?: 0.0).toString()) }
 
     FormSheet(if (initial == null) "إنشاء أمر عمل" else "تعديل أمر العمل", onDismiss) {
         LabeledField("العنوان", title, { title = it })
@@ -448,6 +451,11 @@ internal fun WorkOrderFormSheet(
         OptionDropdown("الحالة", listOf("Open", "In Progress", "Closed"), status) { status = it }
         LabeledField("المسؤول", assignedTo, { assignedTo = it })
         LabeledField("التكلفة التقديرية", cost, { cost = it }, numeric = true)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f)) { LabeledField("ساعات العمالة", laborHours, { laborHours = it }, numeric = true) }
+            Box(modifier = Modifier.weight(1f)) { LabeledField("أجر الساعة", laborRate, { laborRate = it }, numeric = true) }
+        }
+        LabeledField("تكلفة قطع الغيار", partsCost, { partsCost = it }, numeric = true)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("عطل (Breakdown)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = isFailure, onCheckedChange = { isFailure = it })
@@ -475,7 +483,10 @@ internal fun WorkOrderFormSheet(
                     estimatedCost = cost.toDoubleOrNull() ?: 0.0,
                     closeNotes = initial?.closeNotes ?: "",
                     isFailure = isFailure,
-                    downtimeHours = if (isFailure) downtime.toDoubleOrNull() ?: 0.0 else 0.0
+                    downtimeHours = if (isFailure) downtime.toDoubleOrNull() ?: 0.0 else 0.0,
+                    laborHours = laborHours.toDoubleOrNull() ?: 0.0,
+                    laborRate = laborRate.toDoubleOrNull() ?: 0.0,
+                    partsCost = partsCost.toDoubleOrNull() ?: 0.0
                 )
             )
         }

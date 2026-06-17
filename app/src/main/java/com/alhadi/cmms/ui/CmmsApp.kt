@@ -1173,6 +1173,26 @@ private fun AssetDetailScreen(
         }
 
         item {
+            val laborTotal = workOrders.sumOf { it.laborCost() }
+            val partsTotal = workOrders.sumOf { it.partsCost }
+            val grandTotal = workOrders.sumOf { it.totalCost() }
+            val closedCount = workOrders.count { it.status == "Closed" }
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        SectionHeader("التكاليف")
+                        Spacer(modifier = Modifier.weight(1f))
+                        StatusBadge(money(grandTotal), statusTone("info"))
+                    }
+                    InfoRow("إجمالي التكلفة", money(grandTotal))
+                    InfoRow("تكلفة العمالة", money(laborTotal))
+                    InfoRow("تكلفة قطع الغيار", money(partsTotal))
+                    InfoRow("أوامر العمل", "${workOrders.size} (مغلقة: $closedCount)")
+                }
+            }
+        }
+
+        item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 SectionHeader("الخصائص الفنية (${characteristics.size})")
                 Spacer(modifier = Modifier.weight(1f))
@@ -1945,6 +1965,14 @@ private fun ReportsScreen(
     val duePm = pmItems.filter { DateStrings.isDueOrOverdue(it.nextDueAt) }
     val underWarranty = assets.filter { it.isUnderWarranty(today) }
     val expiringSoon = assets.filter { it.warrantyEnd.isNotBlank() && it.warrantyEnd in today..soon }
+    val totalCost = workOrders.sumOf { it.totalCost() }
+    val laborCost = workOrders.sumOf { it.laborCost() }
+    val partsCost = workOrders.sumOf { it.partsCost }
+    val assetName = assets.associate { it.id to it.code }
+    val topCostAssets = workOrders.groupBy { it.assetId }
+        .mapValues { (_, list) -> list.sumOf { it.totalCost() } }
+        .entries.sortedByDescending { it.value }
+        .take(3)
 
     LazyColumn(
         modifier = Modifier
@@ -1964,6 +1992,14 @@ private fun ReportsScreen(
                 "أوامر العمل المغلقة: $closed",
                 "تكلفة تقديرية مفتوحة: ${"%.2f".format(openCost)}"
             ))
+        }
+        item {
+            ReportCard("التكاليف", listOf(
+                "إجمالي تكلفة الصيانة: ${money(totalCost)}",
+                "تكلفة العمالة: ${money(laborCost)}",
+                "تكلفة قطع الغيار: ${money(partsCost)}",
+                "تكلفة تقديرية مفتوحة: ${money(openCost)}"
+            ) + topCostAssets.map { "الأعلى تكلفة — ${assetName[it.key] ?: it.key}: ${money(it.value)}" })
         }
         item {
             ReportCard("الصيانة الدورية", listOf(
@@ -2708,6 +2744,9 @@ private fun FailureAnalysisScreen(
 // ---------------------------------------------------------------------------
 // Shared
 // ---------------------------------------------------------------------------
+
+/** Formats a monetary amount with thousands separators and a currency suffix. */
+private fun money(value: Double): String = "%,.0f ر.س".format(value)
 
 @Composable
 private fun SearchField(query: String, onChange: (String) -> Unit, placeholder: String) {
