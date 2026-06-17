@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
@@ -245,6 +246,12 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val backupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.importBackup(appContext, uri)
     }
+    var pendingPdfOrder by remember { mutableStateOf<WorkOrderEntity?>(null) }
+    val pdfExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        val order = pendingPdfOrder
+        if (uri != null && order != null) viewModel.exportWorkOrderPdf(appContext, uri, order)
+        pendingPdfOrder = null
+    }
 
     BackHandler(enabled = selectedTab == BottomTab.More && moreRoute != null) {
         moreRoute = null
@@ -325,6 +332,10 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onIssueMaterial = viewModel::issuePartToWorkOrder,
+                        onExportPdf = { order ->
+                            pendingPdfOrder = order
+                            pdfExportLauncher.launch("WO-${order.id}-${DateStrings.today()}.pdf")
+                        },
                         onSave = viewModel::saveWorkOrder,
                         onDelete = viewModel::deleteWorkOrder,
                         onUpdateStatus = viewModel::updateWorkOrderStatus,
@@ -2086,6 +2097,7 @@ private fun WorkOrdersScreen(
     canManage: Boolean,
     defaultAssignee: String,
     onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
+    onExportPdf: (WorkOrderEntity) -> Unit,
     onSave: (WorkOrderEntity) -> Unit,
     onDelete: (WorkOrderEntity) -> Unit,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
@@ -2208,6 +2220,7 @@ private fun WorkOrdersScreen(
                     bomPartIds = bom.filter { it.assetId == workOrder.assetId }.map { it.partId }.toSet(),
                     partMap = partMap,
                     onIssueMaterial = onIssueMaterial,
+                    onExportPdf = onExportPdf,
                     canManage = canManage,
                     onUpdateStatus = onUpdateStatus,
                     onApprove = onApprove,
@@ -2259,6 +2272,7 @@ private fun WorkOrderCard(
     bomPartIds: Set<Long>,
     partMap: Map<Long, SparePartEntity>,
     onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
+    onExportPdf: (WorkOrderEntity) -> Unit,
     canManage: Boolean,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
@@ -2565,6 +2579,11 @@ private fun WorkOrderCard(
                 if (workOrder.status == "Technically Completed" && !hasEvidence) {
                     Text("الإغلاق النهائي يتطلّب التقاط صورة دليل تنفيذ بالكاميرا.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
                 }
+            }
+            OutlinedButton(onClick = { onExportPdf(workOrder) }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("تصدير أمر العمل PDF")
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }

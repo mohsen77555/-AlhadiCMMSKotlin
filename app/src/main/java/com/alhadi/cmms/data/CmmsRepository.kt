@@ -109,6 +109,10 @@ class CmmsRepository(private val database: AppDatabase) {
         )
     }
 
+    /** All inventory transactions linked to a specific work order (for PDF / traceability). */
+    suspend fun transactionsForOrder(orderId: Long): List<InventoryTransactionEntity> =
+        transactionDao.dumpAll().filter { it.workOrderId == orderId }
+
     // ---------------------------------------------------------------------
     // Backup & restore (full database snapshot as portable JSON)
     // ---------------------------------------------------------------------
