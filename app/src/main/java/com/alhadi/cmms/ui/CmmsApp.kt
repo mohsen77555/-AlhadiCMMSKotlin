@@ -1,10 +1,12 @@
 package com.alhadi.cmms.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,8 +24,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
@@ -30,41 +37,41 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -77,7 +84,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -93,37 +99,47 @@ import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
-import com.alhadi.cmms.ui.theme.BrandIndigo
-import com.alhadi.cmms.ui.theme.BrandTeal
+import com.alhadi.cmms.ui.theme.AccentBlue
+import com.alhadi.cmms.ui.theme.AccentBrown
+import com.alhadi.cmms.ui.theme.AccentGreen
+import com.alhadi.cmms.ui.theme.AccentNavy
+import com.alhadi.cmms.ui.theme.AccentOrange
+import com.alhadi.cmms.ui.theme.AccentPurple
+import com.alhadi.cmms.ui.theme.AccentRed
+import com.alhadi.cmms.ui.theme.AccentTeal
 import com.alhadi.cmms.ui.theme.StatusInfo
-import com.alhadi.cmms.ui.theme.StatusInfoContainer
 import com.alhadi.cmms.ui.theme.StatusRunning
 import com.alhadi.cmms.ui.theme.StatusRunningContainer
 import com.alhadi.cmms.ui.theme.StatusStopped
 import com.alhadi.cmms.ui.theme.StatusStoppedContainer
-import com.alhadi.cmms.ui.theme.StatusTone
-import com.alhadi.cmms.ui.theme.StatusWarning
-import com.alhadi.cmms.ui.theme.StatusWarningContainer
 import com.alhadi.cmms.ui.theme.priorityTone
 import com.alhadi.cmms.ui.theme.statusTone
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.viewmodel.CmmsViewModel
 import com.alhadi.cmms.viewmodel.DashboardStats
-import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlinx.coroutines.launch
 
-private enum class AppSection(
-    val arabicTitle: String,
-    val icon: ImageVector
-) {
-    Dashboard("الرئيسية", Icons.Filled.Dashboard),
-    Assets("الأصول", Icons.Filled.PrecisionManufacturing),
-    WorkOrders("أوامر العمل", Icons.Filled.Assignment),
-    PreventiveMaintenance("الصيانة", Icons.Filled.EventRepeat),
-    Inventory("المخزون", Icons.Filled.Inventory2),
-    Reports("التقارير", Icons.Filled.Analytics),
-    Admin("الإدارة", Icons.Filled.AdminPanelSettings)
+// ---------------------------------------------------------------------------
+// Navigation model
+// ---------------------------------------------------------------------------
+
+private enum class BottomTab(val label: String, val icon: ImageVector, val accent: Color) {
+    Home("الرئيسية", Icons.Filled.Home, AccentNavy),
+    WorkOrders("أوامر العمل", Icons.Filled.Assignment, AccentBlue),
+    Supervision("الإشراف", Icons.Filled.Verified, AccentTeal),
+    Assets("الأصول", Icons.Filled.PrecisionManufacturing, AccentGreen),
+    More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
+
+private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance }
+
+private data class ScreenMeta(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val accent: Color
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,17 +156,15 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val message by viewModel.message.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    var selectedSection by rememberSaveable { mutableStateOf(AppSection.Dashboard) }
+    var selectedTab by rememberSaveable { mutableStateOf(BottomTab.Home) }
+    var moreRoute by rememberSaveable { mutableStateOf<MoreRoute?>(null) }
     var showCreateSheet by rememberSaveable { mutableStateOf(false) }
 
-    val visibleSections = remember(currentUser) {
-        AppSection.entries.filter { section ->
-            section != AppSection.Admin || currentUser?.isAdmin == true
-        }
-    }
+    val isAdmin = currentUser?.isAdmin == true
+    val canManage = currentUser?.canManage == true
 
-    LaunchedEffect(visibleSections) {
-        if (selectedSection !in visibleSections) selectedSection = AppSection.Dashboard
+    BackHandler(enabled = selectedTab == BottomTab.More && moreRoute != null) {
+        moreRoute = null
     }
 
     LaunchedEffect(message) {
@@ -161,128 +175,110 @@ fun CmmsApp(viewModel: CmmsViewModel) {
         }
     }
 
-    val canManage = currentUser?.canManage == true
+    val meta = screenMeta(selectedTab, moreRoute)
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(selectedSection.arabicTitle, fontWeight = FontWeight.Bold)
-                            Text(
-                                text = "Alhadi CMMS",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        Box(modifier = Modifier.padding(start = 12.dp)) {
-                            CircleAvatar(initials = currentUser?.initials ?: "?", size = 38)
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = viewModel::logout) {
-                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "تسجيل الخروج")
-                        }
-                    },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                AppHeader(
+                    meta = meta,
+                    user = currentUser,
+                    openWorkOrders = stats.openWorkOrders,
+                    assetsCount = stats.assets,
+                    showBack = selectedTab == BottomTab.More && moreRoute != null,
+                    onBack = { moreRoute = null },
+                    onLogout = viewModel::logout,
+                    onSchedule = { selectedTab = BottomTab.Supervision },
+                    onMaintenance = { selectedTab = BottomTab.Supervision },
+                    onAlerts = { selectedTab = BottomTab.Home }
                 )
             },
             bottomBar = {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                    visibleSections.forEach { section ->
-                        NavigationBarItem(
-                            selected = selectedSection == section,
-                            onClick = { selectedSection = section },
-                            icon = { Icon(section.icon, contentDescription = section.arabicTitle) },
-                            label = {
-                                Text(
-                                    section.arabicTitle,
-                                    maxLines = 1,
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
-                        )
+                AppBottomBar(
+                    selected = selectedTab,
+                    isAdmin = isAdmin,
+                    onSelect = {
+                        selectedTab = it
+                        if (it != BottomTab.More) moreRoute = null
                     }
-                }
+                )
             },
-            floatingActionButton = {
-                if (selectedSection == AppSection.WorkOrders && canManage) {
-                    ExtendedFloatingActionButton(
-                        onClick = { showCreateSheet = true },
-                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                        text = { Text("أمر عمل") }
-                    )
-                }
-            },
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            containerColor = MaterialTheme.colorScheme.background
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
         ) { innerPadding ->
             val assetMap = assets.associateBy { it.id }
             AnimatedContent(
-                targetState = selectedSection,
+                targetState = meta.title,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "section"
-            ) { section ->
-                when (section) {
-                    AppSection.Dashboard -> DashboardScreen(
+                label = "screen"
+            ) {
+                when (selectedTab) {
+                    BottomTab.Home -> DashboardScreen(
                         innerPadding = innerPadding,
-                        userName = currentUser?.name ?: "",
                         stats = stats,
                         assets = assets,
                         workOrders = workOrders,
                         parts = spareParts,
-                        pmItems = preventiveMaintenance
+                        pmItems = preventiveMaintenance,
+                        onReports = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Reports },
+                        onGovernance = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Audit }
                     )
 
-                    AppSection.Assets -> AssetsScreen(innerPadding = innerPadding, assets = assets)
-
-                    AppSection.WorkOrders -> WorkOrdersScreen(
+                    BottomTab.WorkOrders -> WorkOrdersScreen(
                         innerPadding = innerPadding,
                         workOrders = workOrders,
                         assetMap = assetMap,
+                        canManage = canManage,
+                        onNewWorkOrder = { showCreateSheet = true },
                         onUpdateStatus = viewModel::updateWorkOrderStatus
                     )
 
-                    AppSection.PreventiveMaintenance -> PreventiveMaintenanceScreen(
+                    BottomTab.Supervision -> PreventiveMaintenanceScreen(
                         innerPadding = innerPadding,
                         pmItems = preventiveMaintenance,
                         assetMap = assetMap,
                         onDone = viewModel::markPreventiveMaintenanceDone
                     )
 
-                    AppSection.Inventory -> InventoryScreen(
-                        innerPadding = innerPadding,
-                        parts = spareParts,
-                        transactions = transactions,
-                        canReceive = canManage,
-                        onIssue = viewModel::issuePart,
-                        onReceive = viewModel::receivePart
-                    )
+                    BottomTab.Assets -> AssetsScreen(innerPadding = innerPadding, assets = assets)
 
-                    AppSection.Reports -> ReportsScreen(
-                        innerPadding = innerPadding,
-                        stats = stats,
-                        workOrders = workOrders,
-                        parts = spareParts,
-                        pmItems = preventiveMaintenance
-                    )
-
-                    AppSection.Admin -> AdminScreen(
-                        innerPadding = innerPadding,
-                        users = users,
-                        auditLog = auditLog,
-                        currentUser = currentUser,
-                        onAddTechnician = viewModel::addTechnician,
-                        onResetSampleData = viewModel::resetSampleData
-                    )
+                    BottomTab.More -> when (moreRoute) {
+                        null -> MoreGrid(
+                            innerPadding = innerPadding,
+                            isAdmin = isAdmin,
+                            onOpen = { moreRoute = it },
+                            onLogout = viewModel::logout
+                        )
+                        MoreRoute.Inventory -> InventoryScreen(
+                            innerPadding = innerPadding,
+                            parts = spareParts,
+                            transactions = transactions,
+                            canReceive = canManage,
+                            onIssue = viewModel::issuePart,
+                            onReceive = viewModel::receivePart
+                        )
+                        MoreRoute.Reports -> ReportsScreen(
+                            innerPadding = innerPadding,
+                            stats = stats,
+                            workOrders = workOrders,
+                            parts = spareParts,
+                            pmItems = preventiveMaintenance
+                        )
+                        MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
+                        MoreRoute.Admin -> AdminScreen(
+                            innerPadding = innerPadding,
+                            users = users,
+                            currentUser = currentUser,
+                            onAddTechnician = viewModel::addTechnician,
+                            onResetSampleData = viewModel::resetSampleData
+                        )
+                        MoreRoute.PreventiveMaintenance -> PreventiveMaintenanceScreen(
+                            innerPadding = innerPadding,
+                            pmItems = preventiveMaintenance,
+                            assetMap = assetMap,
+                            onDone = viewModel::markPreventiveMaintenanceDone
+                        )
+                    }
                 }
             }
         }
@@ -312,6 +308,263 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     }
 }
 
+private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (tab) {
+    BottomTab.Home -> ScreenMeta("الرئيسية", "لوحة المؤشرات والتنبيهات", Icons.Filled.Home, AccentNavy)
+    BottomTab.WorkOrders -> ScreenMeta("أوامر العمل", "إنشاء، إصدار، متابعة، وإغلاق", Icons.Filled.Assignment, AccentBlue)
+    BottomTab.Supervision -> ScreenMeta("الإشراف والصيانة", "الصيانة الدورية والمتابعة", Icons.Filled.Verified, AccentTeal)
+    BottomTab.Assets -> ScreenMeta("الأصول", "سجل الأصول والمعدات", Icons.Filled.PrecisionManufacturing, AccentGreen)
+    BottomTab.More -> when (route) {
+        null -> ScreenMeta("المزيد", "كل الوحدات والإعدادات", Icons.Filled.GridView, AccentBrown)
+        MoreRoute.Inventory -> ScreenMeta("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple)
+        MoreRoute.Reports -> ScreenMeta("التقارير", "مؤشرات وتصدير وتحليلات", Icons.Filled.Analytics, AccentBlue)
+        MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
+        MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
+        MoreRoute.PreventiveMaintenance -> ScreenMeta("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AppHeader(
+    meta: ScreenMeta,
+    user: UserEntity?,
+    openWorkOrders: Int,
+    assetsCount: Int,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    onLogout: () -> Unit,
+    onSchedule: () -> Unit,
+    onMaintenance: () -> Unit,
+    onAlerts: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 3.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Title row: section icon (right) + title block + production badge (left).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .background(meta.accent, RoundedCornerShape(14.dp))
+                        .clickable(enabled = showBack, onClick = onBack),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (showBack) Icons.AutoMirrored.Filled.ArrowBack else meta.icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Alhadi CMMS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            meta.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .background(meta.accent, CircleShape)
+                        )
+                    }
+                    Text(
+                        meta.subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    ProductionBadge()
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        user?.role ?: "محلي",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Status chips row.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SyncCard()
+                StatCard("أمر مفتوح", openWorkOrders.toString(), StatusInfo)
+                StatCard("أصل", assetsCount.toString(), StatusRunning)
+            }
+
+            // Quick action pills row.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                QuickPill("محرك الجدولة", Icons.Filled.Schedule, onSchedule)
+                QuickPill("إدارة الصيانة", Icons.Filled.Build, onMaintenance)
+                QuickPill("التنبيهات", Icons.Filled.NotificationsActive, onAlerts)
+                QuickPill("تسجيل الخروج", Icons.AutoMirrored.Filled.Logout, onLogout)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductionBadge() {
+    Surface(shape = CircleShape, color = StatusRunningContainer) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(modifier = Modifier.size(7.dp).background(StatusRunning, CircleShape))
+            Text(
+                "Production",
+                style = MaterialTheme.typography.labelMedium,
+                color = StatusRunning,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun SyncCard() {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = StatusRunningContainer
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+            Text(
+                "حالة المزامنة",
+                style = MaterialTheme.typography.labelMedium,
+                color = StatusRunning,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "محلي • جاهز للعمل بدون إنترنت",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatCard(label: String, value: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun QuickPill(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bottom navigation (custom, filled-square selected icon)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AppBottomBar(selected: BottomTab, isAdmin: Boolean, onSelect: (BottomTab) -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomTab.entries.forEach { tab ->
+                val isSel = tab == selected
+                Column(
+                    modifier = Modifier
+                        .clickable { onSelect(tab) }
+                        .padding(horizontal = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                if (isSel) tab.accent else Color.Transparent,
+                                RoundedCornerShape(12.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            tab.icon,
+                            contentDescription = tab.label,
+                            tint = if (isSel) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Text(
+                        tab.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isSel) tab.accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
@@ -319,13 +572,22 @@ fun CmmsApp(viewModel: CmmsViewModel) {
 @Composable
 private fun DashboardScreen(
     innerPadding: PaddingValues,
-    userName: String,
     stats: DashboardStats,
     assets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     parts: List<SparePartEntity>,
-    pmItems: List<PreventiveMaintenanceEntity>
+    pmItems: List<PreventiveMaintenanceEntity>,
+    onReports: () -> Unit,
+    onGovernance: () -> Unit
 ) {
+    val today = DateStrings.today()
+    val criticalAssets = assets.count { it.status != "Running" }
+    val overdue = workOrders.count { it.status != "Closed" && it.dueAt < today }
+    val inProgress = workOrders.count { it.status == "In Progress" }
+    val urgent = workOrders.count { it.priority == "Critical" || it.priority == "High" }
+    val assigned = workOrders.count { it.assignedTo.isNotBlank() }
+    val governance = if (workOrders.isEmpty()) 100 else (assigned * 100 / workOrders.size)
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -333,127 +595,123 @@ private fun DashboardScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { HeroHeader(userName = userName, openWorkOrders = stats.openWorkOrders, duePm = stats.duePm) }
+        item { DotSectionTitle("واجهة الإدارة السريعة", AccentOrange) }
 
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    KpiCard("الأصول", stats.assets.toString(), "Assets", Icons.Filled.PrecisionManufacturing, StatusInfo, StatusInfoContainer, Modifier.weight(1f))
-                    KpiCard("أوامر مفتوحة", stats.openWorkOrders.toString(), "Open WO", Icons.Filled.Assignment, StatusWarning, StatusWarningContainer, Modifier.weight(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    KpiCard("صيانة مستحقة", stats.duePm.toString(), "Due PM", Icons.Filled.EventRepeat, StatusStopped, StatusStoppedContainer, Modifier.weight(1f))
-                    KpiCard("نقص مخزون", stats.lowStock.toString(), "Low Stock", Icons.Filled.Inventory2, StatusRunning, StatusRunningContainer, Modifier.weight(1f))
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiTile("أصول حرجة", criticalAssets.toString(), AccentRed, Modifier.weight(1f))
+                KpiTile("CAPA", "0", AccentOrange, Modifier.weight(1f))
+                KpiTile("متأخرة", overdue.toString(), MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
+                KpiTile("أوامر مفتوحة", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f))
             }
         }
 
-        item { SectionHeader("تنبيهات مهمة") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                BigActionButton("التقارير", AccentBlue, Modifier.weight(1f), onReports)
+                BigActionButton("حوكمة $governance%", AccentNavy, Modifier.weight(1f), onGovernance)
+            }
+        }
+
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiTile("مفتوح", stats.openWorkOrders.toString(), AccentBlue, Modifier.weight(1f))
+                KpiTile("قيد التنفيذ", inProgress.toString(), AccentOrange, Modifier.weight(1f))
+                KpiTile("متأخر", overdue.toString(), AccentRed, Modifier.weight(1f))
+                KpiTile("طارئ", urgent.toString(), AccentPurple, Modifier.weight(1f))
+            }
+        }
+
+        item { DotSectionTitle("يحتاج انتباهك", AccentRed) }
 
         val warningAssets = assets.filter { it.status != "Running" }.take(4)
         val lowStockParts = parts.filter { it.onHandQty <= it.minQty }.take(4)
         val duePm = pmItems.filter { DateStrings.isDueOrOverdue(it.nextDueAt) }.take(4)
 
         if (warningAssets.isEmpty() && lowStockParts.isEmpty() && duePm.isEmpty()) {
-            item { EmptyState("لا توجد تنبيهات حاليًا — كل شيء يعمل بشكل جيد", Icons.Filled.CheckCircle) }
+            item { CalmCard() }
         } else {
-            items(warningAssets, key = { "asset-${it.id}" }) { asset ->
-                AlertCard(
-                    icon = Icons.Filled.Warning,
-                    tone = statusTone(asset.status),
-                    title = "${asset.code} • ${asset.name}",
-                    body = "الحالة: ${asset.status} • الموقع: ${asset.location}"
-                )
+            items(warningAssets, key = { "a-${it.id}" }) { asset ->
+                AlertRow(Icons.Filled.Warning, statusTone(asset.status).content, "${asset.code} • ${asset.name}", "الحالة: ${asset.status} • ${asset.location}")
             }
-            items(lowStockParts, key = { "part-${it.id}" }) { part ->
-                AlertCard(
-                    icon = Icons.Filled.Inventory2,
-                    tone = statusTone("stopped"),
-                    title = "${part.partNumber} • ${part.name}",
-                    body = "المتوفر ${part.onHandQty} ${part.unit} • الحد الأدنى ${part.minQty}"
-                )
+            items(lowStockParts, key = { "p-${it.id}" }) { part ->
+                AlertRow(Icons.Filled.Inventory2, AccentRed, "${part.partNumber} • ${part.name}", "المتوفر ${part.onHandQty} • الحد الأدنى ${part.minQty}")
             }
-            items(duePm, key = { "pm-${it.id}" }) { pm ->
-                AlertCard(
-                    icon = Icons.Filled.EventRepeat,
-                    tone = statusTone("warning"),
-                    title = pm.title,
-                    body = "مستحقة بتاريخ ${pm.nextDueAt}"
-                )
-            }
-        }
-
-        item { SectionHeader("آخر أوامر العمل") }
-        if (workOrders.isEmpty()) {
-            item { EmptyState("لا توجد أوامر عمل") }
-        }
-        items(workOrders.take(5), key = { "wo-${it.id}" }) { workOrder ->
-            CompactWorkOrderCard(workOrder)
-        }
-    }
-}
-
-@Composable
-private fun HeroHeader(userName: String, openWorkOrders: Int, duePm: Int) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Brush.linearGradient(listOf(BrandTeal, BrandIndigo)))
-                .padding(20.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = if (userName.isBlank()) "مرحباً" else "مرحباً، $userName",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "لديك $openWorkOrders أمر عمل مفتوح و $duePm مهمة صيانة مستحقة.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.9f)
-                )
+            items(duePm, key = { "m-${it.id}" }) { pm ->
+                AlertRow(Icons.Filled.EventRepeat, AccentOrange, pm.title, "مستحقة بتاريخ ${pm.nextDueAt}")
             }
         }
     }
 }
 
 @Composable
-private fun KpiCard(
-    title: String,
-    value: String,
-    subtitle: String,
-    icon: ImageVector,
-    tint: Color,
-    container: Color,
-    modifier: Modifier = Modifier
-) {
+private fun DotSectionTitle(text: String, dot: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.size(8.dp).background(dot, CircleShape))
+    }
+}
+
+@Composable
+private fun KpiTile(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
     ElevatedCard(
-        modifier = modifier.height(148.dp),
+        modifier = modifier.height(92.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconBubble(icon = icon, tint = tint, container = container)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            LtrText(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = color)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
 
 @Composable
-private fun AlertCard(icon: ImageVector, tone: StatusTone, title: String, body: String) {
+private fun BigActionButton(label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(54.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = color)
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+    }
+}
+
+@Composable
+private fun CalmCard() {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconBubble(Icons.Filled.CheckCircle, StatusRunning, StatusRunningContainer, 40)
+            Column {
+                Text("لا شيء عاجل", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text("كل شيء تحت السيطرة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -463,10 +721,103 @@ private fun AlertCard(icon: ImageVector, tone: StatusTone, title: String, body: 
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconBubble(icon = icon, tint = tone.content, container = tone.container, size = 40)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            IconBubble(icon, tint, tint.copy(alpha = 0.14f), 40)
+            Column(modifier = Modifier.weight(1f)) {
                 LtrText(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// "More" grid
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun MoreGrid(
+    innerPadding: PaddingValues,
+    isAdmin: Boolean,
+    onOpen: (MoreRoute) -> Unit,
+    onLogout: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Inventory) }
+                ModuleCard("التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.Reports) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal, Modifier.weight(1f)) { onOpen(MoreRoute.PreventiveMaintenance) }
+                ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
+            }
+        }
+        if (isAdmin) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    ModuleCard("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Admin) }
+                    ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
+                }
+            }
+        } else {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModuleCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    ElevatedCard(
+        modifier = modifier
+            .height(132.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(accent)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconBubble(icon, accent, accent.copy(alpha = 0.14f), 40)
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -497,9 +848,7 @@ private fun AssetsScreen(innerPadding: PaddingValues, assets: List<AssetEntity>)
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill")
-        }
+        item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill") }
 
         if (filtered.isEmpty()) {
             item { EmptyState("لا توجد أصول مطابقة للبحث", Icons.Filled.Search) }
@@ -518,10 +867,7 @@ private fun AssetCard(asset: AssetEntity) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
                     LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -548,12 +894,18 @@ private fun WorkOrdersScreen(
     innerPadding: PaddingValues,
     workOrders: List<WorkOrderEntity>,
     assetMap: Map<Long, AssetEntity>,
+    canManage: Boolean,
+    onNewWorkOrder: () -> Unit,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit
 ) {
     val statusFilters = listOf("All", "Open", "In Progress", "Closed")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
-    val filtered = remember(selectedFilter, workOrders) {
-        if (selectedFilter == "All") workOrders else workOrders.filter { it.status == selectedFilter }
+    var query by rememberSaveable { mutableStateOf("") }
+    val filtered = remember(selectedFilter, query, workOrders) {
+        workOrders.filter { wo ->
+            (selectedFilter == "All" || wo.status == selectedFilter) &&
+                (query.isBlank() || wo.title.lowercase(Locale.getDefault()).contains(query.lowercase(Locale.getDefault())))
+        }
     }
 
     LazyColumn(
@@ -563,6 +915,8 @@ private fun WorkOrdersScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث في أوامر العمل…") }
+
         item {
             Row(
                 modifier = Modifier
@@ -571,25 +925,34 @@ private fun WorkOrdersScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 statusFilters.forEach { filter ->
-                    FilterChip(
-                        selected = selectedFilter == filter,
-                        onClick = { selectedFilter = filter },
-                        label = { Text(filter) }
-                    )
+                    FilterChip(selected = selectedFilter == filter, onClick = { selectedFilter = filter }, label = { Text(filter) })
+                }
+            }
+        }
+
+        if (canManage) {
+            item {
+                Button(
+                    onClick = onNewWorkOrder,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("أمر عمل جديد", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
 
         if (filtered.isEmpty()) {
-            item { EmptyState("لا توجد أوامر عمل", Icons.Filled.Assignment) }
+            item { EmptyState("لا توجد أوامر عمل هنا.", Icons.Filled.Assignment) }
         }
 
         items(filtered, key = { it.id }) { workOrder ->
-            WorkOrderCard(
-                workOrder = workOrder,
-                asset = assetMap[workOrder.assetId],
-                onUpdateStatus = onUpdateStatus
-            )
+            WorkOrderCard(workOrder = workOrder, asset = assetMap[workOrder.assetId], onUpdateStatus = onUpdateStatus)
         }
     }
 }
@@ -604,17 +967,11 @@ private fun WorkOrderCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(workOrder.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    LtrText(
-                        asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${workOrder.assetId}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    LtrText(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${workOrder.assetId}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 StatusBadge(workOrder.status, statusTone(workOrder.status))
             }
@@ -629,39 +986,12 @@ private fun WorkOrderCard(
             InfoRow("التكلفة التقديرية", "%.2f".format(workOrder.estimatedCost))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 if (workOrder.status == "Open") {
-                    OutlinedButton(
-                        onClick = { onUpdateStatus(workOrder, "In Progress") },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("بدء") }
+                    OutlinedButton(onClick = { onUpdateStatus(workOrder, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء") }
                 }
                 if (workOrder.status != "Closed") {
-                    Button(
-                        onClick = { onUpdateStatus(workOrder, "Closed") },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("إغلاق") }
+                    Button(onClick = { onUpdateStatus(workOrder, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun CompactWorkOrderCard(workOrder: WorkOrderEntity) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(workOrder.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusBadge(workOrder.status, statusTone(workOrder.status))
-                StatusBadge(workOrder.priority, priorityTone(workOrder.priority))
-            }
-            Text(
-                "الاستحقاق: ${workOrder.dueAt}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -691,20 +1021,8 @@ private fun CreateWorkOrderSheet(
         ) {
             Text("إنشاء أمر عمل جديد", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("عنوان أمر العمل") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("الوصف") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth()
-            )
+            OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("عنوان أمر العمل") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("الوصف") }, minLines = 2, modifier = Modifier.fillMaxWidth())
 
             Text("الأصل", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             Box {
@@ -719,13 +1037,10 @@ private fun CreateWorkOrderSheet(
                 }
                 DropdownMenu(expanded = assetMenuOpen, onDismissRequest = { assetMenuOpen = false }) {
                     assets.forEach { asset ->
-                        DropdownMenuItem(
-                            text = { Text("${asset.code} • ${asset.name}") },
-                            onClick = {
-                                selectedAsset = asset
-                                assetMenuOpen = false
-                            }
-                        )
+                        DropdownMenuItem(text = { Text("${asset.code} • ${asset.name}") }, onClick = {
+                            selectedAsset = asset
+                            assetMenuOpen = false
+                        })
                     }
                 }
             }
@@ -771,7 +1086,7 @@ private fun CreateWorkOrderSheet(
 }
 
 // ---------------------------------------------------------------------------
-// Preventive maintenance
+// Preventive maintenance (Supervision tab)
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -790,17 +1105,11 @@ private fun PreventiveMaintenanceScreen(
     ) {
         item {
             SectionHeader("جدول الصيانة الدورية")
-            Text(
-                "المهام مرتبة حسب أقرب تاريخ استحقاق.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("المهام مرتبة حسب أقرب تاريخ استحقاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-
         if (pmItems.isEmpty()) {
             item { EmptyState("لا توجد مهام صيانة دورية", Icons.Filled.EventRepeat) }
         }
-
         items(pmItems, key = { it.id }) { item ->
             PreventiveMaintenanceCard(item = item, asset = assetMap[item.assetId], onDone = onDone)
         }
@@ -818,17 +1127,11 @@ private fun PreventiveMaintenanceCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(item.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    LtrText(
-                        asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${item.assetId}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    LtrText(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${item.assetId}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 StatusBadge(if (due) "مستحقة" else "مجدولة", statusTone(if (due) "overdue" else "scheduled"))
             }
@@ -876,10 +1179,7 @@ private fun InventoryScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor")
-        }
-
+        item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor") }
         item { SectionHeader("قطع الغيار") }
         if (filtered.isEmpty()) {
             item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
@@ -887,7 +1187,6 @@ private fun InventoryScreen(
         items(filtered, key = { it.id }) { part ->
             SparePartCard(part = part, canReceive = canReceive, onIssue = onIssue, onReceive = onReceive)
         }
-
         item {
             Spacer(modifier = Modifier.height(8.dp))
             SectionHeader("آخر حركات المخزون")
@@ -895,9 +1194,7 @@ private fun InventoryScreen(
         if (transactions.isEmpty()) {
             item { EmptyState("لا توجد حركات مخزون") }
         }
-        items(transactions, key = { it.id }) { transaction ->
-            TransactionCard(transaction = transaction)
-        }
+        items(transactions, key = { it.id }) { transaction -> TransactionCard(transaction = transaction) }
     }
 }
 
@@ -913,10 +1210,7 @@ private fun SparePartCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     LtrText(part.partNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -931,13 +1225,9 @@ private fun SparePartCard(
             InfoRow("الموقع", part.location)
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = { onIssue(part) }, modifier = Modifier.weight(1f)) {
-                    Text("صرف -1")
-                }
+                OutlinedButton(onClick = { onIssue(part) }, modifier = Modifier.weight(1f)) { Text("صرف -1") }
                 if (canReceive) {
-                    Button(onClick = { onReceive(part) }, modifier = Modifier.weight(1f)) {
-                        Text("استلام +1")
-                    }
+                    Button(onClick = { onReceive(part) }, modifier = Modifier.weight(1f)) { Text("استلام +1") }
                 }
             }
         }
@@ -969,11 +1259,7 @@ private fun TransactionCard(transaction: InventoryTransactionEntity) {
                     style = MaterialTheme.typography.titleSmall
                 )
                 LtrText("Part #${transaction.partId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    "${transaction.createdAt} • ${transaction.createdBy}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text("${transaction.createdAt} • ${transaction.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -1005,40 +1291,27 @@ private fun ReportsScreen(
     ) {
         item {
             SectionHeader("تقارير مختصرة")
-            Text(
-                "هذه الشاشة جاهزة للتوسعة لاحقًا لتصدير PDF أو Excel.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("جاهزة للتوسعة لاحقًا لتصدير PDF أو Excel.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item {
-            ReportCard(
-                title = "ملخص الصيانة",
-                lines = listOf(
-                    "إجمالي الأصول: ${stats.assets}",
-                    "أوامر العمل المفتوحة: ${stats.openWorkOrders}",
-                    "أوامر العمل المغلقة: $closed",
-                    "تكلفة تقديرية مفتوحة: ${"%.2f".format(openCost)}"
-                )
-            )
+            ReportCard("ملخص الصيانة", listOf(
+                "إجمالي الأصول: ${stats.assets}",
+                "أوامر العمل المفتوحة: ${stats.openWorkOrders}",
+                "أوامر العمل المغلقة: $closed",
+                "تكلفة تقديرية مفتوحة: ${"%.2f".format(openCost)}"
+            ))
         }
         item {
-            ReportCard(
-                title = "الصيانة الدورية",
-                lines = listOf(
-                    "مهام PM المستحقة: ${duePm.size}",
-                    "أقرب مهمة: ${duePm.firstOrNull()?.title ?: "لا يوجد"}"
-                )
-            )
+            ReportCard("الصيانة الدورية", listOf(
+                "مهام PM المستحقة: ${duePm.size}",
+                "أقرب مهمة: ${duePm.firstOrNull()?.title ?: "لا يوجد"}"
+            ))
         }
         item {
-            ReportCard(
-                title = "المخزون",
-                lines = listOf(
-                    "قطع تحت الحد الأدنى: ${lowStock.size}",
-                    "أول قطعة ناقصة: ${lowStock.firstOrNull()?.partNumber ?: "لا يوجد"}"
-                )
-            )
+            ReportCard("المخزون", listOf(
+                "قطع تحت الحد الأدنى: ${lowStock.size}",
+                "أول قطعة ناقصة: ${lowStock.firstOrNull()?.partNumber ?: "لا يوجد"}"
+            ))
         }
     }
 }
@@ -1049,10 +1322,7 @@ private fun ReportCard(title: String, lines: List<String>) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(title)
             lines.forEach { line -> Text("• $line", style = MaterialTheme.typography.bodyMedium) }
         }
@@ -1060,14 +1330,49 @@ private fun ReportCard(title: String, lines: List<String>) {
 }
 
 // ---------------------------------------------------------------------------
-// Admin + audit log (governance)
+// Audit (governance) + Admin
 // ---------------------------------------------------------------------------
+
+@Composable
+private fun AuditScreen(innerPadding: PaddingValues, auditLog: List<AuditLogEntity>) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionHeader("سجل التدقيق")
+            Text("تتبّع كامل لكل إجراء: من فعل ماذا ومتى.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (auditLog.isEmpty()) {
+            item { EmptyState("لا توجد سجلات بعد", Icons.Filled.History) }
+        }
+        items(auditLog, key = { it.id }) { log -> AuditLogCard(log) }
+    }
+}
+
+@Composable
+private fun AuditLogCard(log: AuditLogEntity) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(log.details, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                StatusBadge(log.action, statusTone(log.action))
+            }
+            Text("${log.performedBy} • ${log.createdAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
 
 @Composable
 private fun AdminScreen(
     innerPadding: PaddingValues,
     users: List<UserEntity>,
-    auditLog: List<AuditLogEntity>,
     currentUser: UserEntity?,
     onAddTechnician: () -> Unit,
     onResetSampleData: () -> Unit
@@ -1078,9 +1383,7 @@ private fun AdminScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
             contentAlignment = Alignment.Center
-        ) {
-            EmptyState("هذه الصفحة للمدير فقط", Icons.Filled.AdminPanelSettings)
-        }
+        ) { EmptyState("هذه الصفحة للمدير فقط", Icons.Filled.AdminPanelSettings) }
         return
     }
 
@@ -1091,14 +1394,6 @@ private fun AdminScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            SectionHeader("إعدادات المدير")
-            Text(
-                "صفحة الإدارة تظهر فقط للمستخدمين بدور Admin.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(onClick = onAddTechnician, modifier = Modifier.weight(1f)) {
@@ -1113,26 +1408,8 @@ private fun AdminScreen(
                 }
             }
         }
-
         item { SectionHeader("المستخدمون (${users.size})") }
         items(users, key = { it.id }) { user -> UserCard(user) }
-
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(
-                    Icons.Filled.NotificationsActive,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                SectionHeader("سجل التدقيق (الحوكمة)")
-            }
-        }
-        if (auditLog.isEmpty()) {
-            item { EmptyState("لا توجد سجلات بعد") }
-        }
-        items(auditLog, key = { it.id }) { log -> AuditLogCard(log) }
     }
 }
 
@@ -1157,26 +1434,6 @@ private fun UserCard(user: UserEntity) {
     }
 }
 
-@Composable
-private fun AuditLogCard(log: AuditLogEntity) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(log.details, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                StatusBadge(log.action, statusTone(log.action))
-            }
-            Text(
-                "${log.performedBy} • ${log.createdAt}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Shared
 // ---------------------------------------------------------------------------
@@ -1189,7 +1446,7 @@ private fun SearchField(query: String, onChange: (String) -> Unit, placeholder: 
         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
         placeholder = { Text(placeholder) },
         singleLine = true,
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth()
     )
 }
