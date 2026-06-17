@@ -2517,6 +2517,21 @@ private fun PreventiveMaintenanceScreen(
                 SectionHeader("جدول الصيانة الدورية")
                 Text("المهام مرتبة حسب أقرب تاريخ استحقاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (pmItems.isNotEmpty()) {
+                item {
+                    val due = pmItems.count { DateStrings.isDueOrOverdue(it.nextDueAt) }
+                    val seg = listOf(
+                        ChartSegment("مستحقة", due, AccentOrange),
+                        ChartSegment("مجدولة", pmItems.size - due, AccentGreen)
+                    )
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = pmItems.size.toString(), centerLabel = "مهمة")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
             if (canManage) {
                 item { AddButton("مهمة صيانة جديدة") { editing = null; showForm = true } }
             }
@@ -2603,6 +2618,14 @@ private fun PreventiveMaintenanceCard(
                 Icon(
                     if (showChecklist) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                     contentDescription = null
+                )
+            }
+            if (checklist.isNotEmpty()) {
+                BarMeter(
+                    label = "إنجاز الفحص",
+                    fraction = doneCount.toFloat() / checklist.size,
+                    color = if (doneCount == checklist.size) AccentGreen else AccentTeal,
+                    valueLabel = "$doneCount/${checklist.size}"
                 )
             }
             if (showChecklist) {
