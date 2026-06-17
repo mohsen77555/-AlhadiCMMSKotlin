@@ -20,5 +20,6 @@ data class AssetEntity(
     val status: String,
     val criticality: String,
     val installedAt: String,
-    val lastInspectionAt: String
+    val lastInspectionAt: String,
+    val locationId: Long? = null
 )

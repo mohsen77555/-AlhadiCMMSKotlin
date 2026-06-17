@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -98,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
@@ -138,7 +140,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters }
+private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters, Locations }
 
 private data class ScreenMeta(
     val title: String,
@@ -160,6 +162,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val auditLog by viewModel.auditLog.collectAsStateWithLifecycle()
     val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val readings by viewModel.readings.collectAsStateWithLifecycle()
+    val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -260,6 +263,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         assets = assets,
                         workOrders = workOrders,
                         pmItems = preventiveMaintenance,
+                        locations = locations,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveAsset,
@@ -306,6 +310,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onDeletePoint = viewModel::deleteMeasuringPoint,
                             onAddReading = viewModel::addReading
                         )
+                        MoreRoute.Locations -> LocationsScreen(
+                            innerPadding = innerPadding,
+                            locations = locations,
+                            assets = assets,
+                            canManage = canManage,
+                            onSave = viewModel::saveFunctionalLocation,
+                            onDelete = viewModel::deleteFunctionalLocation
+                        )
                         MoreRoute.Admin -> AdminScreen(
                             innerPadding = innerPadding,
                             users = users,
@@ -347,6 +359,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
         MoreRoute.PreventiveMaintenance -> ScreenMeta("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal)
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
+        MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
     }
 }
 
@@ -789,8 +802,8 @@ private fun MoreGrid(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
                 ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
-                Spacer(modifier = Modifier.weight(1f))
             }
         }
         if (isAdmin) {
@@ -866,6 +879,7 @@ private fun AssetsScreen(
     assets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
+    locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (AssetEntity) -> Unit,
@@ -889,6 +903,7 @@ private fun AssetsScreen(
             asset = detailAsset,
             workOrders = workOrders.filter { it.assetId == detailAsset.id },
             pmItems = pmItems.filter { it.assetId == detailAsset.id },
+            locations = locations,
             canManage = canManage,
             defaultAssignee = defaultAssignee,
             onBack = { detailId = null },
@@ -942,7 +957,7 @@ private fun AssetsScreen(
     }
 
     if (showForm) {
-        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations)
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
@@ -992,6 +1007,7 @@ private fun AssetDetailScreen(
     asset: AssetEntity,
     workOrders: List<WorkOrderEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
+    locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onBack: () -> Unit,
@@ -1000,6 +1016,7 @@ private fun AssetDetailScreen(
     onSaveWorkOrder: (WorkOrderEntity) -> Unit,
     onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit
 ) {
+    val locationLabel = asset.locationId?.let { id -> locations.firstOrNull { it.id == id }?.let { "${it.code} • ${it.name}" } } ?: "غير محدد"
     var showEdit by remember { mutableStateOf(false) }
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
@@ -1036,6 +1053,7 @@ private fun AssetDetailScreen(
                     SectionHeader("المعلومات")
                     InfoRow("المجموعة", asset.groupName)
                     InfoRow("الموقع", asset.location)
+                    InfoRow("الموقع الفني", locationLabel)
                     InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
                     InfoRow("الأهمية", asset.criticality)
                     InfoRow("تاريخ التركيب", asset.installedAt)
@@ -1112,7 +1130,7 @@ private fun AssetDetailScreen(
     }
 
     if (showEdit) {
-        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false })
+        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations)
     }
     if (showStatus) {
         StatusPickerDialog(
@@ -1860,6 +1878,221 @@ private fun MeterCard(
                 Text("تسجيل قراءة")
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Functional locations
+// ---------------------------------------------------------------------------
+
+/** Depth-first ordering of the location tree, returning each node with its depth. */
+private fun orderedLocations(all: List<FunctionalLocationEntity>): List<Pair<FunctionalLocationEntity, Int>> {
+    val byParent = all.groupBy { it.parentId }
+    val result = mutableListOf<Pair<FunctionalLocationEntity, Int>>()
+    val placed = mutableSetOf<Long>()
+    fun visit(parentId: Long?, depth: Int) {
+        byParent[parentId]?.sortedBy { it.code }?.forEach { loc ->
+            if (placed.add(loc.id)) {
+                result += loc to depth
+                visit(loc.id, depth + 1)
+            }
+        }
+    }
+    visit(null, 0)
+    all.filter { it.id !in placed }.sortedBy { it.code }.forEach { result += it to 0 }
+    return result
+}
+
+@Composable
+private fun LocationsScreen(
+    innerPadding: PaddingValues,
+    locations: List<FunctionalLocationEntity>,
+    assets: List<AssetEntity>,
+    canManage: Boolean,
+    onSave: (FunctionalLocationEntity) -> Unit,
+    onDelete: (FunctionalLocationEntity) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<FunctionalLocationEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<FunctionalLocationEntity?>(null) }
+    var detailId by remember { mutableStateOf<Long?>(null) }
+
+    val detail = detailId?.let { id -> locations.firstOrNull { it.id == id } }
+    if (detail != null) {
+        BackHandler { detailId = null }
+        LocationDetailScreen(
+            innerPadding = innerPadding,
+            location = detail,
+            children = locations.filter { it.parentId == detail.id },
+            assets = assets.filter { it.locationId == detail.id },
+            onBack = { detailId = null },
+            onOpenChild = { detailId = it }
+        )
+        return
+    }
+
+    val ordered = remember(locations) { orderedLocations(locations) }
+    val assetCounts = remember(assets) { assets.groupBy { it.locationId } }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                SectionHeader("شجرة المواقع الفنية")
+                Text("نظّم الأصول حسب المصنع والخط والمنطقة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("موقع فني جديد") { editing = null; showForm = true } }
+            }
+            if (ordered.isEmpty()) {
+                item { EmptyState("لا توجد مواقع فنية", Icons.Filled.AccountTree) }
+            }
+            items(ordered, key = { it.first.id }) { (loc, depth) ->
+                LocationCard(
+                    location = loc,
+                    depth = depth,
+                    assetCount = assetCounts[loc.id]?.size ?: 0,
+                    childCount = locations.count { it.parentId == loc.id },
+                    canManage = canManage,
+                    onOpen = { detailId = loc.id },
+                    onEdit = { editing = loc; showForm = true },
+                    onDelete = { deleteTarget = loc }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        LocationFormSheet(initial = editing, allLocations = locations, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف الموقع الفني",
+            text = "هل تريد حذف ${target.code} - ${target.name}؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun LocationCard(
+    location: FunctionalLocationEntity,
+    depth: Int,
+    assetCount: Int,
+    childCount: Int,
+    canManage: Boolean,
+    onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 16).dp)
+            .clickable(onClick = onOpen),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBubble(Icons.Filled.AccountTree, AccentGreen, AccentGreen.copy(alpha = 0.14f), 38)
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(location.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    LtrText(location.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusBadge("أصول: $assetCount", statusTone("info"))
+                StatusBadge("فرعية: $childCount", statusTone("neutral"))
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+@Composable
+private fun LocationDetailScreen(
+    innerPadding: PaddingValues,
+    location: FunctionalLocationEntity,
+    children: List<FunctionalLocationEntity>,
+    assets: List<AssetEntity>,
+    onBack: () -> Unit,
+    onOpenChild: (Long) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع") }
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(location.code, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    LtrText(location.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(location.status, statusTone(location.status))
+            }
+        }
+        if (location.description.isNotBlank()) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Text(location.description, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+
+        item { SectionHeader("المواقع الفرعية (${children.size})") }
+        if (children.isEmpty()) {
+            item { EmptyState("لا توجد مواقع فرعية") }
+        }
+        items(children, key = { "c-${it.id}" }) { child ->
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenChild(child.id) },
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.AccountTree, AccentGreen, AccentGreen.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(child.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        LtrText(child.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        item { SectionHeader("الأصول في هذا الموقع (${assets.size})") }
+        if (assets.isEmpty()) {
+            item { EmptyState("لا توجد أصول مرتبطة بهذا الموقع") }
+        }
+        items(assets, key = { "a-${it.id}" }) { asset ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(asset.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        LtrText(asset.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    StatusBadge(asset.status, statusTone(asset.status))
+                }
+            }
         }
     }
 }

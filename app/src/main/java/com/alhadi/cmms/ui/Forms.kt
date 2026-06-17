@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
@@ -158,6 +159,40 @@ private fun AssetDropdown(assets: List<AssetEntity>, selectedId: Long, onSelect:
     }
 }
 
+/** Optional functional-location picker (with a "none" option). */
+@Composable
+private fun LocationDropdown(
+    label: String,
+    locations: List<FunctionalLocationEntity>,
+    selectedId: Long?,
+    excludeId: Long? = null,
+    onSelect: (Long?) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    val selected = locations.firstOrNull { it.id == selectedId }
+    val options = locations.filter { it.id != excludeId }
+    Column {
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Box {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    selected?.let { "${it.code} • ${it.name}" } ?: "بدون",
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
+                options.forEach { loc ->
+                    DropdownMenuItem(text = { Text("${loc.code} • ${loc.name}") }, onClick = { onSelect(loc.id); open = false })
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
@@ -195,7 +230,12 @@ private fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
 // ---------------------------------------------------------------------------
 
 @Composable
-internal fun AssetFormSheet(initial: AssetEntity?, onDismiss: () -> Unit, onSave: (AssetEntity) -> Unit) {
+internal fun AssetFormSheet(
+    initial: AssetEntity?,
+    onDismiss: () -> Unit,
+    onSave: (AssetEntity) -> Unit,
+    locations: List<FunctionalLocationEntity> = emptyList()
+) {
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var group by remember { mutableStateOf(initial?.groupName ?: "") }
@@ -204,15 +244,19 @@ internal fun AssetFormSheet(initial: AssetEntity?, onDismiss: () -> Unit, onSave
     var model by remember { mutableStateOf(initial?.model ?: "") }
     var status by remember { mutableStateOf(initial?.status ?: "Running") }
     var criticality by remember { mutableStateOf(initial?.criticality ?: "Medium") }
+    var locationId by remember { mutableStateOf(initial?.locationId) }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         LabeledField("الكود (Code)", code, { code = it })
         LabeledField("الاسم (Name)", name, { name = it })
         LabeledField("المجموعة (Group)", group, { group = it })
-        LabeledField("الموقع (Location)", location, { location = it })
+        LabeledField("الموقع النصّي (Location)", location, { location = it })
+        if (locations.isNotEmpty()) {
+            LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+        }
         LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
         LabeledField("الموديل (Model)", model, { model = it })
-        OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped"), status) { status = it }
+        OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
         SaveButton(code.isNotBlank() && name.isNotBlank()) {
             val today = DateStrings.today()
@@ -228,7 +272,42 @@ internal fun AssetFormSheet(initial: AssetEntity?, onDismiss: () -> Unit, onSave
                     status = status,
                     criticality = criticality,
                     installedAt = initial?.installedAt ?: today,
-                    lastInspectionAt = initial?.lastInspectionAt ?: today
+                    lastInspectionAt = initial?.lastInspectionAt ?: today,
+                    locationId = locationId
+                )
+            )
+        }
+    }
+}
+
+@Composable
+internal fun LocationFormSheet(
+    initial: FunctionalLocationEntity?,
+    allLocations: List<FunctionalLocationEntity>,
+    onDismiss: () -> Unit,
+    onSave: (FunctionalLocationEntity) -> Unit
+) {
+    var code by remember { mutableStateOf(initial?.code ?: "") }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var parentId by remember { mutableStateOf(initial?.parentId) }
+    var status by remember { mutableStateOf(initial?.status ?: "Active") }
+
+    FormSheet(if (initial == null) "إضافة موقع فني" else "تعديل الموقع الفني", onDismiss) {
+        LabeledField("الكود (Code)", code, { code = it })
+        LabeledField("الاسم (Name)", name, { name = it })
+        LabeledField("الوصف", description, { description = it }, singleLine = false)
+        LocationDropdown("الموقع الأعلى (Parent)", allLocations, parentId, excludeId = initial?.id) { parentId = it }
+        OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+        SaveButton(code.isNotBlank() && name.isNotBlank()) {
+            onSave(
+                FunctionalLocationEntity(
+                    id = initial?.id ?: 0,
+                    code = code.trim(),
+                    name = name.trim(),
+                    parentId = parentId,
+                    description = description,
+                    status = status
                 )
             )
         }

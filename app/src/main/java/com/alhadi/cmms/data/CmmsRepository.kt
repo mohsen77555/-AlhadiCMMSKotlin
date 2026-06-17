@@ -3,6 +3,7 @@ package com.alhadi.cmms.data
 import androidx.room.withTransaction
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
@@ -22,6 +23,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val userDao = database.userDao()
     private val auditLogDao = database.auditLogDao()
     private val measurementDao = database.measurementDao()
+    private val locationDao = database.functionalLocationDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -33,6 +35,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val auditLog: Flow<List<AuditLogEntity>> = auditLogDao.observeRecent()
     val measuringPoints: Flow<List<MeasuringPointEntity>> = measurementDao.observePoints()
     val readings: Flow<List<MeasurementReadingEntity>> = measurementDao.observeReadings()
+    val functionalLocations: Flow<List<FunctionalLocationEntity>> = locationDao.observeLocations()
 
     fun observeAssetCount(): Flow<Int> = assetDao.observeAssetCount()
     fun observeOpenWorkOrderCount(): Flow<Int> = workOrderDao.observeOpenCount()
@@ -72,6 +75,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                locationDao.deleteAll()
                 measurementDao.deleteAllReadings()
                 measurementDao.deleteAllPoints()
                 transactionDao.deleteAll()
@@ -145,6 +149,15 @@ class CmmsRepository(private val database: AppDatabase) {
                 MeasuringPointEntity(5, 1, "Belt Tension", "N", false, 500.0, 410.0, today)
             )
 
+            val locations = listOf(
+                FunctionalLocationEntity(1, "FAC-01", "Flour Mill Factory", null, "المصنع الرئيسي"),
+                FunctionalLocationEntity(2, "SILO", "Silo Area", 1, "منطقة الصوامع"),
+                FunctionalLocationEntity(3, "MILL", "Milling Floor", 1, "صالة الطحن"),
+                FunctionalLocationEntity(4, "PACK", "Packing Hall", 1, "صالة التعبئة"),
+                FunctionalLocationEntity(5, "UTIL", "Utility Room", 1, "غرفة المرافق"),
+                FunctionalLocationEntity(6, "MILL-RM", "Rollermill Station", 3, "محطة مطاحن الأسطوانات")
+            )
+
             assetDao.insertAssets(assets)
             userDao.insertAll(users)
             workOrderDao.insertWorkOrders(workOrders)
@@ -152,6 +165,7 @@ class CmmsRepository(private val database: AppDatabase) {
             sparePartDao.insertAll(spareParts)
             transactionDao.insertAll(transactions)
             measurementDao.insertPoints(measuringPoints)
+            locationDao.insertAll(locations)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -403,5 +417,20 @@ class CmmsRepository(private val database: AppDatabase) {
         }
         val limit = point.upperLimit
         return if (limit != null && value > limit) "تنبيه: تجاوزت القراءة الحد الأعلى ($limit ${point.unit})" else null
+    }
+
+    // ---------------------------------------------------------------------
+    // Functional locations
+    // ---------------------------------------------------------------------
+
+    suspend fun saveFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
+        val isNew = location.id == 0L
+        locationDao.insert(location)
+        recordAudit(if (isNew) "Create" else "Update", "Location", "${if (isNew) "إضافة" else "تعديل"} موقع فني: ${location.code}", actor)
+    }
+
+    suspend fun deleteFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
+        locationDao.deleteById(location.id)
+        recordAudit("Delete", "Location", "حذف موقع فني: ${location.code}", actor)
     }
 }

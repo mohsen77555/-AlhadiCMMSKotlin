@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.alhadi.cmms.data.CmmsRepository
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
@@ -92,6 +93,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val readings: StateFlow<List<MeasurementReadingEntity>> = repository.readings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val functionalLocations: StateFlow<List<FunctionalLocationEntity>> = repository.functionalLocations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -208,6 +212,10 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
                 .onFailure { _message.value = "حدث خطأ: ${it.message ?: "غير معروف"}" }
         }
     }
+
+    // ----- Functional locations -----
+    fun saveFunctionalLocation(location: FunctionalLocationEntity) = launchAction("تم حفظ الموقع الفني") { repository.saveFunctionalLocation(location, actor()) }
+    fun deleteFunctionalLocation(location: FunctionalLocationEntity) = launchAction("تم حذف الموقع الفني") { repository.deleteFunctionalLocation(location, actor()) }
 
     fun clearMessage() {
         _message.value = null
