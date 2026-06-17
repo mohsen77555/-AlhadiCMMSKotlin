@@ -13,6 +13,7 @@ import com.alhadi.cmms.data.dao.AuditLogDao
 import com.alhadi.cmms.data.dao.CapaDao
 import com.alhadi.cmms.data.dao.FunctionalLocationDao
 import com.alhadi.cmms.data.dao.InventoryTransactionDao
+import com.alhadi.cmms.data.dao.MaintenanceNotificationDao
 import com.alhadi.cmms.data.dao.MeasurementDao
 import com.alhadi.cmms.data.dao.PmChecklistDao
 import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
@@ -28,6 +29,7 @@ import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
@@ -53,9 +55,10 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
         AssetCharacteristicEntity::class,
         AssetBomItemEntity::class,
         AssetMovementEntity::class,
-        PmChecklistItemEntity::class
+        PmChecklistItemEntity::class,
+        MaintenanceNotificationEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -74,6 +77,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun assetBomDao(): AssetBomDao
     abstract fun assetMovementDao(): AssetMovementDao
     abstract fun pmChecklistDao(): PmChecklistDao
+    abstract fun maintenanceNotificationDao(): MaintenanceNotificationDao
 
     companion object {
         @Volatile

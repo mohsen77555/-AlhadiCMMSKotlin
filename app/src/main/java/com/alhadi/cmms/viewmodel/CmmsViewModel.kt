@@ -13,6 +13,7 @@ import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
@@ -123,6 +124,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val pmChecklist: StateFlow<List<PmChecklistItemEntity>> = repository.pmChecklist
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val notifications: StateFlow<List<MaintenanceNotificationEntity>> = repository.notifications
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -265,6 +269,13 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun saveChecklistItem(item: PmChecklistItemEntity) = launchAction("تم حفظ بند الفحص") { repository.saveChecklistItem(item, actor()) }
     fun setChecklistResult(item: PmChecklistItemEntity, result: String) = launchAction("تم تحديث الفحص") { repository.setChecklistResult(item, result, actor()) }
     fun deleteChecklistItem(item: PmChecklistItemEntity) = launchAction("تم حذف بند الفحص") { repository.deleteChecklistItem(item, actor()) }
+
+    fun saveNotification(notification: MaintenanceNotificationEntity) = launchAction("تم حفظ البلاغ") { repository.saveNotification(notification, actor()) }
+    fun setNotificationStatus(notification: MaintenanceNotificationEntity, status: String) = launchAction("تم تحديث حالة البلاغ") { repository.setNotificationStatus(notification, status, actor()) }
+    fun createOrderFromNotification(notification: MaintenanceNotificationEntity) = launchAction("تم إنشاء أمر عمل من البلاغ") {
+        repository.createOrderFromNotification(notification, assignedTo = actor(), dueAt = DateStrings.daysFromToday(3), actor = actor())
+    }
+    fun deleteNotification(notification: MaintenanceNotificationEntity) = launchAction("تم حذف البلاغ") { repository.deleteNotification(notification, actor()) }
 
     // ----- CAPA -----
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }

@@ -121,6 +121,7 @@ import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
@@ -161,7 +162,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters, Locations, Capa, Failures }
+private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters, Locations, Capa, Failures }
 
 private data class ScreenMeta(
     val title: String,
@@ -190,6 +191,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val assetBom by viewModel.assetBom.collectAsStateWithLifecycle()
     val assetMovements by viewModel.assetMovements.collectAsStateWithLifecycle()
     val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
+    val notifications by viewModel.notifications.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -326,6 +328,17 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onOpen = { moreRoute = it },
                             onLogout = viewModel::logout
                         )
+                        MoreRoute.Notifications -> NotificationsScreen(
+                            innerPadding = innerPadding,
+                            notifications = notifications,
+                            assets = assets,
+                            assetMap = assetMap,
+                            canManage = canManage,
+                            onSave = viewModel::saveNotification,
+                            onSetStatus = viewModel::setNotificationStatus,
+                            onCreateOrder = viewModel::createOrderFromNotification,
+                            onDelete = viewModel::deleteNotification
+                        )
                         MoreRoute.Inventory -> InventoryScreen(
                             innerPadding = innerPadding,
                             parts = spareParts,
@@ -420,6 +433,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
     BottomTab.Assets -> ScreenMeta("الأصول", "سجل الأصول والمعدات", Icons.Filled.PrecisionManufacturing, AccentGreen)
     BottomTab.More -> when (route) {
         null -> ScreenMeta("المزيد", "كل الوحدات والإعدادات", Icons.Filled.GridView, AccentBrown)
+        MoreRoute.Notifications -> ScreenMeta("البلاغات", "بلاغات الصيانة وتحويلها لأوامر", Icons.Filled.NotificationsActive, AccentRed)
         MoreRoute.Inventory -> ScreenMeta("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple)
         MoreRoute.Reports -> ScreenMeta("التقارير", "مؤشرات وتصدير وتحليلات", Icons.Filled.Analytics, AccentBlue)
         MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
@@ -901,26 +915,32 @@ private fun MoreGrid(
     ) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Notifications) }
                 ModuleCard("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Inventory) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.Reports) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal, Modifier.weight(1f)) { onOpen(MoreRoute.PreventiveMaintenance) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Meters) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
-                ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
                 ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
         if (isAdmin) {
@@ -1645,6 +1665,179 @@ private fun AssetDetailScreen(
             onDismiss = { showWoForm = false },
             onSave = { onSaveWorkOrder(it); showWoForm = false }
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance notifications (بلاغات)
+// ---------------------------------------------------------------------------
+
+private fun notificationStatusLabel(status: String): String = when (status) {
+    "New" -> "جديد"
+    "Screened" -> "تمت المراجعة"
+    "Approved" -> "معتمد"
+    "Rejected" -> "مرفوض"
+    "OrderCreated" -> "تحوّل لأمر"
+    "Closed" -> "مغلق"
+    else -> status
+}
+
+private fun notificationStatusTone(status: String) = when (status) {
+    "Approved", "OrderCreated" -> statusTone("running")
+    "Rejected", "Closed" -> statusTone("stopped")
+    "Screened" -> statusTone("scheduled")
+    else -> statusTone("overdue")
+}
+
+@Composable
+private fun NotificationsScreen(
+    innerPadding: PaddingValues,
+    notifications: List<MaintenanceNotificationEntity>,
+    assets: List<AssetEntity>,
+    assetMap: Map<Long, AssetEntity>,
+    canManage: Boolean,
+    onSave: (MaintenanceNotificationEntity) -> Unit,
+    onSetStatus: (MaintenanceNotificationEntity, String) -> Unit,
+    onCreateOrder: (MaintenanceNotificationEntity) -> Unit,
+    onDelete: (MaintenanceNotificationEntity) -> Unit
+) {
+    val filters = listOf("All", "New", "Screened", "Approved", "OrderCreated", "Closed")
+    var selectedFilter by rememberSaveable { mutableStateOf("All") }
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<MaintenanceNotificationEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<MaintenanceNotificationEntity?>(null) }
+    val filtered = remember(selectedFilter, notifications) {
+        if (selectedFilter == "All") notifications else notifications.filter { it.status == selectedFilter }
+    }
+    val openCount = notifications.count { it.status == "New" || it.status == "Screened" }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SectionHeader("بلاغات الصيانة")
+                Text("نقطة بداية كل عمل صيانة — تُراجع وتُعتمد ثم تتحول إلى أوامر عمل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MetricColumn("الإجمالي", notifications.size.toString(), AccentBlue)
+                        MetricColumn("مفتوحة", openCount.toString(), if (openCount > 0) AccentOrange else AccentGreen)
+                        MetricColumn("معتمدة", notifications.count { it.status == "Approved" }.toString(), AccentTeal)
+                    }
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filters.forEach { f ->
+                        FilterChip(selected = selectedFilter == f, onClick = { selectedFilter = f }, label = { Text(if (f == "All") "الكل" else notificationStatusLabel(f)) })
+                    }
+                }
+            }
+            item { AddButton("بلاغ جديد") { editing = null; showForm = true } }
+            if (filtered.isEmpty()) {
+                item { EmptyState("لا توجد بلاغات", Icons.Filled.NotificationsActive) }
+            }
+            items(filtered, key = { it.id }) { ntf ->
+                NotificationCard(
+                    notification = ntf,
+                    asset = ntf.assetId?.let { assetMap[it] },
+                    canManage = canManage,
+                    onSetStatus = onSetStatus,
+                    onCreateOrder = onCreateOrder,
+                    onEdit = { editing = ntf; showForm = true },
+                    onDelete = { deleteTarget = ntf }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        NotificationFormSheet(
+            initial = editing,
+            assets = assets,
+            onDismiss = { showForm = false },
+            onSave = { onSave(it); showForm = false }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف البلاغ",
+            text = "هل تريد حذف \"${target.title}\"؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun NotificationCard(
+    notification: MaintenanceNotificationEntity,
+    asset: AssetEntity?,
+    canManage: Boolean,
+    onSetStatus: (MaintenanceNotificationEntity, String) -> Unit,
+    onCreateOrder: (MaintenanceNotificationEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(notification.number, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(notification.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                }
+                StatusBadge(notificationStatusLabel(notification.status), notificationStatusTone(notification.status))
+            }
+            Text(notification.description, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusBadge(notification.type, statusTone("info"))
+                StatusBadge(notification.priority, priorityTone(notification.priority))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            if (asset != null) InfoRow("الأصل", "${asset.code} • ${asset.name}")
+            if (notification.damageCode.isNotBlank()) InfoRow("كود الضرر", notification.damageCode)
+            if (notification.causeCode.isNotBlank()) InfoRow("كود السبب", notification.causeCode)
+            InfoRow("المُبلِّغ", notification.reportedBy)
+            if (notification.requiredEnd.isNotBlank()) InfoRow("مطلوب الإنجاز قبل", notification.requiredEnd)
+            if (notification.linkedOrderId != null) {
+                StatusBadge("أمر عمل #${notification.linkedOrderId}", statusTone("running"))
+            }
+            if (canManage && notification.status != "Closed" && notification.status != "OrderCreated") {
+                when (notification.status) {
+                    "New" -> {
+                        OutlinedButton(onClick = { onSetStatus(notification, "Screened") }, modifier = Modifier.fillMaxWidth()) { Text("مراجعة البلاغ") }
+                    }
+                    "Screened" -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = { onSetStatus(notification, "Approved") }, modifier = Modifier.weight(1f)) { Text("اعتماد") }
+                            OutlinedButton(onClick = { onSetStatus(notification, "Rejected") }, modifier = Modifier.weight(1f)) { Text("رفض") }
+                        }
+                    }
+                    "Approved" -> {
+                        Button(onClick = { onCreateOrder(notification) }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Assignment, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("إنشاء أمر عمل")
+                        }
+                    }
+                    "Rejected" -> {
+                        OutlinedButton(onClick = { onSetStatus(notification, "Closed") }, modifier = Modifier.fillMaxWidth()) { Text("إغلاق البلاغ") }
+                    }
+                }
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
     }
 }
 

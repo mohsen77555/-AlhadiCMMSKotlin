@@ -45,6 +45,7 @@ import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
@@ -817,6 +818,58 @@ internal fun MovementFormSheet(
         SaveButton(!needsLocation || locId != null) {
             val name = locations.firstOrNull { it.id == locId }?.name ?: ""
             onSave(type, if (needsLocation) locId else null, if (needsLocation) name else "", notes.trim())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance notification form (بلاغ)
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun NotificationFormSheet(
+    initial: MaintenanceNotificationEntity?,
+    assets: List<AssetEntity>,
+    onDismiss: () -> Unit,
+    onSave: (MaintenanceNotificationEntity) -> Unit
+) {
+    var type by remember { mutableStateOf(initial?.type ?: "Corrective") }
+    var title by remember { mutableStateOf(initial?.title ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var assetId by remember { mutableStateOf(initial?.assetId) }
+    var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
+    var damageCode by remember { mutableStateOf(initial?.damageCode ?: "") }
+    var causeCode by remember { mutableStateOf(initial?.causeCode ?: "") }
+    var requiredEnd by remember { mutableStateOf(initial?.requiredEnd ?: "") }
+
+    FormSheet(if (initial == null) "بلاغ صيانة جديد" else "تعديل البلاغ", onDismiss) {
+        OptionDropdown("النوع", listOf("Corrective", "Breakdown", "Inspection", "Request"), type) { type = it }
+        LabeledField("العنوان", title, { title = it })
+        LabeledField("وصف المشكلة", description, { description = it }, singleLine = false)
+        AssetDropdownOptional(assets, assetId, onSelect = { assetId = it })
+        OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
+        LabeledField("كود الضرر (اختياري)", damageCode, { damageCode = it })
+        LabeledField("كود السبب (اختياري)", causeCode, { causeCode = it })
+        LabeledField("مطلوب الإنجاز قبل (YYYY-MM-DD)", requiredEnd, { requiredEnd = it })
+        SaveButton(title.isNotBlank()) {
+            onSave(
+                MaintenanceNotificationEntity(
+                    id = initial?.id ?: 0,
+                    number = initial?.number ?: "",
+                    type = type,
+                    title = title.trim(),
+                    description = description,
+                    assetId = assetId,
+                    priority = priority,
+                    damageCode = damageCode.trim(),
+                    causeCode = causeCode.trim(),
+                    reportedBy = initial?.reportedBy ?: "",
+                    reportedAt = initial?.reportedAt ?: "",
+                    requiredEnd = requiredEnd.trim(),
+                    status = initial?.status ?: "New",
+                    linkedOrderId = initial?.linkedOrderId
+                )
+            )
         }
     }
 }

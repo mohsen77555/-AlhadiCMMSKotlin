@@ -10,6 +10,7 @@ import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
@@ -36,6 +37,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val bomDao = database.assetBomDao()
     private val movementDao = database.assetMovementDao()
     private val checklistDao = database.pmChecklistDao()
+    private val notificationDao = database.maintenanceNotificationDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -54,6 +56,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val assetBom: Flow<List<AssetBomItemEntity>> = bomDao.observeBom()
     val assetMovements: Flow<List<AssetMovementEntity>> = movementDao.observeMovements()
     val pmChecklist: Flow<List<PmChecklistItemEntity>> = checklistDao.observeItems()
+    val notifications: Flow<List<MaintenanceNotificationEntity>> = notificationDao.observeNotifications()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -95,6 +98,7 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                notificationDao.deleteAll()
                 checklistDao.deleteAll()
                 movementDao.deleteAll()
                 bomDao.deleteAll()
@@ -237,6 +241,12 @@ class CmmsRepository(private val database: AppDatabase) {
                 PmChecklistItemEntity(7, 4, "فحص تسريبات الهواء", "", "", 3)
             )
 
+            val notifications = listOf(
+                MaintenanceNotificationEntity(1, "NTF-0001", "Breakdown", "اهتزاز غير طبيعي في المطحنة", "اهتزاز وضجيج عالٍ أثناء التشغيل على RM-01.", 7, "Critical", "Vibration", "Bearing wear", "Mohsen Alhadi", today, DateStrings.daysFromToday(1), "Approved", null),
+                MaintenanceNotificationEntity(2, "NTF-0002", "Corrective", "تسريب هواء من الضاغط", "انخفاض ضغط ملحوظ في خط الهواء.", 10, "High", "Leak", "Seal failure", "Maintenance Supervisor", today, DateStrings.daysFromToday(2), "New", null),
+                MaintenanceNotificationEntity(3, "NTF-0003", "Inspection", "ملاحظة أثناء جولة الفحص", "صوت خفيف من ناقل السلسلة، يُنصح بالفحص.", 2, "Medium", "Noise", "", "Electrical Technician", today, "", "Screened", null)
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             capaDao.insertAll(capaActions)
@@ -245,6 +255,7 @@ class CmmsRepository(private val database: AppDatabase) {
             bomDao.insertAll(bomItems)
             movementDao.insertAll(movements)
             checklistDao.insertAll(checklist)
+            notificationDao.insertAll(notifications)
             recordAudit("Seed", "System", "تم تجهيز البيانات التجريبية", "System")
         }
     }
@@ -669,5 +680,68 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteChecklistItem(item: PmChecklistItemEntity, actor: String = "System") {
         checklistDao.deleteById(item.id)
         recordAudit("Delete", "Checklist", "حذف بند فحص: ${item.text}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Maintenance notifications (بلاغات) — the trigger of maintenance work
+    // ---------------------------------------------------------------------
+
+    suspend fun saveNotification(notification: MaintenanceNotificationEntity, actor: String = "System") {
+        val isNew = notification.id == 0L
+        val toSave = if (isNew) {
+            val seq = notificationDao.countOnce() + 1
+            notification.copy(
+                number = "NTF-%04d".format(seq),
+                reportedBy = actor,
+                reportedAt = DateStrings.now(),
+                status = "New"
+            )
+        } else {
+            notification
+        }
+        notificationDao.insert(toSave)
+        recordAudit(if (isNew) "Create" else "Update", "Notification", "${if (isNew) "إنشاء" else "تعديل"} بلاغ: ${notification.title}", actor)
+    }
+
+    suspend fun setNotificationStatus(notification: MaintenanceNotificationEntity, status: String, actor: String = "System") {
+        notificationDao.insert(notification.copy(status = status))
+        recordAudit("Status", "Notification", "تغيير حالة البلاغ ${notification.number} إلى $status", actor)
+    }
+
+    /**
+     * Converts an approved notification into a work order, copying asset/priority/description,
+     * then links the two (notification → OrderCreated + linkedOrderId).
+     */
+    suspend fun createOrderFromNotification(
+        notification: MaintenanceNotificationEntity,
+        assignedTo: String,
+        dueAt: String,
+        actor: String = "System"
+    ) {
+        database.withTransaction {
+            val now = DateStrings.today()
+            val orderId = workOrderDao.insertWorkOrder(
+                WorkOrderEntity(
+                    assetId = notification.assetId ?: 0L,
+                    title = notification.title,
+                    description = notification.description,
+                    priority = notification.priority,
+                    status = "Open",
+                    assignedTo = assignedTo,
+                    createdAt = now,
+                    dueAt = dueAt,
+                    estimatedCost = 0.0,
+                    isFailure = notification.type == "Breakdown",
+                    approvalStatus = if (notification.priority == "Critical") "Pending" else "NotRequired"
+                )
+            )
+            notificationDao.insert(notification.copy(status = "OrderCreated", linkedOrderId = orderId))
+            recordAudit("Create", "WorkOrder", "إنشاء أمر عمل من البلاغ ${notification.number}", actor)
+        }
+    }
+
+    suspend fun deleteNotification(notification: MaintenanceNotificationEntity, actor: String = "System") {
+        notificationDao.deleteById(notification.id)
+        recordAudit("Delete", "Notification", "حذف بلاغ: ${notification.title}", actor)
     }
 }
