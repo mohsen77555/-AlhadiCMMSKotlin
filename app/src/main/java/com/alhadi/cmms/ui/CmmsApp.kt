@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
@@ -220,6 +221,11 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val isAdmin = currentUser?.isAdmin == true
     val canManage = currentUser?.canManage == true
 
+    val appContext = LocalContext.current
+    val excelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importExcel(appContext, uri)
+    }
+
     BackHandler(enabled = selectedTab == BottomTab.More && moreRoute != null) {
         moreRoute = null
     }
@@ -354,7 +360,10 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         null -> MoreGrid(
                             innerPadding = innerPadding,
                             isAdmin = isAdmin,
+                            canManage = canManage,
                             onOpen = { moreRoute = it },
+                            onImportBundled = { viewModel.importBundledKit(appContext) },
+                            onPickExcel = { excelPicker.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream", "*/*")) },
                             onLogout = viewModel::logout
                         )
                         MoreRoute.Notifications -> NotificationsScreen(
@@ -952,7 +961,10 @@ private fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String
 private fun MoreGrid(
     innerPadding: PaddingValues,
     isAdmin: Boolean,
+    canManage: Boolean,
     onOpen: (MoreRoute) -> Unit,
+    onImportBundled: () -> Unit,
+    onPickExcel: () -> Unit,
     onLogout: () -> Unit
 ) {
     LazyColumn(
@@ -962,6 +974,25 @@ private fun MoreGrid(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (canManage) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            IconBubble(Icons.Filled.UploadFile, AccentGreen, AccentGreen.copy(alpha = 0.14f), 40)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("استيراد من Excel", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("حوّل ملف صيانة الآلة إلى أصل وخطط وقطع غيار وأمر عمل تلقائياً.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = onImportBundled, modifier = Modifier.weight(1f)) { Text("استيراد قالب FVV المرفق") }
+                            OutlinedButton(onClick = onPickExcel, modifier = Modifier.weight(1f)) { Text("رفع ملف Excel") }
+                        }
+                    }
+                }
+            }
+        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Notifications) }

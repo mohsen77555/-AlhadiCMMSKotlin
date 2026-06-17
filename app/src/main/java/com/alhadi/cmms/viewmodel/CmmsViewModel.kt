@@ -1,5 +1,7 @@
 package com.alhadi.cmms.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -27,6 +29,8 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.util.DateStrings
+import com.alhadi.cmms.util.XlsxReader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -37,6 +41,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class DashboardStats(
     val assets: Int = 0,
@@ -318,6 +323,33 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun saveCapa(item: CapaEntity) = launchAction("تم حفظ الإجراء") { repository.saveCapa(item, actor()) }
     fun updateCapaStatus(item: CapaEntity, status: String) = launchAction("تم تحديث حالة الإجراء") { repository.updateCapaStatus(item, status, actor()) }
     fun deleteCapa(item: CapaEntity) = launchAction("تم حذف الإجراء") { repository.deleteCapa(item, actor()) }
+
+    /** Imports a maintenance-kit workbook the user picked (content URI). */
+    fun importExcel(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val sheets = context.contentResolver.openInputStream(uri)?.use { XlsxReader.read(it) }
+                        ?: throw IllegalStateException("تعذّر فتح الملف")
+                    repository.importMachineKit(sheets, actor())
+                }
+            }.onSuccess { _message.value = it }
+                .onFailure { _message.value = "تعذّر الاستيراد: ${it.message ?: "ملف غير صالح"}" }
+        }
+    }
+
+    /** Imports the maintenance-kit workbook bundled with the app (assets/). */
+    fun importBundledKit(context: Context, assetFile: String = "FVV_maintenance_kit.xlsx") {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val sheets = context.assets.open(assetFile).use { XlsxReader.read(it) }
+                    repository.importMachineKit(sheets, actor())
+                }
+            }.onSuccess { _message.value = it }
+                .onFailure { _message.value = "تعذّر استيراد القالب المرفق: ${it.message ?: "غير معروف"}" }
+        }
+    }
 
     fun clearMessage() {
         _message.value = null
