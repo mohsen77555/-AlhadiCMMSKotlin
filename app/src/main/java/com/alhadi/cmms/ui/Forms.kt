@@ -295,6 +295,12 @@ internal fun AssetFormSheet(
     var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
     var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
     var warrantyEnd by remember { mutableStateOf(initial?.warrantyEnd ?: "") }
+    var serialNumber by remember { mutableStateOf(initial?.serialNumber ?: "") }
+    var assetTag by remember { mutableStateOf(initial?.assetTag ?: "") }
+    var supplier by remember { mutableStateOf(initial?.supplier ?: "") }
+    var purchaseOrder by remember { mutableStateOf(initial?.purchaseOrder ?: "") }
+    var purchaseCost by remember { mutableStateOf((initial?.purchaseCost ?: 0.0).toString()) }
+    var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         LabeledField("الكود (Code)", code, { code = it })
@@ -311,6 +317,13 @@ internal fun AssetFormSheet(
         LabeledField("الموديل (Model)", model, { model = it })
         OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
+        Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
+        LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
+        LabeledField("المورّد (Supplier)", supplier, { supplier = it })
+        LabeledField("أمر الشراء (PO)", purchaseOrder, { purchaseOrder = it })
+        LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
+        LabeledField("تاريخ الاقتناء (YYYY-MM-DD)", acquiredAt, { acquiredAt = it })
         Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
         LabeledField("بداية الضمان (YYYY-MM-DD)", warrantyStart, { warrantyStart = it })
@@ -334,7 +347,13 @@ internal fun AssetFormSheet(
                     warrantyProvider = warrantyProvider.trim(),
                     warrantyStart = warrantyStart.trim(),
                     warrantyEnd = warrantyEnd.trim(),
-                    parentAssetId = parentAssetId
+                    parentAssetId = parentAssetId,
+                    serialNumber = serialNumber.trim(),
+                    assetTag = assetTag.trim(),
+                    supplier = supplier.trim(),
+                    purchaseOrder = purchaseOrder.trim(),
+                    purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
+                    acquiredAt = acquiredAt.trim()
                 )
             )
         }

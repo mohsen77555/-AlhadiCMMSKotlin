@@ -1001,7 +1001,9 @@ private fun AssetsScreen(
             asset.code.lowercase(Locale.getDefault()).contains(q) ||
                 asset.name.lowercase(Locale.getDefault()).contains(q) ||
                 asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
-                asset.location.lowercase(Locale.getDefault()).contains(q)
+                asset.location.lowercase(Locale.getDefault()).contains(q) ||
+                asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetTag.lowercase(Locale.getDefault()).contains(q)
         }
     }
     val grouped = filtered.groupBy { it.groupName }
@@ -1165,6 +1167,8 @@ private fun AssetDetailScreen(
                     InfoRow("الموقع الفني", locationLabel)
                     InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
                     InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                    if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
+                    if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
                     InfoRow("الأهمية", asset.criticality)
                     InfoRow("تاريخ التركيب", asset.installedAt)
                     InfoRow("آخر فحص", asset.lastInspectionAt)
@@ -1188,6 +1192,22 @@ private fun AssetDetailScreen(
                     InfoRow("تكلفة العمالة", money(laborTotal))
                     InfoRow("تكلفة قطع الغيار", money(partsTotal))
                     InfoRow("أوامر العمل", "${workOrders.size} (مغلقة: $closedCount)")
+                }
+            }
+        }
+
+        val hasFinancial = asset.supplier.isNotBlank() || asset.purchaseOrder.isNotBlank() ||
+            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank()
+        if (hasFinancial) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("المعلومات المالية")
+                        if (asset.supplier.isNotBlank()) InfoRow("المورّد", asset.supplier)
+                        if (asset.purchaseOrder.isNotBlank()) InfoRow("أمر الشراء", asset.purchaseOrder)
+                        if (asset.purchaseCost > 0.0) InfoRow("تكلفة الشراء", money(asset.purchaseCost))
+                        if (asset.acquiredAt.isNotBlank()) InfoRow("تاريخ الاقتناء", asset.acquiredAt)
+                    }
                 }
             }
         }

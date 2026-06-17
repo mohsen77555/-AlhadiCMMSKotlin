@@ -25,7 +25,13 @@ data class AssetEntity(
     val warrantyProvider: String = "",
     val warrantyStart: String = "",
     val warrantyEnd: String = "",
-    val parentAssetId: Long? = null
+    val parentAssetId: Long? = null,
+    val serialNumber: String = "",
+    val assetTag: String = "",
+    val supplier: String = "",
+    val purchaseOrder: String = "",
+    val purchaseCost: Double = 0.0,
+    val acquiredAt: String = ""
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

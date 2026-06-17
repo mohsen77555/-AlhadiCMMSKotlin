@@ -52,7 +52,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
         AssetBomItemEntity::class,
         AssetMovementEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
