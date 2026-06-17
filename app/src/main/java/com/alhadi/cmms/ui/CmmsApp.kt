@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
@@ -142,7 +143,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters, Locations, Capa }
+private enum class MoreRoute { Inventory, Reports, Audit, Admin, PreventiveMaintenance, Meters, Locations, Capa, Failures }
 
 private data class ScreenMeta(
     val title: String,
@@ -333,6 +334,11 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onUpdateStatus = viewModel::updateCapaStatus,
                             onDelete = viewModel::deleteCapa
                         )
+                        MoreRoute.Failures -> FailureAnalysisScreen(
+                            innerPadding = innerPadding,
+                            workOrders = workOrders,
+                            assetMap = assetMap
+                        )
                         MoreRoute.Admin -> AdminScreen(
                             innerPadding = innerPadding,
                             users = users,
@@ -376,6 +382,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
         MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
+        MoreRoute.Failures -> ScreenMeta("تحليل الأعطال", "MTTR و MTBF وتكرار الأعطال", Icons.Filled.TrendingUp, AccentRed)
     }
 }
 
@@ -824,8 +831,8 @@ private fun MoreGrid(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
-                Spacer(modifier = Modifier.weight(1f))
+                ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
+                ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
             }
         }
         if (isAdmin) {
@@ -2284,6 +2291,84 @@ private fun CapaCard(
                 }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Failure analysis (MTTR / MTBF)
+// ---------------------------------------------------------------------------
+
+private data class FailureStat(
+    val assetId: Long,
+    val failures: Int,
+    val mttrHours: Double,
+    val mtbfDays: Double?
+)
+
+@Composable
+private fun FailureAnalysisScreen(
+    innerPadding: PaddingValues,
+    workOrders: List<WorkOrderEntity>,
+    assetMap: Map<Long, AssetEntity>
+) {
+    val failures = remember(workOrders) { workOrders.filter { it.isFailure } }
+    val stats = remember(failures) {
+        failures.groupBy { it.assetId }.map { (assetId, list) ->
+            val downtimes = list.map { it.downtimeHours }.filter { it > 0.0 }
+            val mttr = if (downtimes.isEmpty()) 0.0 else downtimes.average()
+            val sorted = list.map { it.createdAt }.sorted()
+            val mtbf = if (sorted.size >= 2) {
+                val gaps = sorted.zipWithNext { a, b -> DateStrings.daysBetween(a, b).toDouble() }
+                gaps.average()
+            } else null
+            FailureStat(assetId, list.size, mttr, mtbf)
+        }.sortedByDescending { it.failures }
+    }
+    val overallMttr = remember(failures) {
+        val d = failures.map { it.downtimeHours }.filter { it > 0.0 }
+        if (d.isEmpty()) 0.0 else d.average()
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionHeader("ملخص الموثوقية")
+            Text("MTTR = متوسط زمن الإصلاح • MTBF = متوسط الزمن بين الأعطال.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiTile("إجمالي الأعطال", failures.size.toString(), AccentRed, Modifier.weight(1f))
+                KpiTile("MTTR (ساعة)", "%.1f".format(overallMttr), AccentOrange, Modifier.weight(1f))
+                KpiTile("أصول متأثرة", stats.size.toString(), AccentBlue, Modifier.weight(1f))
+            }
+        }
+
+        item { SectionHeader("حسب الأصل") }
+        if (stats.isEmpty()) {
+            item { EmptyState("لا توجد أعطال مسجّلة بعد", Icons.Filled.TrendingUp) }
+        }
+        items(stats, key = { it.assetId }) { stat ->
+            val asset = assetMap[stat.assetId]
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(asset?.code ?: "Asset #${stat.assetId}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            LtrText(asset?.name ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusBadge("أعطال: ${stat.failures}", statusTone(if (stat.failures >= 3) "stopped" else "warning"))
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    InfoRow("MTTR", "%.1f ساعة".format(stat.mttrHours))
+                    InfoRow("MTBF", stat.mtbfDays?.let { "%.0f يوم".format(it) } ?: "—")
+                }
+            }
         }
     }
 }

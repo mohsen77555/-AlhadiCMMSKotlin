@@ -20,5 +20,7 @@ data class WorkOrderEntity(
     val createdAt: String,
     val dueAt: String,
     val estimatedCost: Double,
-    val closeNotes: String = ""
+    val closeNotes: String = "",
+    val isFailure: Boolean = false,
+    val downtimeHours: Double = 0.0
 )

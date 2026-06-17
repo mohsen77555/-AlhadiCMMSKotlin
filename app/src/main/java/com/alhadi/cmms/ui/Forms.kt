@@ -414,6 +414,8 @@ internal fun WorkOrderFormSheet(
     var assignedTo by remember { mutableStateOf(initial?.assignedTo ?: defaultAssignee) }
     var cost by remember { mutableStateOf((initial?.estimatedCost ?: 0.0).toString()) }
     var dueDays by remember { mutableStateOf("3") }
+    var isFailure by remember { mutableStateOf(initial?.isFailure ?: false) }
+    var downtime by remember { mutableStateOf((initial?.downtimeHours ?: 0.0).toString()) }
 
     FormSheet(if (initial == null) "إنشاء أمر عمل" else "تعديل أمر العمل", onDismiss) {
         LabeledField("العنوان", title, { title = it })
@@ -423,6 +425,13 @@ internal fun WorkOrderFormSheet(
         OptionDropdown("الحالة", listOf("Open", "In Progress", "Closed"), status) { status = it }
         LabeledField("المسؤول", assignedTo, { assignedTo = it })
         LabeledField("التكلفة التقديرية", cost, { cost = it }, numeric = true)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("عطل (Breakdown)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = isFailure, onCheckedChange = { isFailure = it })
+        }
+        if (isFailure) {
+            LabeledField("مدة التوقف (ساعات)", downtime, { downtime = it }, numeric = true)
+        }
         if (initial == null) {
             LabeledField("الاستحقاق خلال (أيام)", dueDays, { dueDays = it }, numeric = true)
         }
@@ -441,7 +450,9 @@ internal fun WorkOrderFormSheet(
                     createdAt = initial?.createdAt ?: today,
                     dueAt = due,
                     estimatedCost = cost.toDoubleOrNull() ?: 0.0,
-                    closeNotes = initial?.closeNotes ?: ""
+                    closeNotes = initial?.closeNotes ?: "",
+                    isFailure = isFailure,
+                    downtimeHours = if (isFailure) downtime.toDoubleOrNull() ?: 0.0 else 0.0
                 )
             )
         }
