@@ -173,6 +173,7 @@ import com.alhadi.cmms.ui.theme.priorityTone
 import com.alhadi.cmms.ui.theme.statusTone
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.ImageStore
+import java.io.File
 import com.alhadi.cmms.viewmodel.CmmsViewModel
 import com.alhadi.cmms.viewmodel.DashboardStats
 import java.util.Locale
@@ -1791,15 +1792,35 @@ private fun AssetDetailScreen(
             item { EmptyState("لا توجد مستندات لهذا الأصل", Icons.Filled.Description) }
         }
         items(documents, key = { "doc-${it.id}" }) { doc ->
+            val docContext = LocalContext.current
+            val attachment = remember(doc.reference) { File(doc.reference).takeIf { it.exists() } }
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         IconBubble(Icons.Filled.Description, AccentBlue, AccentBlue.copy(alpha = 0.14f), 36)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(doc.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            LtrText(doc.reference, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            LtrText(if (attachment != null) attachment.name else doc.reference, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         StatusBadge(doc.type, statusTone("info"))
+                    }
+                    if (attachment != null && ImageStore.isImagePath(doc.reference)) {
+                        val thumb = remember(doc.reference) { ImageStore.decode(doc.reference) }
+                        if (thumb != null) {
+                            Image(
+                                bitmap = thumb,
+                                contentDescription = doc.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(8.dp))
+                            )
+                        }
+                    }
+                    if (attachment != null) {
+                        Button(onClick = { openAttachment(docContext, doc.reference) }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Description, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("فتح المرفق")
+                        }
                     }
                     Text("${doc.uploadedBy} • ${doc.uploadedAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (canManage) {
@@ -4512,6 +4533,19 @@ private fun shareText(context: Context, subject: String, body: String) {
         putExtra(Intent.EXTRA_TEXT, body)
     }
     context.startActivity(Intent.createChooser(intent, subject))
+}
+
+/** Opens a locally-stored attachment with the system viewer (image / PDF / …). */
+private fun openAttachment(context: Context, path: String) {
+    val file = File(path)
+    if (!file.exists()) return
+    val uri = ImageStore.uriFor(context, file)
+    val mime = context.contentResolver.getType(uri) ?: "*/*"
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mime)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { context.startActivity(intent) }
 }
 
 /** Builds the shareable maintenance report body from the dashboard figures. */

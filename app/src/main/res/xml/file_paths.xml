@@ -3,4 +3,7 @@
     <files-path
         name="wo_photos"
         path="wo_photos/" />
+    <files-path
+        name="asset_docs"
+        path="asset_docs/" />
 </paths>

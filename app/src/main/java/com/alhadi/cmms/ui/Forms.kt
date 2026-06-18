@@ -4,6 +4,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import com.alhadi.cmms.util.ImageStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -936,10 +949,43 @@ internal fun DocumentFormSheet(
     var title by remember { mutableStateOf(initial?.title ?: "") }
     var reference by remember { mutableStateOf(initial?.reference ?: "") }
 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var attaching by remember { mutableStateOf(false) }
+    var attachedName by remember {
+        mutableStateOf(initial?.reference?.let { if (File(it).exists()) File(it).name else "" } ?: "")
+    }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            attaching = true
+            scope.launch {
+                runCatching {
+                    val name = ImageStore.queryDisplayName(context, uri)
+                    val path = withContext(Dispatchers.IO) { ImageStore.importToFiles(context, "asset_docs", uri, name) }
+                    reference = path
+                    attachedName = name ?: File(path).name
+                }
+                attaching = false
+            }
+        }
+    }
+
     FormSheet(if (initial == null) "إضافة مستند" else "تعديل المستند", onDismiss) {
         OptionDropdown("النوع", listOf("Manual", "Drawing", "Certificate", "Image", "Report", "Other"), type) { type = it }
         LabeledField("العنوان", title, { title = it })
-        LabeledField("المرجع (رابط/مسار/ملاحظة)", reference, { reference = it }, singleLine = false)
+        Button(
+            onClick = { picker.launch(arrayOf("image/*", "application/pdf", "*/*")) },
+            enabled = !attaching,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Filled.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(if (attaching) "جارٍ الإرفاق…" else "إرفاق ملف من الجهاز")
+        }
+        if (attachedName.isNotBlank()) {
+            Text("الملف المرفق: $attachedName", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        }
+        LabeledField("أو مرجع (رابط/ملاحظة)", reference, { reference = it }, singleLine = false)
         SaveButton(title.isNotBlank()) {
             onSave(
                 AssetDocumentEntity(
