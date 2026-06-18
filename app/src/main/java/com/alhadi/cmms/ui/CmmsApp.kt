@@ -195,6 +195,25 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
 
 private enum class MoreRoute { Notifications, Inventory, Procurement, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
 
+private fun roleKey(user: UserEntity?): String = user?.role?.lowercase(Locale.getDefault()) ?: ""
+
+/** Bottom tabs each role may see. "More" is always present (it hosts logout). */
+private fun allowedTabsFor(user: UserEntity?): Set<BottomTab> = when (roleKey(user)) {
+    "admin", "supervisor" -> BottomTab.entries.toSet()
+    "technician" -> setOf(BottomTab.Home, BottomTab.WorkOrders, BottomTab.Supervision, BottomTab.Assets, BottomTab.More)
+    "storekeeper" -> setOf(BottomTab.Home, BottomTab.Assets, BottomTab.More)
+    else -> setOf(BottomTab.Home, BottomTab.More)
+}
+
+/** Whether a role may open a given "More" module. */
+private fun allowedMoreRoute(user: UserEntity?, route: MoreRoute): Boolean = when (roleKey(user)) {
+    "admin" -> true
+    "supervisor" -> route != MoreRoute.Admin
+    "technician" -> route in setOf(MoreRoute.Notifications, MoreRoute.Meters, MoreRoute.TaskLists)
+    "storekeeper" -> route in setOf(MoreRoute.Inventory, MoreRoute.Procurement, MoreRoute.Notifications)
+    else -> false
+}
+
 private data class ScreenMeta(
     val title: String,
     val subtitle: String,
@@ -241,6 +260,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
 
     val isAdmin = currentUser?.isAdmin == true
     val canManage = currentUser?.canManage == true
+    val isStorekeeper = currentUser?.role.equals("Storekeeper", ignoreCase = true)
+    // Storekeepers manage inventory & procurement even though they don't manage assets/work orders.
+    val canManageStore = canManage || isStorekeeper
+
+    val allowedTabs = allowedTabsFor(currentUser)
+    // Never show a tab / module the role isn't allowed to see (also blocks stray navigation).
+    val activeTab = if (selectedTab in allowedTabs) selectedTab else BottomTab.Home
+    val activeRoute = moreRoute?.takeIf { allowedMoreRoute(currentUser, it) }
 
     val appContext = LocalContext.current
     val excelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -280,7 +307,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
         }
     }
 
-    val meta = screenMeta(selectedTab, moreRoute)
+    val meta = screenMeta(activeTab, activeRoute)
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
@@ -291,7 +318,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                     user = currentUser,
                     openWorkOrders = stats.openWorkOrders,
                     assetsCount = stats.assets,
-                    showBack = selectedTab == BottomTab.More && moreRoute != null,
+                    showBack = activeTab == BottomTab.More && activeRoute != null,
                     onBack = { moreRoute = null },
                     onLogout = viewModel::logout,
                     onSchedule = { selectedTab = BottomTab.Supervision },
@@ -301,8 +328,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
             },
             bottomBar = {
                 AppBottomBar(
-                    selected = selectedTab,
-                    isAdmin = isAdmin,
+                    selected = activeTab,
+                    tabs = allowedTabs,
                     onSelect = {
                         selectedTab = it
                         if (it != BottomTab.More) moreRoute = null
@@ -317,7 +344,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "screen"
             ) {
-                when (selectedTab) {
+                when (activeTab) {
                     BottomTab.Home -> DashboardScreen(
                         innerPadding = innerPadding,
                         stats = stats,
@@ -414,9 +441,10 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         }
                     )
 
-                    BottomTab.More -> when (moreRoute) {
+                    BottomTab.More -> when (activeRoute) {
                         null -> MoreGrid(
                             innerPadding = innerPadding,
+                            user = currentUser,
                             isAdmin = isAdmin,
                             canManage = canManage,
                             onOpen = { moreRoute = it },
@@ -439,8 +467,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             innerPadding = innerPadding,
                             parts = spareParts,
                             transactions = transactions,
-                            canReceive = canManage,
-                            canManage = canManage,
+                            canReceive = canManageStore,
+                            canManage = canManageStore,
                             onIssue = viewModel::issuePart,
                             onReceive = viewModel::receivePart,
                             onReorder = viewModel::createReorderForPart,
@@ -461,7 +489,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             orders = purchaseOrders,
                             parts = spareParts,
                             workOrders = workOrders,
-                            canManage = canManage,
+                            canManage = canManageStore,
                             onSave = viewModel::savePurchaseOrder,
                             onSetStatus = viewModel::setPurchaseOrderStatus,
                             onDelete = viewModel::deletePurchaseOrder
@@ -775,7 +803,7 @@ private fun QuickPill(label: String, icon: ImageVector, onClick: () -> Unit) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AppBottomBar(selected: BottomTab, isAdmin: Boolean, onSelect: (BottomTab) -> Unit) {
+private fun AppBottomBar(selected: BottomTab, tabs: Set<BottomTab>, onSelect: (BottomTab) -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
         Row(
             modifier = Modifier
@@ -784,7 +812,7 @@ private fun AppBottomBar(selected: BottomTab, isAdmin: Boolean, onSelect: (Botto
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BottomTab.entries.forEach { tab ->
+            BottomTab.entries.filter { it in tabs }.forEach { tab ->
                 val isSel = tab == selected
                 Column(
                     modifier = Modifier
@@ -1070,9 +1098,34 @@ private fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String
 // "More" grid
 // ---------------------------------------------------------------------------
 
+private data class MoreModule(
+    val route: MoreRoute,
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val color: Color
+)
+
+private val ALL_MORE_MODULES = listOf(
+    MoreModule(MoreRoute.Notifications, "البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed),
+    MoreModule(MoreRoute.Inventory, "المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple),
+    MoreModule(MoreRoute.Procurement, "المشتريات", "طلبات الشراء والاستلام", Icons.Filled.ShoppingCart, AccentGreen),
+    MoreModule(MoreRoute.Reports, "التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue),
+    MoreModule(MoreRoute.PreventiveMaintenance, "الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal),
+    MoreModule(MoreRoute.TaskLists, "قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue),
+    MoreModule(MoreRoute.Meters, "العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple),
+    MoreModule(MoreRoute.Locations, "المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen),
+    MoreModule(MoreRoute.Capa, "الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange),
+    MoreModule(MoreRoute.Failures, "تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed),
+    MoreModule(MoreRoute.Audit, "سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy),
+    MoreModule(MoreRoute.Trash, "سلة المحذوفات", "استرجاع أو حذف نهائي", Icons.Filled.Delete, AccentBrown),
+    MoreModule(MoreRoute.Admin, "الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
+)
+
 @Composable
 private fun MoreGrid(
     innerPadding: PaddingValues,
+    user: UserEntity?,
     isAdmin: Boolean,
     canManage: Boolean,
     onOpen: (MoreRoute) -> Unit,
@@ -1080,6 +1133,8 @@ private fun MoreGrid(
     onPickExcel: () -> Unit,
     onLogout: () -> Unit
 ) {
+    // Only show modules the current role is allowed to open.
+    val modules = ALL_MORE_MODULES.filter { allowedMoreRoute(user, it.route) }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1106,55 +1161,18 @@ private fun MoreGrid(
                 }
             }
         }
-        item {
+        items(modules.chunked(2)) { rowModules ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Notifications) }
-                ModuleCard("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Inventory) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.Reports) }
-                ModuleCard("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal, Modifier.weight(1f)) { onOpen(MoreRoute.PreventiveMaintenance) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.TaskLists) }
-                ModuleCard("العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Meters) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
-                ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
-                ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("المشتريات", "طلبات الشراء والاستلام", Icons.Filled.ShoppingCart, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Procurement) }
-                ModuleCard("سلة المحذوفات", "استرجاع أو حذف نهائي", Icons.Filled.Delete, AccentBrown, Modifier.weight(1f)) { onOpen(MoreRoute.Trash) }
-            }
-        }
-        if (isAdmin) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    ModuleCard("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Admin) }
-                    ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
+                rowModules.forEach { m ->
+                    ModuleCard(m.title, m.subtitle, m.icon, m.color, Modifier.weight(1f)) { onOpen(m.route) }
                 }
+                if (rowModules.size == 1) Spacer(modifier = Modifier.weight(1f))
             }
-        } else {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
@@ -1973,12 +1991,7 @@ private fun notificationStatusLabel(status: String): String = when (status) {
     else -> status
 }
 
-private fun roleLabel(role: String): String = when (role.lowercase(Locale.getDefault())) {
-    "admin" -> "مدير"
-    "supervisor" -> "مشرف"
-    "technician" -> "فني"
-    else -> role
-}
+private fun roleLabel(role: String): String = roleLabelAr(role)
 
 private fun workOrderStatusLabel(status: String): String = when (status) {
     "Open" -> "مفتوح"

@@ -90,6 +90,15 @@ import com.alhadi.cmms.util.DateStrings
 // Reusable building blocks
 // ---------------------------------------------------------------------------
 
+/** Arabic label for a user role. */
+internal fun roleLabelAr(role: String): String = when (role.lowercase(Locale.getDefault())) {
+    "admin" -> "مدير"
+    "supervisor" -> "مشرف"
+    "technician" -> "فني"
+    "storekeeper" -> "أمين مخزن"
+    else -> role
+}
+
 @Composable
 internal fun ConfirmDialog(
     title: String,
@@ -1353,7 +1362,7 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
     FormSheet(if (initial == null) "إضافة مستخدم" else "تعديل المستخدم", onDismiss) {
         LabeledField("الاسم", name, { name = it })
         LabeledField("اسم المستخدم", username, { username = it })
-        OptionDropdown("الدور", listOf("Admin", "Supervisor", "Technician"), role) { role = it }
+        OptionDropdown("الدور", listOf("Admin", "Supervisor", "Technician", "Storekeeper"), role, display = { roleLabelAr(it) }) { role = it }
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
