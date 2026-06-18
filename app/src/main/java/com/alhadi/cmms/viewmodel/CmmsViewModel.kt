@@ -425,6 +425,75 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         }
     }
 
+    /** Exports a management KPI summary as a printable PDF. */
+    fun exportReportPdf(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val assets = repository.assets.first()
+                    val wos = repository.workOrders.first()
+                    val parts = repository.spareParts.first()
+                    val pm = repository.preventiveMaintenance.first()
+                    val day = DateStrings.today()
+                    fun money(v: Double) = "%,.2f ر.س".format(v)
+                    val laborCost = wos.sumOf { it.laborHours * it.laborRate }
+                    val partsCost = wos.sumOf { it.partsCost }
+                    val openCost = wos.filter { it.status != "Closed" }.sumOf { it.estimatedCost }
+                    val invValue = parts.sumOf { it.onHandQty * it.lastPrice }
+                    val sections = listOf(
+                        PdfExporter.ReportSection("الأصول", listOf(
+                            "الإجمالي" to assets.size.toString(),
+                            "تعمل" to assets.count { it.status == "Running" }.toString(),
+                            "متوقفة/متقاعدة" to assets.count { it.status == "Stopped" || it.status == "Retired" }.toString(),
+                            "تحذير/صيانة" to assets.count { it.status == "Warning" || it.status == "Under Maintenance" }.toString()
+                        )),
+                        PdfExporter.ReportSection("أوامر العمل", listOf(
+                            "الإجمالي" to wos.size.toString(),
+                            "مفتوحة" to wos.count { it.status == "Open" }.toString(),
+                            "قيد التنفيذ" to wos.count { it.status == "In Progress" }.toString(),
+                            "مكتملة فنياً" to wos.count { it.status == "Technically Completed" }.toString(),
+                            "مغلقة" to wos.count { it.status == "Closed" }.toString(),
+                            "أعطال" to wos.count { it.isFailure }.toString()
+                        )),
+                        PdfExporter.ReportSection("التكاليف", listOf(
+                            "تكلفة العمالة" to money(laborCost),
+                            "تكلفة قطع الغيار" to money(partsCost),
+                            "الإجمالي" to money(laborCost + partsCost),
+                            "تقديرية مفتوحة" to money(openCost)
+                        )),
+                        PdfExporter.ReportSection("الصيانة الدورية", listOf(
+                            "إجمالي المهام" to pm.size.toString(),
+                            "مستحقة/متأخرة" to pm.count { DateStrings.isDueOrOverdue(it.nextDueAt, day) }.toString()
+                        )),
+                        PdfExporter.ReportSection("المخزون", listOf(
+                            "عدد القطع" to parts.size.toString(),
+                            "تحت الحد الأدنى" to parts.count { it.onHandQty <= it.minQty }.toString(),
+                            "قيمة المخزون" to money(invValue)
+                        ))
+                    )
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        PdfExporter.writeReport(out, "تقرير مؤشرات الصيانة", DateStrings.now(), sections)
+                    } ?: throw IllegalStateException("تعذّر إنشاء الملف")
+                }
+            }.onSuccess { _message.value = "تم تصدير التقرير PDF" }
+                .onFailure { _message.value = "تعذّر تصدير التقرير: ${it.message ?: "غير معروف"}" }
+        }
+    }
+
+    /** Exports a printable QR label for an asset. */
+    fun exportAssetLabelPdf(context: Context, uri: Uri, asset: AssetEntity) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        PdfExporter.writeAssetLabel(out, asset)
+                    } ?: throw IllegalStateException("تعذّر إنشاء الملف")
+                }
+            }.onSuccess { _message.value = "تم إنشاء ملصق QR" }
+                .onFailure { _message.value = "تعذّر إنشاء الملصق: ${it.message ?: "غير معروف"}" }
+        }
+    }
+
     fun restoreTrash(item: TrashEntity) = launchAction("تم استرجاع العنصر") { repository.restoreTrash(item, actor()) }
     fun purgeTrash(item: TrashEntity) = launchAction("تم الحذف نهائياً") { repository.purgeTrash(item, actor()) }
     fun emptyTrash() = launchAction("تم تفريغ سلة المحذوفات") { repository.emptyTrash(actor()) }

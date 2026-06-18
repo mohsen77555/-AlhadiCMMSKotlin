@@ -1,5 +1,6 @@
 package com.alhadi.cmms.util
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -15,6 +16,8 @@ import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import java.io.OutputStream
 
 /**
@@ -106,6 +109,68 @@ object PdfExporter {
         pager.finish()
         doc.writeTo(out)
         doc.close()
+    }
+
+    /** A titled block of key/value rows for the KPI report. */
+    data class ReportSection(val title: String, val rows: List<Pair<String, String>>)
+
+    /** Renders a printable management KPI report (RTL). */
+    fun writeReport(out: OutputStream, title: String, generatedAt: String, sections: List<ReportSection>) {
+        val doc = PdfDocument()
+        val pager = Pager(doc)
+        pager.paragraph(title, paint(20f, bold = true))
+        pager.footer("الهادي — نظام إدارة الصيانة • صُدِّر في $generatedAt")
+        pager.rule()
+        sections.forEach { section ->
+            pager.heading(section.title)
+            section.rows.forEach { (key, value) -> pager.kv(key, value) }
+        }
+        pager.finish()
+        doc.writeTo(out)
+        doc.close()
+    }
+
+    /** Renders a printable QR label for an asset (big QR + code + name) to stick on the machine. */
+    fun writeAssetLabel(out: OutputStream, asset: AssetEntity) {
+        val doc = PdfDocument()
+        val page = doc.startPage(PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, 1).create())
+        val canvas = page.canvas
+
+        val center = PAGE_W / 2f
+        val codePaint = paint(40f, bold = true).apply { textAlign = Paint.Align.CENTER }
+        val namePaint = paint(20f).apply { textAlign = Paint.Align.CENTER }
+        val hintPaint = paint(13f, color = Color.GRAY).apply { textAlign = Paint.Align.CENTER }
+
+        var y = 140f
+        canvas.drawText(asset.code, center, y, codePaint)
+        y += 36f
+        canvas.drawText(asset.name, center, y, namePaint)
+
+        val qrSize = 360
+        val qr = qrBitmap("ALHADI:${asset.code}", qrSize)
+        y += 40f
+        canvas.drawBitmap(qr, center - qrSize / 2f, y, null)
+        y += qrSize + 36f
+        canvas.drawText("امسح الرمز للوصول السريع لبطاقة الأصل", center, y, hintPaint)
+        y += 22f
+        canvas.drawText("${asset.groupName} • ${asset.location}", center, y, hintPaint)
+
+        doc.finishPage(page)
+        doc.writeTo(out)
+        doc.close()
+    }
+
+    private fun qrBitmap(content: String, size: Int): Bitmap {
+        val matrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size)
+        val pixels = IntArray(size * size)
+        for (y in 0 until size) {
+            val offset = y * size
+            for (x in 0 until size) {
+                pixels[offset + x] = if (matrix[x, y]) Color.BLACK else Color.WHITE
+            }
+        }
+        return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            .also { it.setPixels(pixels, 0, size, 0, 0, size, size) }
     }
 
     private fun money(value: Double): String = "%,.2f ر.س".format(value)

@@ -254,6 +254,15 @@ fun CmmsApp(viewModel: CmmsViewModel) {
         if (uri != null && order != null) viewModel.exportWorkOrderPdf(appContext, uri, order)
         pendingPdfOrder = null
     }
+    val reportPdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null) viewModel.exportReportPdf(appContext, uri)
+    }
+    var pendingLabelAsset by remember { mutableStateOf<AssetEntity?>(null) }
+    val assetLabelLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        val asset = pendingLabelAsset
+        if (uri != null && asset != null) viewModel.exportAssetLabelPdf(appContext, uri, asset)
+        pendingLabelAsset = null
+    }
 
     BackHandler(enabled = selectedTab == BottomTab.More && moreRoute != null) {
         moreRoute = null
@@ -394,7 +403,11 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onDeleteCharacteristic = viewModel::deleteCharacteristic,
                         onSaveBom = viewModel::saveBomItem,
                         onDeleteBom = viewModel::deleteBomItem,
-                        onMove = viewModel::performAssetMovement
+                        onMove = viewModel::performAssetMovement,
+                        onPrintLabel = { asset ->
+                            pendingLabelAsset = asset
+                            assetLabelLauncher.launch("asset-label-${asset.code}.pdf")
+                        }
                     )
 
                     BottomTab.More -> when (moreRoute) {
@@ -435,7 +448,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             assets = assets,
                             workOrders = workOrders,
                             parts = spareParts,
-                            pmItems = preventiveMaintenance
+                            pmItems = preventiveMaintenance,
+                            onExportPdf = { reportPdfLauncher.launch("maintenance-report-${DateStrings.today()}.pdf") }
                         )
                         MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
                         MoreRoute.Trash -> TrashScreen(
@@ -1204,7 +1218,8 @@ private fun AssetsScreen(
     onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onSaveBom: (AssetBomItemEntity) -> Unit,
     onDeleteBom: (AssetBomItemEntity) -> Unit,
-    onMove: (AssetEntity, String, Long?, String, String) -> Unit
+    onMove: (AssetEntity, String, Long?, String, String) -> Unit,
+    onPrintLabel: (AssetEntity) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showForm by remember { mutableStateOf(false) }
@@ -1260,7 +1275,8 @@ private fun AssetsScreen(
             onDeleteCharacteristic = onDeleteCharacteristic,
             onSaveBom = onSaveBom,
             onDeleteBom = onDeleteBom,
-            onMove = onMove
+            onMove = onMove,
+            onPrintLabel = onPrintLabel
         )
         return
     }
@@ -1412,7 +1428,8 @@ private fun AssetDetailScreen(
     onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onSaveBom: (AssetBomItemEntity) -> Unit,
     onDeleteBom: (AssetBomItemEntity) -> Unit,
-    onMove: (AssetEntity, String, Long?, String, String) -> Unit
+    onMove: (AssetEntity, String, Long?, String, String) -> Unit,
+    onPrintLabel: (AssetEntity) -> Unit
 ) {
     var showDocForm by remember { mutableStateOf(false) }
     var editingDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
@@ -1606,6 +1623,11 @@ private fun AssetDetailScreen(
                     }
                     LtrText("ALHADI:${asset.code}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("امسح الرمز للوصول إلى بطاقة الأصل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = { onPrintLabel(asset) }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("طباعة ملصق QR (PDF)")
+                    }
                 }
             }
         }
@@ -3293,7 +3315,8 @@ private fun ReportsScreen(
     assets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     parts: List<SparePartEntity>,
-    pmItems: List<PreventiveMaintenanceEntity>
+    pmItems: List<PreventiveMaintenanceEntity>,
+    onExportPdf: () -> Unit
 ) {
     val today = DateStrings.today()
     val soon = DateStrings.daysFromToday(30)
@@ -3345,6 +3368,12 @@ private fun ReportsScreen(
                     Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("مشاركة")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(onClick = onExportPdf) {
+                    Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("PDF")
                 }
             }
         }
