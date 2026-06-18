@@ -47,10 +47,33 @@ object DbMigrations {
         }
     }
 
+    /** v23 -> v24: adds the procurement (`purchase_orders`) table. */
+    val MIGRATION_23_24 = object : Migration(23, 24) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `purchase_orders` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`number` TEXT NOT NULL, " +
+                    "`status` TEXT NOT NULL, " +
+                    "`partId` INTEGER, " +
+                    "`itemName` TEXT NOT NULL, " +
+                    "`quantity` INTEGER NOT NULL, " +
+                    "`unitPrice` REAL NOT NULL, " +
+                    "`supplier` TEXT NOT NULL, " +
+                    "`workOrderId` INTEGER, " +
+                    "`requestedBy` TEXT NOT NULL, " +
+                    "`createdAt` TEXT NOT NULL, " +
+                    "`neededBy` TEXT NOT NULL, " +
+                    "`receivedAt` TEXT NOT NULL, " +
+                    "`notes` TEXT NOT NULL)"
+            )
+        }
+    }
+
     /**
      * All migrations, in order. Append new `Migration` objects here as the schema evolves.
      */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23)
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

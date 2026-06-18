@@ -15,6 +15,7 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -54,6 +55,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val taskListDao = database.taskListDao()
     private val permitDao = database.workPermitDao()
     private val trashDao = database.trashDao()
+    private val purchaseOrderDao = database.purchaseOrderDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -80,6 +82,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val taskListOperations: Flow<List<TaskListOperationEntity>> = taskListDao.observeTaskListOperations()
     val workPermits: Flow<List<WorkPermitEntity>> = permitDao.observePermits()
     val trash: Flow<List<TrashEntity>> = trashDao.observeTrash()
+    val purchaseOrders: Flow<List<PurchaseOrderEntity>> = purchaseOrderDao.observePurchaseOrders()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -150,6 +153,7 @@ class CmmsRepository(private val database: AppDatabase) {
                 "User" -> userDao.insert(backupJson.decodeFromString(UserEntity.serializer(), item.payload))
                 "Notification" -> notificationDao.insert(backupJson.decodeFromString(MaintenanceNotificationEntity.serializer(), item.payload))
                 "TaskList" -> taskListDao.insertTaskList(backupJson.decodeFromString(TaskListEntity.serializer(), item.payload))
+                "Purchase" -> purchaseOrderDao.insert(backupJson.decodeFromString(PurchaseOrderEntity.serializer(), item.payload))
             }
             trashDao.deleteById(item.id)
             recordAudit("Restore", item.entityType, "استرجاع: ${item.label}", actor)
@@ -203,7 +207,8 @@ class CmmsRepository(private val database: AppDatabase) {
             photos = workOrderPhotos.first(),
             taskLists = taskLists.first(),
             taskListOperations = taskListOperations.first(),
-            permits = workPermits.first()
+            permits = workPermits.first(),
+            purchaseOrders = purchaseOrderDao.dumpAll()
         )
         return backupJson.encodeToString(BackupBundle.serializer(), bundle)
     }
@@ -216,6 +221,7 @@ class CmmsRepository(private val database: AppDatabase) {
         val bundle = backupJson.decodeFromString(BackupBundle.serializer(), content)
         database.withTransaction {
             // Clear everything first.
+            purchaseOrderDao.deleteAll()
             auditLogDao.deleteAll()
             permitDao.deleteAll()
             taskListDao.deleteAllOperations()
@@ -263,6 +269,7 @@ class CmmsRepository(private val database: AppDatabase) {
             taskListDao.insertTaskLists(bundle.taskLists)
             taskListDao.insertOperations(bundle.taskListOperations)
             permitDao.insertAll(bundle.permits)
+            purchaseOrderDao.insertAll(bundle.purchaseOrders)
 
             recordAudit("Import", "Backup", "تم استعادة نسخة احتياطية (${bundle.totalRecords} سجل)", "System")
         }
@@ -841,6 +848,78 @@ class CmmsRepository(private val database: AppDatabase) {
         moveToTrash("CAPA", item.id, "${item.code} — ${item.title}", backupJson.encodeToString(CapaEntity.serializer(), item), actor)
         capaDao.deleteById(item.id)
         recordAudit("Delete", "CAPA", "حذف إجراء: ${item.title}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // CRUD — Procurement (purchase orders)
+    // ---------------------------------------------------------------------
+
+    suspend fun savePurchaseOrder(order: PurchaseOrderEntity, actor: String = "System") {
+        val isNew = order.id == 0L
+        val toSave = if (isNew) {
+            order.copy(
+                number = order.number.ifBlank { "PO-%04d".format(purchaseOrderDao.countOnce() + 1) },
+                createdAt = order.createdAt.ifBlank { DateStrings.today() },
+                requestedBy = order.requestedBy.ifBlank { actor }
+            )
+        } else order
+        purchaseOrderDao.insert(toSave)
+        recordAudit(if (isNew) "Create" else "Update", "Purchase", "${if (isNew) "إنشاء" else "تعديل"} طلب شراء: ${toSave.number}", actor)
+    }
+
+    /**
+     * Advances a purchase order. Receiving it raises the linked part's stock and last price and
+     * records an inventory transaction — the core link between procurement and inventory.
+     */
+    suspend fun setPurchaseOrderStatus(order: PurchaseOrderEntity, status: String, actor: String = "System") {
+        database.withTransaction {
+            if (status == "Received" && order.status != "Received") {
+                order.partId?.let { partId ->
+                    sparePartDao.adjustStock(partId, order.quantity)
+                    if (order.unitPrice > 0) sparePartDao.updateLastPrice(partId, order.unitPrice)
+                    transactionDao.insert(
+                        InventoryTransactionEntity(
+                            partId = partId,
+                            workOrderId = order.workOrderId,
+                            transactionType = "Receive",
+                            quantity = order.quantity,
+                            createdAt = DateStrings.today(),
+                            createdBy = actor,
+                            note = "استلام شراء ${order.number}"
+                        )
+                    )
+                }
+                purchaseOrderDao.insert(order.copy(status = status, receivedAt = DateStrings.today()))
+                recordAudit("Receive", "Purchase", "استلام طلب شراء ${order.number} (${order.quantity} ${order.itemName})", actor)
+            } else {
+                purchaseOrderDao.insert(order.copy(status = status))
+                recordAudit("Status", "Purchase", "تحديث حالة ${order.number} إلى $status", actor)
+            }
+        }
+    }
+
+    suspend fun deletePurchaseOrder(order: PurchaseOrderEntity, actor: String = "System") {
+        moveToTrash("Purchase", order.id, "${order.number} — ${order.itemName}", backupJson.encodeToString(PurchaseOrderEntity.serializer(), order), actor)
+        purchaseOrderDao.deleteById(order.id)
+        recordAudit("Delete", "Purchase", "حذف طلب شراء: ${order.number}", actor)
+    }
+
+    /** One-tap reorder request from inventory for a part below its minimum. */
+    suspend fun createReorderForPart(part: SparePartEntity, actor: String = "System") {
+        val qty = (part.minQty - part.onHandQty).coerceAtLeast(1)
+        savePurchaseOrder(
+            PurchaseOrderEntity(
+                status = "Requested",
+                partId = part.id,
+                itemName = "${part.partNumber} — ${part.name}",
+                quantity = qty,
+                unitPrice = part.lastPrice,
+                requestedBy = actor,
+                neededBy = DateStrings.daysFromToday(7),
+                notes = "طلب إعادة تعبئة تلقائي للمخزون"
+            ),
+            actor
+        )
     }
 
     // ---------------------------------------------------------------------

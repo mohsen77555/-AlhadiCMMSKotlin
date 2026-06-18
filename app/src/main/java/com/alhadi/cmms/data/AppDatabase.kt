@@ -17,6 +17,7 @@ import com.alhadi.cmms.data.dao.MaintenanceNotificationDao
 import com.alhadi.cmms.data.dao.MeasurementDao
 import com.alhadi.cmms.data.dao.PmChecklistDao
 import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
+import com.alhadi.cmms.data.dao.PurchaseOrderDao
 import com.alhadi.cmms.data.dao.SparePartDao
 import com.alhadi.cmms.data.dao.TaskListDao
 import com.alhadi.cmms.data.dao.TrashDao
@@ -40,6 +41,7 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -76,9 +78,10 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         TaskListEntity::class,
         TaskListOperationEntity::class,
         WorkPermitEntity::class,
-        TrashEntity::class
+        TrashEntity::class,
+        PurchaseOrderEntity::class
     ],
-    version = 23,
+    version = 24,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -104,6 +107,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskListDao(): TaskListDao
     abstract fun workPermitDao(): WorkPermitDao
     abstract fun trashDao(): TrashDao
+    abstract fun purchaseOrderDao(): PurchaseOrderDao
 
     companion object {
         @Volatile

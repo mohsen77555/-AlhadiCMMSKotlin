@@ -24,15 +24,17 @@ data class ReminderSummary(
     val duePm: Int = 0,
     val overdueWorkOrders: Int = 0,
     val expiringPermits: Int = 0,
-    val lowStock: Int = 0
+    val lowStock: Int = 0,
+    val pendingPurchases: Int = 0
 ) {
-    val total: Int get() = duePm + overdueWorkOrders + expiringPermits + lowStock
+    val total: Int get() = duePm + overdueWorkOrders + expiringPermits + lowStock + pendingPurchases
 
     fun lines(): List<String> = buildList {
         if (duePm > 0) add("صيانة دورية مستحقة: $duePm")
         if (overdueWorkOrders > 0) add("أوامر عمل متأخرة: $overdueWorkOrders")
         if (expiringPermits > 0) add("تصاريح تنتهي قريباً: $expiringPermits")
         if (lowStock > 0) add("قطع تحت الحد الأدنى: $lowStock")
+        if (pendingPurchases > 0) add("طلبات شراء معلّقة: $pendingPurchases")
     }
 }
 
@@ -53,6 +55,7 @@ object Reminders {
         val workOrders = repository.workOrders.first()
         val permits = repository.workPermits.first()
         val parts = repository.spareParts.first()
+        val purchases = repository.purchaseOrders.first()
         val soon = DateStrings.daysFromToday(EXPIRY_WINDOW_DAYS)
         return ReminderSummary(
             duePm = pm.count { DateStrings.isDueOrOverdue(it.nextDueAt, today) },
@@ -60,7 +63,8 @@ object Reminders {
             expiringPermits = permits.count {
                 it.status != "Rejected" && it.status != "Closed" && it.validUntil.isNotBlank() && it.validUntil <= soon
             },
-            lowStock = parts.count { it.onHandQty <= it.minQty }
+            lowStock = parts.count { it.onHandQty <= it.minQty },
+            pendingPurchases = purchases.count { it.status == "Requested" || it.status == "Approved" || it.status == "Ordered" }
         )
     }
 

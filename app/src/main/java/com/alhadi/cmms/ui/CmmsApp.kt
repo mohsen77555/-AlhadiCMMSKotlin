@@ -72,6 +72,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingDown
@@ -146,6 +147,7 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -191,7 +193,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
+private enum class MoreRoute { Notifications, Inventory, Procurement, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
 
 private data class ScreenMeta(
     val title: String,
@@ -212,6 +214,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val users by viewModel.users.collectAsStateWithLifecycle()
     val auditLog by viewModel.auditLog.collectAsStateWithLifecycle()
     val trash by viewModel.trash.collectAsStateWithLifecycle()
+    val purchaseOrders by viewModel.purchaseOrders.collectAsStateWithLifecycle()
     val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
@@ -440,6 +443,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             canManage = canManage,
                             onIssue = viewModel::issuePart,
                             onReceive = viewModel::receivePart,
+                            onReorder = viewModel::createReorderForPart,
                             onSave = viewModel::savePart,
                             onDelete = viewModel::deletePart
                         )
@@ -451,6 +455,16 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             parts = spareParts,
                             pmItems = preventiveMaintenance,
                             onExportPdf = { reportPdfLauncher.launch("maintenance-report-${DateStrings.today()}.pdf") }
+                        )
+                        MoreRoute.Procurement -> ProcurementScreen(
+                            innerPadding = innerPadding,
+                            orders = purchaseOrders,
+                            parts = spareParts,
+                            workOrders = workOrders,
+                            canManage = canManage,
+                            onSave = viewModel::savePurchaseOrder,
+                            onSetStatus = viewModel::setPurchaseOrderStatus,
+                            onDelete = viewModel::deletePurchaseOrder
                         )
                         MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
                         MoreRoute.Trash -> TrashScreen(
@@ -552,6 +566,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         null -> ScreenMeta("المزيد", "كل الوحدات والإعدادات", Icons.Filled.GridView, AccentBrown)
         MoreRoute.Notifications -> ScreenMeta("البلاغات", "بلاغات الصيانة وتحويلها لأوامر", Icons.Filled.NotificationsActive, AccentRed)
         MoreRoute.Inventory -> ScreenMeta("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple)
+        MoreRoute.Procurement -> ScreenMeta("المشتريات", "طلبات الشراء واستلامها", Icons.Filled.ShoppingCart, AccentGreen)
         MoreRoute.Reports -> ScreenMeta("التقارير", "مؤشرات وتصدير وتحليلات", Icons.Filled.Analytics, AccentBlue)
         MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
         MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
@@ -1123,8 +1138,8 @@ private fun MoreGrid(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("المشتريات", "طلبات الشراء والاستلام", Icons.Filled.ShoppingCart, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Procurement) }
                 ModuleCard("سلة المحذوفات", "استرجاع أو حذف نهائي", Icons.Filled.Delete, AccentBrown, Modifier.weight(1f)) { onOpen(MoreRoute.Trash) }
-                Spacer(modifier = Modifier.weight(1f))
             }
         }
         if (isAdmin) {
@@ -3086,6 +3101,7 @@ private fun InventoryScreen(
     canManage: Boolean,
     onIssue: (SparePartEntity, Int) -> Unit,
     onReceive: (SparePartEntity, Int) -> Unit,
+    onReorder: (SparePartEntity) -> Unit,
     onSave: (SparePartEntity) -> Unit,
     onDelete: (SparePartEntity) -> Unit
 ) {
@@ -3165,6 +3181,7 @@ private fun InventoryScreen(
                         canManage = canManage,
                         onIssue = onIssue,
                         onReceive = onReceive,
+                        onReorder = { onReorder(part) },
                         onEdit = { editing = part; showForm = true },
                         onDelete = { deleteTarget = part }
                     )
@@ -3203,6 +3220,7 @@ private fun SparePartCard(
     canManage: Boolean,
     onIssue: (SparePartEntity, Int) -> Unit,
     onReceive: (SparePartEntity, Int) -> Unit,
+    onReorder: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -3239,6 +3257,13 @@ private fun SparePartCard(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("استلام")
                     }
+                }
+            }
+            if (canManage) {
+                OutlinedButton(onClick = onReorder, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.ShoppingCart, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (lowStock) "طلب شراء (مخزون منخفض)" else "طلب شراء")
                 }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
@@ -3509,6 +3534,155 @@ private fun ReportCard(title: String, lines: List<String>) {
 // ---------------------------------------------------------------------------
 // Audit (governance) + Admin
 // ---------------------------------------------------------------------------
+
+@Composable
+private fun ProcurementScreen(
+    innerPadding: PaddingValues,
+    orders: List<PurchaseOrderEntity>,
+    parts: List<SparePartEntity>,
+    workOrders: List<WorkOrderEntity>,
+    canManage: Boolean,
+    onSave: (PurchaseOrderEntity) -> Unit,
+    onSetStatus: (PurchaseOrderEntity, String) -> Unit,
+    onDelete: (PurchaseOrderEntity) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<PurchaseOrderEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<PurchaseOrderEntity?>(null) }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionHeader("المشتريات (${orders.size})")
+            Text("طلبات الشراء؛ استلام الطلب يرفع رصيد المخزون تلقائياً.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (orders.isNotEmpty()) {
+            item {
+                val seg = listOf(
+                    ChartSegment("مطلوب", orders.count { it.status == "Requested" }, AccentBlue),
+                    ChartSegment("معتمد", orders.count { it.status == "Approved" }, AccentOrange),
+                    ChartSegment("تم التوريد", orders.count { it.status == "Ordered" }, AccentPurple),
+                    ChartSegment("مستلم", orders.count { it.status == "Received" }, AccentGreen),
+                    ChartSegment("ملغى", orders.count { it.status == "Cancelled" }, AccentRed)
+                )
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        DonutChart(segments = seg, centerValue = orders.size.toString(), centerLabel = "طلب")
+                        ChartLegend(seg, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+        if (canManage) {
+            item { AddButton("طلب شراء جديد") { editing = null; showForm = true } }
+        }
+        if (orders.isEmpty()) {
+            item { EmptyState("لا توجد طلبات شراء", Icons.Filled.ShoppingCart) }
+        }
+        items(orders, key = { it.id }) { po ->
+            PurchaseOrderCard(
+                po = po,
+                canManage = canManage,
+                onSetStatus = { status -> onSetStatus(po, status) },
+                onEdit = { editing = po; showForm = true },
+                onDelete = { deleteTarget = po }
+            )
+        }
+    }
+
+    if (showForm) {
+        PurchaseOrderFormSheet(
+            initial = editing,
+            parts = parts,
+            workOrders = workOrders,
+            onDismiss = { showForm = false },
+            onSave = { onSave(it); showForm = false }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف طلب الشراء",
+            text = "هل تريد حذف ${target.number}؟ (يمكن استرجاعه من سلة المحذوفات)",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun PurchaseOrderCard(
+    po: PurchaseOrderEntity,
+    canManage: Boolean,
+    onSetStatus: (String) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val tone = purchaseTone(po.status)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBubble(Icons.Filled.ShoppingCart, tone.content, tone.container, 40)
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(po.number, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(po.itemName, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+                StatusBadge(purchaseStatusLabel(po.status), tone)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            InfoRow("الكمية", po.quantity.toString())
+            InfoRow("سعر الوحدة", money(po.unitPrice))
+            InfoRow("الإجمالي", money(po.total))
+            if (po.supplier.isNotBlank()) InfoRow("المورّد", po.supplier)
+            if (po.neededBy.isNotBlank()) InfoRow("مطلوب بحلول", po.neededBy)
+            if (po.workOrderId != null) InfoRow("مرتبط بأمر", "#${po.workOrderId}")
+            if (po.receivedAt.isNotBlank()) InfoRow("تاريخ الاستلام", po.receivedAt)
+            if (po.notes.isNotBlank()) Text(po.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (canManage) {
+                when (po.status) {
+                    "Requested" -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = { onSetStatus("Approved") }, modifier = Modifier.weight(1f)) { Text("اعتماد") }
+                        OutlinedButton(onClick = { onSetStatus("Cancelled") }, modifier = Modifier.weight(1f)) { Text("إلغاء") }
+                    }
+                    "Approved" -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = { onSetStatus("Ordered") }, modifier = Modifier.weight(1f)) { Text("تحويل لتوريد") }
+                        OutlinedButton(onClick = { onSetStatus("Cancelled") }, modifier = Modifier.weight(1f)) { Text("إلغاء") }
+                    }
+                    "Ordered" -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = { onSetStatus("Received") }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("استلام للمخزون")
+                        }
+                        OutlinedButton(onClick = { onSetStatus("Cancelled") }, modifier = Modifier.weight(1f)) { Text("إلغاء") }
+                    }
+                }
+                EditDeleteRow(onEdit, onDelete)
+            }
+        }
+    }
+}
+
+private fun purchaseStatusLabel(status: String): String = when (status) {
+    "Requested" -> "مطلوب"; "Approved" -> "معتمد"; "Ordered" -> "تم التوريد"
+    "Received" -> "مستلم"; "Cancelled" -> "ملغى"; else -> status
+}
+
+private fun purchaseTone(status: String) = statusTone(
+    when (status) {
+        "Received" -> "running"
+        "Cancelled" -> "stopped"
+        "Approved", "Ordered" -> "info"
+        else -> "neutral"
+    }
+)
 
 @Composable
 private fun AuditScreen(innerPadding: PaddingValues, auditLog: List<AuditLogEntity>) {

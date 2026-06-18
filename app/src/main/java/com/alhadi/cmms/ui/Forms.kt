@@ -75,6 +75,7 @@ import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -996,6 +997,78 @@ internal fun DocumentFormSheet(
                     reference = reference.trim(),
                     uploadedBy = initial?.uploadedBy ?: "",
                     uploadedAt = initial?.uploadedAt ?: ""
+                )
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Purchase order form
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun PurchaseOrderFormSheet(
+    initial: PurchaseOrderEntity?,
+    parts: List<SparePartEntity>,
+    workOrders: List<WorkOrderEntity>,
+    onDismiss: () -> Unit,
+    onSave: (PurchaseOrderEntity) -> Unit
+) {
+    val noPart = "— بدون ربط بقطعة —"
+    val noWo = "— بدون أمر عمل —"
+    val partOptions = remember(parts) { listOf(noPart) + parts.map { "${it.partNumber} — ${it.name}" } }
+    val woOptions = remember(workOrders) { listOf(noWo) + workOrders.map { "#${it.id} ${it.title}" } }
+
+    var partLabel by remember {
+        mutableStateOf(initial?.partId?.let { pid -> parts.firstOrNull { it.id == pid }?.let { "${it.partNumber} — ${it.name}" } } ?: noPart)
+    }
+    var itemName by remember { mutableStateOf(initial?.itemName ?: "") }
+    var quantity by remember { mutableStateOf((initial?.quantity ?: 1).toString()) }
+    var unitPrice by remember { mutableStateOf((initial?.unitPrice ?: 0.0).toString()) }
+    var supplier by remember { mutableStateOf(initial?.supplier ?: "") }
+    var neededBy by remember { mutableStateOf(initial?.neededBy ?: DateStrings.daysFromToday(7)) }
+    var woLabel by remember {
+        mutableStateOf(initial?.workOrderId?.let { id -> "#$id " + (workOrders.firstOrNull { it.id == id }?.title ?: "") } ?: noWo)
+    }
+    var status by remember { mutableStateOf(initial?.status ?: "Requested") }
+    var notes by remember { mutableStateOf(initial?.notes ?: "") }
+
+    FormSheet(if (initial == null) "طلب شراء جديد" else "تعديل طلب الشراء", onDismiss) {
+        OptionDropdown("القطعة من المخزون", partOptions, partLabel) { sel ->
+            partLabel = sel
+            val p = parts.firstOrNull { "${it.partNumber} — ${it.name}" == sel }
+            if (p != null) itemName = "${p.partNumber} — ${p.name}"
+        }
+        LabeledField("اسم الصنف", itemName, { itemName = it })
+        LabeledField("الكمية", quantity, { quantity = it }, numeric = true)
+        LabeledField("سعر الوحدة", unitPrice, { unitPrice = it }, numeric = true)
+        LabeledField("المورّد", supplier, { supplier = it })
+        DateField("مطلوب بحلول", neededBy) { neededBy = it }
+        OptionDropdown("مرتبط بأمر عمل (اختياري)", woOptions, woLabel) { woLabel = it }
+        if (initial != null) {
+            OptionDropdown("الحالة", listOf("Requested", "Approved", "Ordered", "Received", "Cancelled"), status) { status = it }
+        }
+        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
+        SaveButton(itemName.isNotBlank() && (quantity.toIntOrNull() ?: 0) > 0) {
+            val p = parts.firstOrNull { "${it.partNumber} — ${it.name}" == partLabel }
+            val woId = workOrders.firstOrNull { "#${it.id} ${it.title}" == woLabel }?.id
+            onSave(
+                PurchaseOrderEntity(
+                    id = initial?.id ?: 0,
+                    number = initial?.number ?: "",
+                    status = status,
+                    partId = p?.id,
+                    itemName = itemName.trim(),
+                    quantity = quantity.toIntOrNull() ?: 1,
+                    unitPrice = unitPrice.toDoubleOrNull() ?: 0.0,
+                    supplier = supplier.trim(),
+                    workOrderId = woId,
+                    requestedBy = initial?.requestedBy ?: "",
+                    createdAt = initial?.createdAt ?: "",
+                    neededBy = neededBy,
+                    receivedAt = initial?.receivedAt ?: "",
+                    notes = notes.trim()
                 )
             )
         }
