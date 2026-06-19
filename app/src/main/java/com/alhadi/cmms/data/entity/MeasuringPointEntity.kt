@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 
 @Entity(
     tableName = "measuring_points",
-    indices = [Index(value = ["assetId"]), Index(value = ["pointCode"], unique = true)]
+    indices = [Index(value = ["assetId"]), Index(value = ["pointCode"])]
 )
 @Serializable
 data class MeasuringPointEntity(
