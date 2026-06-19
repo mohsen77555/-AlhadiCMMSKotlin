@@ -1127,6 +1127,10 @@ private data class MoreModule(
     val color: Color
 )
 
+/**
+ * All available modules that can appear under the "المزيد" tab.
+ * Each entry declares route, localized title/subtitle, icon, and accent color.
+ */
 private val ALL_MORE_MODULES = listOf(
     MoreModule(MoreRoute.Notifications, "البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed),
     MoreModule(MoreRoute.Inventory, "المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple),
@@ -1144,6 +1148,35 @@ private val ALL_MORE_MODULES = listOf(
     MoreModule(MoreRoute.Admin, "الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
 )
 
+private data class MoreGroup(val title: String, val routes: List<MoreRoute>)
+
+private val MORE_GROUPS = listOf(
+    MoreGroup("العمل والصيانة", listOf(
+        MoreRoute.Notifications,
+        MoreRoute.PreventiveMaintenance,
+        MoreRoute.TaskLists,
+        MoreRoute.Meters,
+        MoreRoute.Capa,
+        MoreRoute.Failures
+    )),
+    MoreGroup("الأصول والمواقع", listOf(
+        MoreRoute.Locations
+    )),
+    MoreGroup("المخزون والمشتريات", listOf(
+        MoreRoute.Inventory,
+        MoreRoute.Procurement,
+        MoreRoute.Suppliers
+    )),
+    MoreGroup("التقارير والحوكمة", listOf(
+        MoreRoute.Reports,
+        MoreRoute.Audit
+    )),
+    MoreGroup("الإدارة وسلة المحذوفات", listOf(
+        MoreRoute.Admin,
+        MoreRoute.Trash
+    ))
+)
+
 @Composable
 private fun MoreGrid(
     innerPadding: PaddingValues,
@@ -1155,8 +1188,9 @@ private fun MoreGrid(
     onPickExcel: () -> Unit,
     onLogout: () -> Unit
 ) {
-    // Only show modules the current role is allowed to open.
     val modules = ALL_MORE_MODULES.filter { allowedMoreRoute(user, it.route) }
+    val moduleMap = modules.associateBy { it.route }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1166,13 +1200,20 @@ private fun MoreGrid(
     ) {
         if (canManage) {
             item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             IconBubble(Icons.Filled.UploadFile, AccentGreen, AccentGreen.copy(alpha = 0.14f), 40)
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("استيراد من Excel", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                                Text("حوّل ملف صيانة الآلة إلى أصل وخطط وقطع غيار وأمر عمل تلقائياً.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    "حوّل ملف صيانة الآلة إلى أصل وخطط وقطع غيار وأمر عمل تلقائياً.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1183,14 +1224,29 @@ private fun MoreGrid(
                 }
             }
         }
-        items(modules.chunked(2)) { rowModules ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                rowModules.forEach { m ->
-                    ModuleCard(m.title, m.subtitle, m.icon, m.color, Modifier.weight(1f)) { onOpen(m.route) }
+
+        MORE_GROUPS.forEach { group ->
+            val groupModules = group.routes.mapNotNull { moduleMap[it] }
+            if (groupModules.isNotEmpty()) {
+                item {
+                    Text(
+                        text = group.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
                 }
-                if (rowModules.size == 1) Spacer(modifier = Modifier.weight(1f))
+                items(groupModules.chunked(2)) { rowModules ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        rowModules.forEach { m ->
+                            ModuleCard(m.title, m.subtitle, m.icon, m.color, Modifier.weight(1f)) { onOpen(m.route) }
+                        }
+                        if (rowModules.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
             }
         }
+
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
