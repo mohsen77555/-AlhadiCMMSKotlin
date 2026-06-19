@@ -1,0 +1,42 @@
+Backend stage 1 diagnostics
+generate_status=0
+test_status=1
+smoke_status=99
+
+--- generation ---
+Backend foundation stage 1 files generated successfully.
+
+--- build and tests ---
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :clean UP-TO-DATE
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :processResources
+> Task :processTestResources NO-SOURCE
+
+> Task :compileKotlin FAILED
+e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/backend/src/main/kotlin/com/alhadi/cmms/backend/Application.kt:234:66 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun DecodedJWT.tokenVersion(): Int
+e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/backend/src/main/kotlin/com/alhadi/cmms/backend/security/Security.kt:68:27 'public' function exposes its 'internal' parameter type 'UserRecord'.
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1781861155629.json
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 49s
+3 actionable tasks: 2 executed, 1 up-to-date
+
+--- smoke test ---
+Backend smoke test was not started because the build failed.
+
+--- server ---
