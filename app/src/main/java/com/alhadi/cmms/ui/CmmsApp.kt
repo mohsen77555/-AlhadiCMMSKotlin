@@ -1306,6 +1306,7 @@ private fun AssetsScreen(
     onPrintLabel: (AssetEntity) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    var plantFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AssetEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<AssetEntity?>(null) }
@@ -1366,18 +1367,21 @@ private fun AssetsScreen(
         return
     }
 
-    val filtered = remember(query, assets) {
-        if (query.isBlank()) assets else assets.filter { asset ->
-            val q = query.lowercase(Locale.getDefault())
-            asset.code.lowercase(Locale.getDefault()).contains(q) ||
-                asset.name.lowercase(Locale.getDefault()).contains(q) ||
-                asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
-                asset.location.lowercase(Locale.getDefault()).contains(q) ||
-                asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
-                asset.assetTag.lowercase(Locale.getDefault()).contains(q)
+    val filtered = remember(query, assets, plantFilter) {
+        assets.filter { asset ->
+            (plantFilter == null || asset.plant == plantFilter) && (query.isBlank() || run {
+                val q = query.lowercase(Locale.getDefault())
+                asset.code.lowercase(Locale.getDefault()).contains(q) ||
+                    asset.name.lowercase(Locale.getDefault()).contains(q) ||
+                    asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
+                    asset.location.lowercase(Locale.getDefault()).contains(q) ||
+                    asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
+                    asset.assetTag.lowercase(Locale.getDefault()).contains(q)
+            })
         }
     }
     val grouped = filtered.groupBy { it.groupName }
+    val plantNames = remember(orgUnits) { orgUnits.filter { it.type == "Plant" }.map { it.name } }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -1414,6 +1418,19 @@ private fun AssetsScreen(
                     }
                     FilledTonalIconButton(onClick = { launchScan() }) {
                         Icon(Icons.Filled.QrCodeScanner, contentDescription = "مسح رمز الأصل")
+                    }
+                }
+            }
+            if (plantNames.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(selected = plantFilter == null, onClick = { plantFilter = null }, label = { Text("كل المصانع") })
+                        plantNames.forEach { p ->
+                            FilterChip(selected = plantFilter == p, onClick = { plantFilter = if (plantFilter == p) null else p }, label = { Text(p) })
+                        }
                     }
                 }
             }
