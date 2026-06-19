@@ -115,7 +115,38 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
+    /** Adds structured component-list headers, alternatives, hierarchy and item controls. */
+    val MIGRATION_25_26 = object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN constructionType TEXT NOT NULL DEFAULT ''",
+                "CREATE TABLE IF NOT EXISTS asset_bom_headers (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, assetId INTEGER, code TEXT NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'Asset', usage TEXT NOT NULL DEFAULT 'Maintenance', alternative TEXT NOT NULL DEFAULT '01', status TEXT NOT NULL DEFAULT 'Active', validFrom TEXT NOT NULL DEFAULT '', validTo TEXT NOT NULL DEFAULT '', revision TEXT NOT NULL DEFAULT '', assignmentType TEXT NOT NULL DEFAULT 'Direct', constructionType TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '')",
+                "CREATE INDEX IF NOT EXISTS index_asset_bom_headers_assetId ON asset_bom_headers(assetId)",
+                "CREATE INDEX IF NOT EXISTS index_asset_bom_headers_constructionType ON asset_bom_headers(constructionType)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_asset_bom_headers_code_alternative ON asset_bom_headers(code, alternative)",
+                "ALTER TABLE asset_bom_items ADD COLUMN headerId INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE asset_bom_items ADD COLUMN itemNumber INTEGER NOT NULL DEFAULT 10",
+                "ALTER TABLE asset_bom_items ADD COLUMN itemCategory TEXT NOT NULL DEFAULT 'Stock'",
+                "ALTER TABLE asset_bom_items ADD COLUMN status TEXT NOT NULL DEFAULT 'Active'",
+                "ALTER TABLE asset_bom_items ADD COLUMN validFrom TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_bom_items ADD COLUMN validTo TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_bom_items ADD COLUMN isCritical INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE asset_bom_items ADD COLUMN useInOrders INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE asset_bom_items ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_bom_items ADD COLUMN parentItemId INTEGER",
+                "ALTER TABLE asset_bom_items ADD COLUMN assemblyAssetId INTEGER",
+                "ALTER TABLE asset_bom_items ADD COLUMN alternativeGroup TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_bom_items ADD COLUMN isAlternative INTEGER NOT NULL DEFAULT 0",
+                "CREATE INDEX IF NOT EXISTS index_asset_bom_items_headerId ON asset_bom_items(headerId)",
+                "CREATE INDEX IF NOT EXISTS index_asset_bom_items_parentItemId ON asset_bom_items(parentItemId)",
+                "CREATE INDEX IF NOT EXISTS index_asset_bom_items_assemblyAssetId ON asset_bom_items(assemblyAssetId)",
+                "INSERT INTO asset_bom_headers (assetId, code, name, category, usage, alternative, status, validFrom, validTo, revision, assignmentType, constructionType, description) SELECT assetId, 'BOM-' || assetId, 'قائمة الصيانة الرئيسية', 'Asset', 'Maintenance', '01', 'Active', '', '', 'A', 'Direct', '', '' FROM asset_bom_items GROUP BY assetId",
+                "UPDATE asset_bom_items SET headerId = COALESCE((SELECT h.id FROM asset_bom_headers h WHERE h.assetId = asset_bom_items.assetId AND h.assignmentType = 'Direct' ORDER BY h.id LIMIT 1), 0), itemNumber = id * 10"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

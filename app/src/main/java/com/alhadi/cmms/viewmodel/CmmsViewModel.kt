@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.alhadi.cmms.data.CmmsRepository
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -128,6 +129,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val assetCharacteristics: StateFlow<List<AssetCharacteristicEntity>> = repository.assetCharacteristics
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val assetBomHeaders: StateFlow<List<AssetBomHeaderEntity>> = repository.assetBomHeaders
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val assetBom: StateFlow<List<AssetBomItemEntity>> = repository.assetBom
@@ -293,6 +297,8 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun deleteCharacteristic(item: AssetCharacteristicEntity) = launchAction("تم حذف الخاصية") { repository.deleteCharacteristic(item, actor()) }
 
     // ----- Asset BOM -----
+    fun saveBomHeader(header: AssetBomHeaderEntity) = launchAction("تم حفظ قائمة المكونات") { repository.saveBomHeader(header, actor()) }
+    fun deleteBomHeader(header: AssetBomHeaderEntity) = launchAction("تم حذف قائمة المكونات") { repository.deleteBomHeader(header, actor()) }
     fun saveBomItem(item: AssetBomItemEntity) = launchAction("تم حفظ بند المكوّنات") { repository.saveBomItem(item, actor()) }
     fun deleteBomItem(item: AssetBomItemEntity) = launchAction("تم حذف بند المكوّنات") { repository.deleteBomItem(item, actor()) }
 

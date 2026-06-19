@@ -133,6 +133,7 @@ import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.notify.Reminders
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -215,6 +216,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
     val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
+    val assetBomHeaders by viewModel.assetBomHeaders.collectAsStateWithLifecycle()
     val assetBom by viewModel.assetBom.collectAsStateWithLifecycle()
     val assetMovements by viewModel.assetMovements.collectAsStateWithLifecycle()
     val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
@@ -328,6 +330,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         permits = workPermits,
                         parts = spareParts,
                         transactions = transactions,
+                        bomHeaders = assetBomHeaders,
                         bom = assetBom,
                         canManage = canManage,
                         defaultAssignee = actorName,
@@ -376,6 +379,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         locations = locations,
                         documents = assetDocuments,
                         characteristics = assetCharacteristics,
+                        bomHeaders = assetBomHeaders,
                         bomItems = assetBom,
                         movements = assetMovements,
                         spareParts = spareParts,
@@ -390,6 +394,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onDeleteDocument = viewModel::deleteAssetDocument,
                         onSaveCharacteristic = viewModel::saveCharacteristic,
                         onDeleteCharacteristic = viewModel::deleteCharacteristic,
+                        onSaveBomHeader = viewModel::saveBomHeader,
+                        onDeleteBomHeader = viewModel::deleteBomHeader,
                         onSaveBom = viewModel::saveBomItem,
                         onDeleteBom = viewModel::deleteBomItem,
                         onMove = viewModel::performAssetMovement
@@ -1171,6 +1177,7 @@ private fun AssetsScreen(
     locations: List<FunctionalLocationEntity>,
     documents: List<AssetDocumentEntity>,
     characteristics: List<AssetCharacteristicEntity>,
+    bomHeaders: List<AssetBomHeaderEntity>,
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
     spareParts: List<SparePartEntity>,
@@ -1185,6 +1192,8 @@ private fun AssetsScreen(
     onDeleteDocument: (AssetDocumentEntity) -> Unit,
     onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onSaveBomHeader: (AssetBomHeaderEntity) -> Unit,
+    onDeleteBomHeader: (AssetBomHeaderEntity) -> Unit,
     onSaveBom: (AssetBomItemEntity) -> Unit,
     onDeleteBom: (AssetBomItemEntity) -> Unit,
     onMove: (AssetEntity, String, Long?, String, String) -> Unit
@@ -1225,7 +1234,8 @@ private fun AssetsScreen(
             pmItems = pmItems.filter { it.assetId == detailAsset.id },
             documents = documents.filter { it.assetId == detailAsset.id },
             characteristics = characteristics,
-            bomItems = bomItems.filter { it.assetId == detailAsset.id },
+            bomHeaders = bomHeaders,
+            bomItems = bomItems,
             movements = movements.filter { it.assetId == detailAsset.id },
             spareParts = spareParts,
             locations = locations,
@@ -1241,6 +1251,8 @@ private fun AssetsScreen(
             onDeleteDocument = onDeleteDocument,
             onSaveCharacteristic = onSaveCharacteristic,
             onDeleteCharacteristic = onDeleteCharacteristic,
+            onSaveBomHeader = onSaveBomHeader,
+            onDeleteBomHeader = onDeleteBomHeader,
             onSaveBom = onSaveBom,
             onDeleteBom = onDeleteBom,
             onMove = onMove
@@ -1271,6 +1283,7 @@ private fun AssetsScreen(
                 asset.city.lowercase(Locale.getDefault()).contains(q) ||
                 asset.country.lowercase(Locale.getDefault()).contains(q) ||
                 asset.standardClass.lowercase(Locale.getDefault()).contains(q) ||
+                asset.constructionType.lowercase(Locale.getDefault()).contains(q) ||
                 asset.linearRouteCode.lowercase(Locale.getDefault()).contains(q) ||
                 asset.linearReferencePattern.lowercase(Locale.getDefault()).contains(q) ||
                 asset.linearStartMarker.lowercase(Locale.getDefault()).contains(q) ||
@@ -1418,6 +1431,7 @@ private fun AssetDetailScreen(
     pmItems: List<PreventiveMaintenanceEntity>,
     documents: List<AssetDocumentEntity>,
     characteristics: List<AssetCharacteristicEntity>,
+    bomHeaders: List<AssetBomHeaderEntity>,
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
     spareParts: List<SparePartEntity>,
@@ -1434,6 +1448,8 @@ private fun AssetDetailScreen(
     onDeleteDocument: (AssetDocumentEntity) -> Unit,
     onSaveCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
+    onSaveBomHeader: (AssetBomHeaderEntity) -> Unit,
+    onDeleteBomHeader: (AssetBomHeaderEntity) -> Unit,
     onSaveBom: (AssetBomItemEntity) -> Unit,
     onDeleteBom: (AssetBomItemEntity) -> Unit,
     onMove: (AssetEntity, String, Long?, String, String) -> Unit
@@ -1510,6 +1526,7 @@ private fun AssetDetailScreen(
                     if (asset.description.isNotBlank()) InfoRow("الوصف", asset.description)
                     InfoRow("فئة الأصل", assetCategoryLabel(asset.category))
                     if (asset.objectType.isNotBlank()) InfoRow("نوع الأصل", asset.objectType)
+                    if (asset.constructionType.isNotBlank()) InfoRow("نوع الإنشاء", asset.constructionType)
                     InfoRow("المجموعة", asset.groupName)
                     InfoRow("الموقع", asset.location.ifBlank { "غير محدد" })
                     InfoRow("الموقع الفني", locationLabel)
@@ -1705,38 +1722,18 @@ private fun AssetDetailScreen(
         }
 
         item {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                SectionHeader("قائمة المكوّنات BOM (${bomItems.size})")
-                Spacer(modifier = Modifier.weight(1f))
-                if (canManage && spareParts.isNotEmpty()) {
-                    OutlinedButton(onClick = { showBomForm = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("إضافة")
-                    }
-                }
-            }
-        }
-        if (bomItems.isEmpty()) {
-            item { EmptyState("لا توجد قطع غيار مرتبطة بهذا الأصل") }
-        }
-        items(bomItems, key = { "bom-${it.id}" }) { item ->
-            val part = partMap[item.partId]
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    IconBubble(Icons.Filled.Inventory2, AccentPurple, AccentPurple.copy(alpha = 0.14f), 36)
-                    Column(modifier = Modifier.weight(1f)) {
-                        LtrText(part?.partNumber ?: "Part #${item.partId}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                        Text(part?.name ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    StatusBadge("×${item.quantity}", statusTone("info"))
-                    if (canManage) {
-                        IconButton(onClick = { deleteBom = item }) {
-                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                }
-            }
+            AssetBomSection(
+                asset = asset,
+                allAssets = allAssets,
+                headers = bomHeaders,
+                items = bomItems,
+                parts = spareParts,
+                canManage = canManage,
+                onSaveHeader = onSaveBomHeader,
+                onDeleteHeader = onDeleteBomHeader,
+                onSaveItem = onSaveBom,
+                onDeleteItem = onDeleteBom
+            )
         }
 
         item {
@@ -2273,6 +2270,7 @@ private fun WorkOrdersScreen(
     permits: List<WorkPermitEntity>,
     parts: List<SparePartEntity>,
     transactions: List<InventoryTransactionEntity>,
+    bomHeaders: List<AssetBomHeaderEntity>,
     bom: List<AssetBomItemEntity>,
     canManage: Boolean,
     defaultAssignee: String,
@@ -2293,6 +2291,7 @@ private fun WorkOrdersScreen(
     onDeletePermit: (WorkPermitEntity) -> Unit
 ) {
     val partMap = remember(parts) { parts.associateBy { it.id } }
+    val today = DateStrings.today()
     val statusFilters = listOf("All", "Open", "In Progress", "Technically Completed", "Closed")
     val priorityFilters = listOf("All", "Critical", "High", "Medium", "Low")
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
@@ -2400,7 +2399,13 @@ private fun WorkOrdersScreen(
                     permits = permits.filter { it.orderId == workOrder.id },
                     materials = transactions.filter { it.workOrderId == workOrder.id },
                     catalog = parts,
-                    bomPartIds = bom.filter { it.assetId == workOrder.assetId }.map { it.partId }.toSet(),
+                    bomPartIds = assetMap[workOrder.assetId]?.let { orderAsset ->
+                        val activeHeaderIds = resolveAssetBomHeaders(orderAsset, bomHeaders)
+                            .filter { bomHeaderUsableInOrder(it, today) }
+                            .mapTo(mutableSetOf()) { it.id }
+                        bom.filter { it.headerId in activeHeaderIds && bomItemUsableInOrder(it, today) }
+                            .mapTo(mutableSetOf()) { it.partId }
+                    } ?: emptySet(),
                     partMap = partMap,
                     onIssueMaterial = onIssueMaterial,
                     onExportPdf = onExportPdf,
@@ -2846,7 +2851,7 @@ private fun MaterialPickerSheet(
                         LtrText(part.partNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                         Text(part.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (part.id in bomPartIds) StatusBadge("ضمن BOM", statusTone("info"))
+                    if (part.id in bomPartIds) StatusBadge("موصى بها", statusTone("info"))
                     StatusBadge("متوفر ${part.onHandQty}", statusTone("running"))
                 }
             }

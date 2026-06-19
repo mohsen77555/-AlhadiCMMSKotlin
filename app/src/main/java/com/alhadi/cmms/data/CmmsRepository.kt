@@ -1,6 +1,7 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -43,6 +44,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val capaDao = database.capaDao()
     private val documentDao = database.assetDocumentDao()
     private val characteristicDao = database.assetCharacteristicDao()
+    private val bomHeaderDao = database.assetBomHeaderDao()
     private val bomDao = database.assetBomDao()
     private val movementDao = database.assetMovementDao()
     private val checklistDao = database.pmChecklistDao()
@@ -67,6 +69,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val capaActions: Flow<List<CapaEntity>> = capaDao.observeCapa()
     val assetDocuments: Flow<List<AssetDocumentEntity>> = documentDao.observeDocuments()
     val assetCharacteristics: Flow<List<AssetCharacteristicEntity>> = characteristicDao.observeCharacteristics()
+    val assetBomHeaders: Flow<List<AssetBomHeaderEntity>> = bomHeaderDao.observeHeaders()
     val assetBom: Flow<List<AssetBomItemEntity>> = bomDao.observeBom()
     val assetMovements: Flow<List<AssetMovementEntity>> = movementDao.observeMovements()
     val pmChecklist: Flow<List<PmChecklistItemEntity>> = checklistDao.observeItems()
@@ -127,10 +130,44 @@ class CmmsRepository(private val database: AppDatabase) {
         encodeDefaults = true
     }
 
+
+    private suspend fun restoreBomData(
+        headers: List<AssetBomHeaderEntity>,
+        items: List<AssetBomItemEntity>
+    ) {
+        val restoredHeaderIds = headers.mapTo(mutableSetOf()) { it.id }
+        if (headers.isNotEmpty()) bomHeaderDao.insertAll(headers)
+
+        val assigned = items.filter { it.headerId != 0L && it.headerId in restoredHeaderIds }
+        if (assigned.isNotEmpty()) bomDao.insertAll(assigned)
+
+        val legacy = items.filterNot { it in assigned }
+        legacy.groupBy { it.assetId }.forEach { (assetId, lines) ->
+            val headerId = bomHeaderDao.insert(
+                AssetBomHeaderEntity(
+                    assetId = assetId.takeIf { it != 0L },
+                    code = "RESTORED-$assetId",
+                    name = "قائمة مكونات مستعادة",
+                    category = "Asset",
+                    usage = "Maintenance",
+                    alternative = "01",
+                    status = "Active",
+                    revision = "A",
+                    assignmentType = "Direct"
+                )
+            )
+            bomDao.insertAll(
+                lines.sortedBy { it.id }.mapIndexed { index, item ->
+                    item.copy(headerId = headerId, itemNumber = item.itemNumber.takeIf { it > 0 } ?: (index + 1) * 10)
+                }
+            )
+        }
+    }
+
     /** Serializes every table into a portable JSON backup string. */
     suspend fun exportBackup(): String {
         val bundle = BackupBundle(
-            appDbVersion = 22,
+            appDbVersion = 26,
             exportedAt = DateStrings.now(),
             assets = assets.first(),
             workOrders = workOrders.first(),
@@ -145,6 +182,7 @@ class CmmsRepository(private val database: AppDatabase) {
             capa = capaActions.first(),
             assetDocuments = assetDocuments.first(),
             assetCharacteristics = assetCharacteristics.first(),
+            assetBomHeaders = assetBomHeaders.first(),
             assetBom = assetBom.first(),
             assetMovements = assetMovements.first(),
             pmChecklist = pmChecklist.first(),
@@ -178,6 +216,7 @@ class CmmsRepository(private val database: AppDatabase) {
             checklistDao.deleteAll()
             movementDao.deleteAll()
             bomDao.deleteAll()
+            bomHeaderDao.deleteAll()
             characteristicDao.deleteAll()
             documentDao.deleteAll()
             capaDao.deleteAll()
@@ -205,7 +244,7 @@ class CmmsRepository(private val database: AppDatabase) {
             capaDao.insertAll(bundle.capa)
             documentDao.insertAll(bundle.assetDocuments)
             characteristicDao.insertAll(bundle.assetCharacteristics)
-            bomDao.insertAll(bundle.assetBom)
+            restoreBomData(bundle.assetBomHeaders, bundle.assetBom)
             movementDao.insertAll(bundle.assetMovements)
             notificationDao.insertAll(bundle.notifications)
             operationDao.insertAll(bundle.operations)
@@ -238,6 +277,7 @@ class CmmsRepository(private val database: AppDatabase) {
                 checklistDao.deleteAll()
                 movementDao.deleteAll()
                 bomDao.deleteAll()
+                bomHeaderDao.deleteAll()
                 characteristicDao.deleteAll()
                 documentDao.deleteAll()
                 capaDao.deleteAll()
@@ -354,11 +394,21 @@ class CmmsRepository(private val database: AppDatabase) {
                 AssetCharacteristicEntity(5, 4, "Voltage", "400", "V")
             )
 
+            val bomHeaders = listOf(
+                AssetBomHeaderEntity(1, 7, "RM-01-MAIN", "مكونات صيانة المطحنة", "Asset", "Maintenance", "01", "Active", "", "", "A", "Direct", "", "قطع الغيار والتجميعات الرئيسية"),
+                AssetBomHeaderEntity(2, 1, "BE-101-MAIN", "مكونات المصعد", "Asset", "Maintenance", "01", "Active", "", "", "A", "Direct", "", ""),
+                AssetBomHeaderEntity(3, 2, "CC-205-MAIN", "مكونات ناقل السلسلة", "Asset", "Maintenance", "01", "Active", "", "", "A", "Direct", "", ""),
+                AssetBomHeaderEntity(4, 10, "CP-01-MAIN", "مكونات الضاغط", "Asset", "Maintenance", "01", "Active", "", "", "A", "Direct", "", ""),
+                AssetBomHeaderEntity(5, 4, "SF-030-MAIN", "مكونات مروحة الصومعة", "Asset", "Maintenance", "01", "Active", "", "", "A", "Direct", "", "هيكل متعدد المستويات")
+            )
+
             val bomItems = listOf(
-                AssetBomItemEntity(1, 7, 1, 4),
-                AssetBomItemEntity(2, 1, 2, 2),
-                AssetBomItemEntity(3, 2, 3, 6),
-                AssetBomItemEntity(4, 10, 5, 1)
+                AssetBomItemEntity(id = 1, assetId = 7, partId = 1, quantity = 4, headerId = 1, itemNumber = 10, itemCategory = "Stock", isCritical = true, notes = "محامل التشغيل الرئيسية"),
+                AssetBomItemEntity(id = 2, assetId = 1, partId = 2, quantity = 2, headerId = 2, itemNumber = 10, itemCategory = "Stock", isCritical = true),
+                AssetBomItemEntity(id = 3, assetId = 2, partId = 3, quantity = 6, headerId = 3, itemNumber = 10, itemCategory = "Stock"),
+                AssetBomItemEntity(id = 4, assetId = 10, partId = 5, quantity = 1, headerId = 4, itemNumber = 10, itemCategory = "Stock"),
+                AssetBomItemEntity(id = 5, assetId = 4, partId = 0, quantity = 1, headerId = 5, itemNumber = 10, itemCategory = "Assembly", useInOrders = false, assemblyAssetId = 6, notes = "تجميعة الاستشعار والتحكم"),
+                AssetBomItemEntity(id = 6, assetId = 4, partId = 4, quantity = 1, headerId = 5, itemNumber = 20, itemCategory = "Stock", parentItemId = 5, isCritical = true)
             )
 
             val movements = listOf(
@@ -413,6 +463,7 @@ class CmmsRepository(private val database: AppDatabase) {
             capaDao.insertAll(capaActions)
             documentDao.insertAll(documents)
             characteristicDao.insertAll(characteristics)
+            bomHeaderDao.insertAll(bomHeaders)
             bomDao.insertAll(bomItems)
             movementDao.insertAll(movements)
             checklistDao.insertAll(checklist)
@@ -647,8 +698,14 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteAsset(asset: AssetEntity, actor: String = "System") {
-        assetDao.deleteById(asset.id)
-        recordAudit("Delete", "Asset", "حذف أصل: ${asset.code}", actor)
+        database.withTransaction {
+            bomHeaderDao.headersForAsset(asset.id).forEach { header ->
+                bomDao.deleteForHeader(header.id)
+                bomHeaderDao.deleteById(header.id)
+            }
+            assetDao.deleteById(asset.id)
+            recordAudit("Delete", "Asset", "حذف أصل: ${asset.code}", actor)
+        }
     }
 
     suspend fun changeAssetStatus(asset: AssetEntity, status: String, actor: String = "System") {
@@ -868,15 +925,77 @@ class CmmsRepository(private val database: AppDatabase) {
     // Asset BOM (maintenance bill of materials)
     // ---------------------------------------------------------------------
 
+    suspend fun saveBomHeader(header: AssetBomHeaderEntity, actor: String = "System") {
+        require(header.code.isNotBlank()) { "أدخل كود قائمة المكونات" }
+        require(header.name.isNotBlank()) { "أدخل اسم قائمة المكونات" }
+        require(header.hasValidDates()) { "تاريخ بداية الصلاحية يجب ألا يتجاوز تاريخ النهاية" }
+        if (header.assignmentType == "Direct") {
+            require(header.assetId != null && header.assetId != 0L) { "حدد الأصل المرتبط بالقائمة" }
+        } else {
+            require(header.constructionType.isNotBlank()) { "أدخل نوع الإنشاء للتعيين المشترك" }
+        }
+
+        val normalized = header.copy(
+            assetId = header.assetId.takeIf { header.assignmentType == "Direct" },
+            code = header.code.trim().uppercase(),
+            name = header.name.trim(),
+            alternative = header.alternative.trim().ifBlank { "01" },
+            constructionType = header.constructionType.trim(),
+            description = header.description.trim()
+        )
+        val isNew = normalized.id == 0L
+        if (isNew) bomHeaderDao.insert(normalized) else bomHeaderDao.update(normalized)
+        recordAudit(if (isNew) "Create" else "Update", "BOM", "${if (isNew) "إنشاء" else "تعديل"} قائمة مكونات: ${normalized.code}", actor)
+    }
+
+    suspend fun deleteBomHeader(header: AssetBomHeaderEntity, actor: String = "System") {
+        database.withTransaction {
+            bomDao.deleteForHeader(header.id)
+            bomHeaderDao.deleteById(header.id)
+            recordAudit("Delete", "BOM", "حذف قائمة مكونات: ${header.code}", actor)
+        }
+    }
+
     suspend fun saveBomItem(item: AssetBomItemEntity, actor: String = "System") {
-        val isNew = item.id == 0L
-        bomDao.insert(item)
-        recordAudit(if (isNew) "Create" else "Update", "BOM", "${if (isNew) "إضافة" else "تعديل"} بند مكوّنات (قطعة #${item.partId})", actor)
+        require(item.headerId != 0L) { "حدد قائمة المكونات" }
+        require(item.itemNumber > 0) { "رقم البند يجب أن يكون أكبر من صفر" }
+        require(item.quantity > 0) { "الكمية يجب أن تكون أكبر من صفر" }
+        require(item.hasValidDates()) { "تاريخ بداية صلاحية البند يجب ألا يتجاوز تاريخ النهاية" }
+
+        val header = bomHeaderDao.getById(item.headerId)
+            ?: throw IllegalStateException("قائمة المكونات المحددة غير موجودة")
+        val parent = item.parentItemId?.let { bomDao.getById(it) }
+        if (parent != null) require(parent.headerId == item.headerId) { "البند الأب يجب أن يكون ضمن القائمة نفسها" }
+        require(item.id == 0L || item.parentItemId != item.id) { "لا يمكن أن يكون البند أباً لنفسه" }
+
+        val normalized = when (item.itemCategory) {
+            "Stock", "NonStock" -> {
+                require(item.partId != 0L) { "حدد قطعة الغيار" }
+                item.copy(assetId = header.assetId ?: 0L, assemblyAssetId = null)
+            }
+            "Assembly" -> {
+                require(item.assemblyAssetId != null && item.assemblyAssetId != 0L) { "حدد تجميعة الصيانة" }
+                require(item.assemblyAssetId != header.assetId) { "لا يمكن ربط الأصل بنفسه كتجميعة" }
+                item.copy(assetId = header.assetId ?: 0L, partId = 0L, useInOrders = false)
+            }
+            "Text" -> {
+                require(item.notes.isNotBlank()) { "أدخل وصف البند النصي" }
+                item.copy(assetId = header.assetId ?: 0L, partId = 0L, assemblyAssetId = null, useInOrders = false)
+            }
+            else -> throw IllegalArgumentException("فئة بند غير مدعومة")
+        }
+
+        val isNew = normalized.id == 0L
+        bomDao.insert(normalized)
+        recordAudit(if (isNew) "Create" else "Update", "BOM", "${if (isNew) "إضافة" else "تعديل"} بند ${normalized.itemNumber} في ${header.code}", actor)
     }
 
     suspend fun deleteBomItem(item: AssetBomItemEntity, actor: String = "System") {
-        bomDao.deleteById(item.id)
-        recordAudit("Delete", "BOM", "حذف بند مكوّنات (قطعة #${item.partId})", actor)
+        database.withTransaction {
+            bomDao.clearParent(item.id)
+            bomDao.deleteById(item.id)
+            recordAudit("Delete", "BOM", "حذف بند مكونات رقم ${item.itemNumber}", actor)
+        }
     }
 
     // ---------------------------------------------------------------------

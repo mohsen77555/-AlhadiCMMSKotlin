@@ -1,5 +1,6 @@
 package com.alhadi.cmms.data
 
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -49,6 +50,7 @@ data class BackupBundle(
     val capa: List<CapaEntity> = emptyList(),
     val assetDocuments: List<AssetDocumentEntity> = emptyList(),
     val assetCharacteristics: List<AssetCharacteristicEntity> = emptyList(),
+    val assetBomHeaders: List<AssetBomHeaderEntity> = emptyList(),
     val assetBom: List<AssetBomItemEntity> = emptyList(),
     val assetMovements: List<AssetMovementEntity> = emptyList(),
     val pmChecklist: List<PmChecklistItemEntity> = emptyList(),
@@ -65,11 +67,11 @@ data class BackupBundle(
         get() = assets.size + workOrders.size + preventiveMaintenance.size + spareParts.size +
             inventoryTransactions.size + users.size + auditLog.size + measuringPoints.size +
             measurementReadings.size + functionalLocations.size + capa.size + assetDocuments.size +
-            assetCharacteristics.size + assetBom.size + assetMovements.size + pmChecklist.size +
+            assetCharacteristics.size + assetBomHeaders.size + assetBom.size + assetMovements.size + pmChecklist.size +
             notifications.size + operations.size + confirmations.size + photos.size +
             taskLists.size + taskListOperations.size + permits.size
 
     companion object {
-        const val CURRENT_FORMAT_VERSION = 1
+        const val CURRENT_FORMAT_VERSION = 2
     }
 }

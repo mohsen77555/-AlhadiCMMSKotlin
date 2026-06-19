@@ -80,6 +80,8 @@ data class AssetEntity(
     val country: String = "",
     @ColumnInfo(defaultValue = "''")
     val standardClass: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val constructionType: String = "",
     @ColumnInfo(defaultValue = "1")
     val inheritParentCharacteristics: Boolean = true,
     @ColumnInfo(defaultValue = "0")

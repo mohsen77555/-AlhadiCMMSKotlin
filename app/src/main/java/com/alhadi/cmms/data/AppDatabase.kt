@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.alhadi.cmms.data.dao.AssetBomDao
+import com.alhadi.cmms.data.dao.AssetBomHeaderDao
 import com.alhadi.cmms.data.dao.AssetCharacteristicDao
 import com.alhadi.cmms.data.dao.AssetDao
 import com.alhadi.cmms.data.dao.AssetDocumentDao
@@ -25,6 +26,7 @@ import com.alhadi.cmms.data.dao.WorkOrderDao
 import com.alhadi.cmms.data.dao.WorkOrderOperationDao
 import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
 import com.alhadi.cmms.data.dao.WorkPermitDao
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -64,6 +66,7 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         CapaEntity::class,
         AssetDocumentEntity::class,
         AssetCharacteristicEntity::class,
+        AssetBomHeaderEntity::class,
         AssetBomItemEntity::class,
         AssetMovementEntity::class,
         PmChecklistItemEntity::class,
@@ -75,7 +78,7 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         TaskListOperationEntity::class,
         WorkPermitEntity::class
     ],
-    version = 25,
+    version = 26,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -91,6 +94,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun capaDao(): CapaDao
     abstract fun assetDocumentDao(): AssetDocumentDao
     abstract fun assetCharacteristicDao(): AssetCharacteristicDao
+    abstract fun assetBomHeaderDao(): AssetBomHeaderDao
     abstract fun assetBomDao(): AssetBomDao
     abstract fun assetMovementDao(): AssetMovementDao
     abstract fun pmChecklistDao(): PmChecklistDao
