@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -34,7 +35,49 @@ data class AssetEntity(
     val supplier: String = "",
     val purchaseOrder: String = "",
     val purchaseCost: Double = 0.0,
-    val acquiredAt: String = ""
+    val acquiredAt: String = "",
+    @ColumnInfo(defaultValue = "'Machine'")
+    val category: String = "Machine",
+    @ColumnInfo(defaultValue = "''")
+    val objectType: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val description: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val maintenancePlant: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val planningPlant: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val plannerGroup: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val mainWorkCenter: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val productionWorkCenter: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val costCenter: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val responsiblePerson: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val assetNumber: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val constructionYear: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val constructionMonth: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val startupDate: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val partnerName: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val partnerRole: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val partnerPhone: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val partnerEmail: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val addressLine: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val city: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val country: String = ""
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

@@ -364,30 +364,91 @@ internal fun AssetFormSheet(
     var purchaseOrder by remember { mutableStateOf(initial?.purchaseOrder ?: "") }
     var purchaseCost by remember { mutableStateOf((initial?.purchaseCost ?: 0.0).toString()) }
     var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
+    var category by remember { mutableStateOf(initial?.category ?: "Machine") }
+    var objectType by remember { mutableStateOf(initial?.objectType ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var maintenancePlant by remember { mutableStateOf(initial?.maintenancePlant ?: "") }
+    var planningPlant by remember { mutableStateOf(initial?.planningPlant ?: "") }
+    var plannerGroup by remember { mutableStateOf(initial?.plannerGroup ?: "") }
+    var mainWorkCenter by remember { mutableStateOf(initial?.mainWorkCenter ?: "") }
+    var productionWorkCenter by remember { mutableStateOf(initial?.productionWorkCenter ?: "") }
+    var costCenter by remember { mutableStateOf(initial?.costCenter ?: "") }
+    var responsiblePerson by remember { mutableStateOf(initial?.responsiblePerson ?: "") }
+    var assetNumber by remember { mutableStateOf(initial?.assetNumber ?: "") }
+    var constructionYear by remember { mutableStateOf(initial?.constructionYear ?: "") }
+    var constructionMonth by remember { mutableStateOf(initial?.constructionMonth ?: "") }
+    var startupDate by remember { mutableStateOf(initial?.startupDate ?: "") }
+    var partnerName by remember { mutableStateOf(initial?.partnerName ?: "") }
+    var partnerRole by remember { mutableStateOf(initial?.partnerRole ?: "") }
+    var partnerPhone by remember { mutableStateOf(initial?.partnerPhone ?: "") }
+    var partnerEmail by remember { mutableStateOf(initial?.partnerEmail ?: "") }
+    var addressLine by remember { mutableStateOf(initial?.addressLine ?: "") }
+    var city by remember { mutableStateOf(initial?.city ?: "") }
+    var country by remember { mutableStateOf(initial?.country ?: "") }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
-        LabeledField("الكود (Code)", code, { code = it })
-        LabeledField("الاسم (Name)", name, { name = it })
-        LabeledField("المجموعة (Group)", group, { group = it })
-        LabeledField("الموقع النصّي (Location)", location, { location = it })
+        Text("البيانات الأساسية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("كود الأصل", code, { code = it })
+        LabeledField("اسم الأصل", name, { name = it })
+        LabeledField("الوصف", description, { description = it }, singleLine = false)
+        OptionDropdown(
+            label = "فئة الأصل",
+            options = assetCategoryOptions,
+            selected = category,
+            display = ::assetCategoryLabel
+        ) { category = it }
+        LabeledField("نوع الأصل (مثال: مضخة، محرك، ناقل)", objectType, { objectType = it })
+        LabeledField("المجموعة", group, { group = it })
+        LabeledField("الموقع النصّي", location, { location = it })
         if (locations.isNotEmpty()) {
             LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
         }
         if (allAssets.isNotEmpty()) {
             AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
         }
+
+        Text("البيانات الفنية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
-        LabeledField("الموديل (Model)", model, { model = it })
+        LabeledField("الموديل", model, { model = it })
+        LabeledField("سنة الصنع", constructionYear, { constructionYear = it }, numeric = true)
+        LabeledField("شهر الصنع", constructionMonth, { constructionMonth = it }, numeric = true)
+        DateField("تاريخ بدء التشغيل", startupDate) { startupDate = it }
         OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
-        Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
-        LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
-        LabeledField("المورّد (Supplier)", supplier, { supplier = it })
-        LabeledField("أمر الشراء (PO)", purchaseOrder, { purchaseOrder = it })
+
+        Text("التنظيم والمسؤولية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("مصنع الصيانة", maintenancePlant, { maintenancePlant = it })
+        LabeledField("مصنع التخطيط", planningPlant, { planningPlant = it })
+        LabeledField("مجموعة المخططين", plannerGroup, { plannerGroup = it })
+        LabeledField("مركز العمل الرئيسي", mainWorkCenter, { mainWorkCenter = it })
+        LabeledField("مركز عمل الإنتاج", productionWorkCenter, { productionWorkCenter = it })
+        LabeledField("مركز التكلفة", costCenter, { costCenter = it })
+        LabeledField("الشخص المسؤول", responsiblePerson, { responsiblePerson = it })
+
+        Text("الهوية والمعلومات المالية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("الرقم التسلسلي", serialNumber, { serialNumber = it })
+        LabeledField("وسم الأصل", assetTag, { assetTag = it })
+        LabeledField("رقم الأصل المالي", assetNumber, { assetNumber = it })
+        LabeledField("المورّد", supplier, { supplier = it })
+        LabeledField("أمر الشراء", purchaseOrder, { purchaseOrder = it })
         LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
         DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
-        Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+
+        Text("جهة الاتصال والعنوان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("اسم الجهة أو الشخص", partnerName, { partnerName = it })
+        OptionDropdown(
+            label = "صفة الجهة",
+            options = assetPartnerRoleOptions,
+            selected = partnerRole,
+            display = ::assetPartnerRoleLabel
+        ) { partnerRole = it }
+        LabeledField("رقم الهاتف", partnerPhone, { partnerPhone = it })
+        LabeledField("البريد الإلكتروني", partnerEmail, { partnerEmail = it })
+        LabeledField("العنوان", addressLine, { addressLine = it }, singleLine = false)
+        LabeledField("المدينة", city, { city = it })
+        LabeledField("الدولة", country, { country = it })
+
+        Text("الضمان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
         DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
         DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
@@ -416,7 +477,28 @@ internal fun AssetFormSheet(
                     supplier = supplier.trim(),
                     purchaseOrder = purchaseOrder.trim(),
                     purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
-                    acquiredAt = acquiredAt.trim()
+                    acquiredAt = acquiredAt.trim(),
+                    category = category,
+                    objectType = objectType.trim(),
+                    description = description.trim(),
+                    maintenancePlant = maintenancePlant.trim(),
+                    planningPlant = planningPlant.trim(),
+                    plannerGroup = plannerGroup.trim(),
+                    mainWorkCenter = mainWorkCenter.trim(),
+                    productionWorkCenter = productionWorkCenter.trim(),
+                    costCenter = costCenter.trim(),
+                    responsiblePerson = responsiblePerson.trim(),
+                    assetNumber = assetNumber.trim(),
+                    constructionYear = constructionYear.trim(),
+                    constructionMonth = constructionMonth.trim(),
+                    startupDate = startupDate.trim(),
+                    partnerName = partnerName.trim(),
+                    partnerRole = partnerRole,
+                    partnerPhone = partnerPhone.trim(),
+                    partnerEmail = partnerEmail.trim(),
+                    addressLine = addressLine.trim(),
+                    city = city.trim(),
+                    country = country.trim()
                 )
             )
         }

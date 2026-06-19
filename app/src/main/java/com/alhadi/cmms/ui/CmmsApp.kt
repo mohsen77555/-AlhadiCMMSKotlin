@@ -1256,7 +1256,20 @@ private fun AssetsScreen(
                 asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
                 asset.location.lowercase(Locale.getDefault()).contains(q) ||
                 asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
-                asset.assetTag.lowercase(Locale.getDefault()).contains(q)
+                asset.assetTag.lowercase(Locale.getDefault()).contains(q) ||
+                asset.description.lowercase(Locale.getDefault()).contains(q) ||
+                asset.category.lowercase(Locale.getDefault()).contains(q) ||
+                asset.objectType.lowercase(Locale.getDefault()).contains(q) ||
+                asset.maintenancePlant.lowercase(Locale.getDefault()).contains(q) ||
+                asset.planningPlant.lowercase(Locale.getDefault()).contains(q) ||
+                asset.plannerGroup.lowercase(Locale.getDefault()).contains(q) ||
+                asset.mainWorkCenter.lowercase(Locale.getDefault()).contains(q) ||
+                asset.costCenter.lowercase(Locale.getDefault()).contains(q) ||
+                asset.responsiblePerson.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetNumber.lowercase(Locale.getDefault()).contains(q) ||
+                asset.partnerName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.city.lowercase(Locale.getDefault()).contains(q) ||
+                asset.country.lowercase(Locale.getDefault()).contains(q)
         }
     }
     val grouped = filtered.groupBy { it.groupName }
@@ -1359,9 +1372,18 @@ private fun AssetCard(
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 StatusBadge(asset.criticality, priorityTone(asset.criticality))
-                AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
+                AssistChip(onClick = {}, label = { Text(assetCategoryLabel(asset.category), maxLines = 1) })
+                if (asset.objectType.isNotBlank()) {
+                    AssistChip(onClick = {}, label = { Text(asset.objectType, maxLines = 1) })
+                }
+            }
+            if (asset.location.isNotBlank()) {
+                Text(asset.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
@@ -1418,6 +1440,20 @@ private fun AssetDetailScreen(
     var showMoveForm by remember { mutableStateOf(false) }
     val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
     val retired = asset.status.equals("Retired", ignoreCase = true)
+    val hasOrganization = listOf(
+        asset.maintenancePlant,
+        asset.planningPlant,
+        asset.plannerGroup,
+        asset.mainWorkCenter,
+        asset.productionWorkCenter,
+        asset.costCenter,
+        asset.responsiblePerson
+    ).any { it.isNotBlank() }
+    val hasPartner = listOf(asset.partnerName, asset.partnerRole, asset.partnerPhone, asset.partnerEmail).any { it.isNotBlank() }
+    val hasAddress = listOf(asset.addressLine, asset.city, asset.country).any { it.isNotBlank() }
+    val constructionDate = listOf(asset.constructionYear, asset.constructionMonth)
+        .filter { it.isNotBlank() }
+        .joinToString(" / ")
 
     LazyColumn(
         modifier = Modifier
@@ -1446,17 +1482,57 @@ private fun AssetDetailScreen(
         item {
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SectionHeader("المعلومات")
+                    SectionHeader("المعلومات الأساسية")
+                    if (asset.description.isNotBlank()) InfoRow("الوصف", asset.description)
+                    InfoRow("فئة الأصل", assetCategoryLabel(asset.category))
+                    if (asset.objectType.isNotBlank()) InfoRow("نوع الأصل", asset.objectType)
                     InfoRow("المجموعة", asset.groupName)
-                    InfoRow("الموقع", asset.location)
+                    InfoRow("الموقع", asset.location.ifBlank { "غير محدد" })
                     InfoRow("الموقع الفني", locationLabel)
                     InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
-                    InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                    InfoRow("الشركة/الموديل", listOf(asset.manufacturer, asset.model).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { "غير محدد" })
                     if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
                     if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
+                    if (asset.assetNumber.isNotBlank()) InfoRow("رقم الأصل المالي", asset.assetNumber)
                     InfoRow("الأهمية", asset.criticality)
+                    if (constructionDate.isNotBlank()) InfoRow("سنة / شهر الصنع", constructionDate)
                     InfoRow("تاريخ التركيب", asset.installedAt)
+                    if (asset.startupDate.isNotBlank()) InfoRow("تاريخ بدء التشغيل", asset.startupDate)
                     InfoRow("آخر فحص", asset.lastInspectionAt)
+                }
+            }
+        }
+
+        if (hasOrganization) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("التنظيم والمسؤولية")
+                        if (asset.maintenancePlant.isNotBlank()) InfoRow("مصنع الصيانة", asset.maintenancePlant)
+                        if (asset.planningPlant.isNotBlank()) InfoRow("مصنع التخطيط", asset.planningPlant)
+                        if (asset.plannerGroup.isNotBlank()) InfoRow("مجموعة المخططين", asset.plannerGroup)
+                        if (asset.mainWorkCenter.isNotBlank()) InfoRow("مركز العمل الرئيسي", asset.mainWorkCenter)
+                        if (asset.productionWorkCenter.isNotBlank()) InfoRow("مركز عمل الإنتاج", asset.productionWorkCenter)
+                        if (asset.costCenter.isNotBlank()) InfoRow("مركز التكلفة", asset.costCenter)
+                        if (asset.responsiblePerson.isNotBlank()) InfoRow("الشخص المسؤول", asset.responsiblePerson)
+                    }
+                }
+            }
+        }
+
+        if (hasPartner || hasAddress) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("جهة الاتصال والعنوان")
+                        if (asset.partnerName.isNotBlank()) InfoRow("الجهة أو الشخص", asset.partnerName)
+                        if (asset.partnerRole.isNotBlank()) InfoRow("الصفة", assetPartnerRoleLabel(asset.partnerRole))
+                        if (asset.partnerPhone.isNotBlank()) InfoRow("الهاتف", asset.partnerPhone)
+                        if (asset.partnerEmail.isNotBlank()) InfoRow("البريد الإلكتروني", asset.partnerEmail)
+                        if (asset.addressLine.isNotBlank()) InfoRow("العنوان", asset.addressLine)
+                        if (asset.city.isNotBlank()) InfoRow("المدينة", asset.city)
+                        if (asset.country.isNotBlank()) InfoRow("الدولة", asset.country)
+                    }
                 }
             }
         }
