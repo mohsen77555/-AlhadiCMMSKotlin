@@ -3,7 +3,7 @@ package com.alhadi.cmms.domain.governance
 import com.alhadi.cmms.data.BackupBundle
 
 object BackupGovernance {
-    const val CURRENT_DB_VERSION = 25
+    const val CURRENT_DB_VERSION = 26
 
     fun validateForRestore(bundle: BackupBundle): BackupValidationResult {
         val errors = mutableListOf<String>()
