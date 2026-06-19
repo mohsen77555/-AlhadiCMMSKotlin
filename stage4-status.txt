@@ -10,20 +10,20 @@ Structured maintenance component-list data stage 4 patch completed successfully.
 Structured maintenance component-list UI stage 4 patch completed successfully.
 
 --- build ---
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4430:28 Unresolved reference 'EditDeleteRow'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4439:1 Modifier 'private' is not applicable to 'local class'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4447:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4535:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4538:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4548:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4569:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4582:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4598:1 Modifier 'private' is not applicable to 'local function'.
-e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:4611:2 Syntax error: Expecting '}'.
+> Task :app:writeDebugSigningConfigVersions
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :app:mergeExtDexDebug
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin
+e: file:///home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt:1257:13 No value passed for parameter 'bomHeaders'.
 
 > Task :app:compileDebugKotlin FAILED
 > Task :app:copyRoomSchemas
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1781851495398.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1781851771188.json
 
 FAILURE: Build failed with an exception.
 
@@ -228,5 +228,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 6s
+BUILD FAILED in 59s
 32 actionable tasks: 32 executed
