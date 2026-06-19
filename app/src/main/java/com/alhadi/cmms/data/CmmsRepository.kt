@@ -29,6 +29,8 @@ import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PasswordHasher
+import com.alhadi.cmms.domain.governance.AssetGovernance
+import com.alhadi.cmms.domain.governance.BackupGovernance
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
@@ -187,7 +189,7 @@ class CmmsRepository(private val database: AppDatabase) {
     /** Serializes every table into a portable JSON backup string. */
     suspend fun exportBackup(): String {
         val bundle = BackupBundle(
-            appDbVersion = 22,
+            appDbVersion = 26,
             exportedAt = DateStrings.now(),
             assets = assets.first(),
             workOrders = workOrders.first(),
@@ -224,6 +226,7 @@ class CmmsRepository(private val database: AppDatabase) {
      */
     suspend fun importBackup(content: String): BackupBundle {
         val bundle = backupJson.decodeFromString(BackupBundle.serializer(), content)
+        BackupGovernance.requireValidForRestore(bundle)
         database.withTransaction {
             // Clear everything first.
             supplierDao.deleteAll()
@@ -667,8 +670,46 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveAsset(asset: AssetEntity, actor: String = "System") {
         val isNew = asset.id == 0L
-        assetDao.insertAsset(asset)
-        recordAudit(if (isNew) "Create" else "Update", "Asset", "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code}", actor)
+        val existing = if (isNew) null else assetDao.getAssetById(asset.id)
+        if (existing != null && existing.lifecycleStatus != asset.lifecycleStatus) {
+            AssetGovernance.requireLifecycleTransition(existing.lifecycleStatus, asset.lifecycleStatus)
+        }
+
+        val now = DateStrings.now()
+        val score = AssetGovernance.calculateCriticalityScore(
+            safety = asset.criticalitySafetyImpact,
+            production = asset.criticalityProductionImpact,
+            environment = asset.criticalityEnvironmentalImpact,
+            service = asset.criticalityServiceImpact,
+            financial = asset.criticalityFinancialImpact
+        )
+        val rating = AssetGovernance.criticalityRating(score)
+        val assessmentChanged = existing == null ||
+            existing.criticalitySafetyImpact != asset.criticalitySafetyImpact ||
+            existing.criticalityProductionImpact != asset.criticalityProductionImpact ||
+            existing.criticalityEnvironmentalImpact != asset.criticalityEnvironmentalImpact ||
+            existing.criticalityServiceImpact != asset.criticalityServiceImpact ||
+            existing.criticalityFinancialImpact != asset.criticalityFinancialImpact
+
+        val governed = asset.copy(
+            status = asset.operationalStatus.ifBlank { asset.status },
+            operationalStatus = asset.operationalStatus.ifBlank { asset.status },
+            criticality = rating,
+            criticalityScore = score,
+            criticalityAssessedAt = if (assessmentChanged) now else asset.criticalityAssessedAt,
+            criticalityAssessedBy = if (assessmentChanged) actor else asset.criticalityAssessedBy,
+            createdBy = if (isNew) actor else asset.createdBy,
+            createdAt = if (isNew) now else asset.createdAt,
+            updatedBy = actor,
+            updatedAt = now
+        )
+        assetDao.insertAsset(governed)
+        recordAudit(
+            if (isNew) "Create" else "Update",
+            "Asset",
+            "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code} • أهمية $rating ($score)",
+            actor
+        )
     }
 
     suspend fun deleteAsset(asset: AssetEntity, actor: String = "System") {
@@ -678,8 +719,16 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun changeAssetStatus(asset: AssetEntity, status: String, actor: String = "System") {
-        assetDao.insertAsset(asset.copy(status = status))
-        recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status", actor)
+        val now = DateStrings.now()
+        assetDao.insertAsset(
+            asset.copy(
+                status = status,
+                operationalStatus = status,
+                updatedBy = actor,
+                updatedAt = now
+            )
+        )
+        recordAudit("Status", "Asset", "تغيير الحالة التشغيلية ${asset.code} من ${asset.effectiveOperationalStatus()} إلى $status", actor)
     }
 
     // ---------------------------------------------------------------------
@@ -821,7 +870,33 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
         val isNew = location.id == 0L
-        locationDao.insert(location)
+        if (!isNew && location.parentId == location.id) {
+            throw IllegalStateException("لا يمكن أن يكون الموقع أباً لنفسه")
+        }
+        if (!isNew && location.referenceLocationId == location.id) {
+            throw IllegalStateException("لا يمكن أن يكون الموقع مرجعاً لنفسه")
+        }
+
+        val all = locationDao.dumpAll()
+        var cursor = location.parentId
+        val visited = mutableSetOf<Long>()
+        while (cursor != null) {
+            if (!isNew && cursor == location.id) {
+                throw IllegalStateException("العلاقة المحددة تنشئ دورة في شجرة المواقع")
+            }
+            if (!visited.add(cursor)) {
+                throw IllegalStateException("تم اكتشاف دورة في شجرة المواقع الفنية")
+            }
+            cursor = all.firstOrNull { it.id == cursor }?.parentId
+        }
+
+        val now = DateStrings.now()
+        val governed = location.copy(
+            referenceLocationId = if (location.isReference) null else location.referenceLocationId,
+            createdAt = if (isNew) now else location.createdAt,
+            updatedAt = now
+        )
+        locationDao.insert(governed)
         recordAudit(if (isNew) "Create" else "Update", "Location", "${if (isNew) "إضافة" else "تعديل"} موقع فني: ${location.code}", actor)
     }
 
@@ -1012,13 +1087,52 @@ class CmmsRepository(private val database: AppDatabase) {
     ) {
         database.withTransaction {
             val now = DateStrings.now()
+            val targetLifecycle = when (eventType) {
+                MovementType.INSTALL -> when (asset.lifecycleStatus) {
+                    "Draft", "Acquired", "InStorage" -> "Installed"
+                    else -> asset.lifecycleStatus
+                }
+                MovementType.DISMANTLE, MovementType.RETIRE -> "Decommissioned"
+                else -> asset.lifecycleStatus
+            }
+            if (targetLifecycle != asset.lifecycleStatus) {
+                AssetGovernance.requireLifecycleTransition(asset.lifecycleStatus, targetLifecycle)
+            }
+            if ((eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) && notes.isBlank()) {
+                throw IllegalStateException("سبب الفك أو التقاعد مطلوب")
+            }
+
+            val operational = when (eventType) {
+                MovementType.INSTALL, MovementType.TRANSFER -> "Running"
+                MovementType.DISMANTLE -> "Standby"
+                MovementType.RETIRE -> "Retired"
+                else -> asset.effectiveOperationalStatus()
+            }
             val updated = when (eventType) {
-                MovementType.INSTALL, MovementType.TRANSFER ->
-                    asset.copy(locationId = toLocationId, location = toLocationName.ifBlank { asset.location }, status = "Running")
-                MovementType.DISMANTLE ->
-                    asset.copy(locationId = null, status = "Standby")
-                MovementType.RETIRE ->
-                    asset.copy(status = "Retired")
+                MovementType.INSTALL, MovementType.TRANSFER -> asset.copy(
+                    locationId = toLocationId,
+                    location = toLocationName.ifBlank { asset.location },
+                    status = operational,
+                    operationalStatus = operational,
+                    lifecycleStatus = targetLifecycle,
+                    updatedBy = actor,
+                    updatedAt = now
+                )
+                MovementType.DISMANTLE -> asset.copy(
+                    locationId = null,
+                    status = operational,
+                    operationalStatus = operational,
+                    lifecycleStatus = targetLifecycle,
+                    updatedBy = actor,
+                    updatedAt = now
+                )
+                MovementType.RETIRE -> asset.copy(
+                    status = operational,
+                    operationalStatus = operational,
+                    lifecycleStatus = targetLifecycle,
+                    updatedBy = actor,
+                    updatedAt = now
+                )
                 else -> asset
             }
             assetDao.insertAsset(updated)
@@ -1032,10 +1146,20 @@ class CmmsRepository(private val database: AppDatabase) {
                     toLocationName = if (eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) "" else toLocationName,
                     notes = notes,
                     performedBy = actor,
-                    occurredAt = now
+                    occurredAt = now,
+                    reason = notes,
+                    previousLifecycleStatus = asset.lifecycleStatus,
+                    newLifecycleStatus = targetLifecycle,
+                    approvedBy = if (AssetGovernance.requiresApproval(targetLifecycle)) actor else "",
+                    referenceType = "AssetMovement"
                 )
             )
-            recordAudit("Movement", "Asset", "${MovementType.label(eventType)} للأصل: ${asset.code}", actor)
+            recordAudit(
+                "Movement",
+                "Asset",
+                "${MovementType.label(eventType)} للأصل: ${asset.code} • ${asset.lifecycleStatus} → $targetLifecycle",
+                actor
+            )
         }
     }
 

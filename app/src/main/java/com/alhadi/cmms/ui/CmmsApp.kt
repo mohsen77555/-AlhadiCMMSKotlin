@@ -1401,7 +1401,11 @@ private fun AssetsScreen(
                 asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
                 asset.location.lowercase(Locale.getDefault()).contains(q) ||
                 asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
-                asset.assetTag.lowercase(Locale.getDefault()).contains(q)
+                asset.assetTag.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetType.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetCategory.lowercase(Locale.getDefault()).contains(q) ||
+                asset.organizationCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.plantCode.lowercase(Locale.getDefault()).contains(q)
         }
     }
     val grouped = filtered.groupBy { it.groupName }
@@ -1494,19 +1498,20 @@ private fun AssetCard(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                val tone = statusTone(asset.status)
+                val tone = statusTone(asset.effectiveOperationalStatus())
                 IconBubble(Icons.Filled.PrecisionManufacturing, tone.content, tone.container, 44)
                 Column(modifier = Modifier.weight(1f)) {
                     LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(asset.status, tone)
+                StatusBadge(asset.effectiveOperationalStatus(), tone)
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusBadge(asset.criticality, priorityTone(asset.criticality))
                 AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
+                if (asset.assetCategory.isNotBlank()) AssistChip(onClick = {}, label = { Text(asset.assetCategory, maxLines = 1) })
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
@@ -1563,7 +1568,7 @@ private fun AssetDetailScreen(
     var showWoForm by remember { mutableStateOf(false) }
     var showMoveForm by remember { mutableStateOf(false) }
     val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
-    val retired = asset.status.equals("Retired", ignoreCase = true)
+    val retired = asset.lifecycleStatus == "Decommissioned" || asset.lifecycleStatus == "Disposed" || asset.status.equals("Retired", ignoreCase = true)
 
     LazyColumn(
         modifier = Modifier
@@ -1585,23 +1590,38 @@ private fun AssetDetailScreen(
                     LtrText(asset.code, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(asset.status, statusTone(asset.status))
+                StatusBadge(asset.effectiveOperationalStatus(), statusTone(asset.effectiveOperationalStatus()))
             }
         }
 
         item {
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SectionHeader("المعلومات")
+                    SectionHeader("بطاقة الأصل والحوكمة")
+                    InfoRow("نوع الأصل", asset.assetType)
+                    if (asset.assetCategory.isNotBlank()) InfoRow("التصنيف", asset.assetCategory)
                     InfoRow("المجموعة", asset.groupName)
+                    if (asset.description.isNotBlank()) InfoRow("الوصف", asset.description)
                     InfoRow("الموقع", asset.location)
                     InfoRow("الموقع الفني", locationLabel)
                     InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
+                    InfoRow("دورة الحياة", asset.lifecycleStatus)
+                    InfoRow("الحالة التشغيلية", asset.effectiveOperationalStatus())
+                    InfoRow("الحالة الصحية", asset.healthStatus)
                     InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                    asset.manufacturingYear?.let { InfoRow("سنة التصنيع", it.toString()) }
                     if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
                     if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
-                    InfoRow("الأهمية", asset.criticality)
+                    InfoRow("الأهمية", "${asset.criticality} (${asset.criticalityScore}/25)")
+                    if (asset.organizationCode.isNotBlank()) InfoRow("المنظمة", asset.organizationCode)
+                    if (asset.plantCode.isNotBlank()) InfoRow("المصنع", asset.plantCode)
+                    if (asset.maintenanceWorkCenter.isNotBlank()) InfoRow("مركز العمل", asset.maintenanceWorkCenter)
+                    if (asset.planningGroup.isNotBlank()) InfoRow("مجموعة التخطيط", asset.planningGroup)
+                    if (asset.costCenter.isNotBlank()) InfoRow("مركز التكلفة", asset.costCenter)
+                    if (asset.ownerDepartment.isNotBlank()) InfoRow("الإدارة المالكة", asset.ownerDepartment)
+                    if (asset.responsiblePerson.isNotBlank()) InfoRow("المسؤول", asset.responsiblePerson)
                     InfoRow("تاريخ التركيب", asset.installedAt)
+                    if (asset.commissioningDate.isNotBlank()) InfoRow("بدء التشغيل", asset.commissioningDate)
                     InfoRow("آخر فحص", asset.lastInspectionAt)
                 }
             }
@@ -1628,7 +1648,8 @@ private fun AssetDetailScreen(
         }
 
         val hasFinancial = asset.supplier.isNotBlank() || asset.purchaseOrder.isNotBlank() ||
-            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank()
+            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank() || asset.purchaseDate.isNotBlank() ||
+            asset.financialAssetRef.isNotBlank()
         if (hasFinancial) {
             item {
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -1637,7 +1658,9 @@ private fun AssetDetailScreen(
                         if (asset.supplier.isNotBlank()) InfoRow("المورّد", asset.supplier)
                         if (asset.purchaseOrder.isNotBlank()) InfoRow("أمر الشراء", asset.purchaseOrder)
                         if (asset.purchaseCost > 0.0) InfoRow("تكلفة الشراء", money(asset.purchaseCost))
+                        if (asset.purchaseDate.isNotBlank()) InfoRow("تاريخ الشراء", asset.purchaseDate)
                         if (asset.acquiredAt.isNotBlank()) InfoRow("تاريخ الاقتناء", asset.acquiredAt)
+                        if (asset.financialAssetRef.isNotBlank()) InfoRow("مرجع الأصل المالي", asset.financialAssetRef)
                     }
                 }
             }
@@ -1968,6 +1991,10 @@ private fun AssetDetailScreen(
                         }
                         if (route.isNotBlank()) LtrText(route, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (mv.notes.isNotBlank()) Text(mv.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (mv.previousLifecycleStatus.isNotBlank() || mv.newLifecycleStatus.isNotBlank()) {
+                            Text("دورة الحياة: ${mv.previousLifecycleStatus.ifBlank { "—" }} → ${mv.newLifecycleStatus.ifBlank { "—" }}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                        if (mv.approvedBy.isNotBlank()) Text("اعتمدها: ${mv.approvedBy}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         Text("${mv.performedBy} • ${mv.occurredAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -4634,7 +4661,7 @@ private fun LocationDetailScreen(
                         LtrText(asset.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                         LtrText(asset.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    StatusBadge(asset.status, statusTone(asset.status))
+                    StatusBadge(asset.effectiveOperationalStatus(), statusTone(asset.effectiveOperationalStatus()))
                 }
             }
         }

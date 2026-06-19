@@ -85,6 +85,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.domain.governance.AssetGovernance
 import com.alhadi.cmms.util.DateStrings
 
 // ---------------------------------------------------------------------------
@@ -371,50 +372,119 @@ internal fun AssetFormSheet(
 ) {
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
+    var assetType by remember { mutableStateOf(initial?.assetType ?: "Equipment") }
+    var assetCategory by remember { mutableStateOf(initial?.assetCategory ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
     var group by remember { mutableStateOf(initial?.groupName ?: "") }
     var location by remember { mutableStateOf(initial?.location ?: "") }
-    var manufacturer by remember { mutableStateOf(initial?.manufacturer ?: "") }
-    var model by remember { mutableStateOf(initial?.model ?: "") }
-    var status by remember { mutableStateOf(initial?.status ?: "Running") }
-    var criticality by remember { mutableStateOf(initial?.criticality ?: "Medium") }
     var locationId by remember { mutableStateOf(initial?.locationId) }
     var parentAssetId by remember { mutableStateOf(initial?.parentAssetId) }
-    var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
-    var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
-    var warrantyEnd by remember { mutableStateOf(initial?.warrantyEnd ?: "") }
+
+    var organizationCode by remember { mutableStateOf(initial?.organizationCode ?: "") }
+    var plantCode by remember { mutableStateOf(initial?.plantCode ?: "") }
+    var workCenter by remember { mutableStateOf(initial?.maintenanceWorkCenter ?: "") }
+    var planningGroup by remember { mutableStateOf(initial?.planningGroup ?: "") }
+    var costCenter by remember { mutableStateOf(initial?.costCenter ?: "") }
+    var ownerDepartment by remember { mutableStateOf(initial?.ownerDepartment ?: "") }
+    var responsiblePerson by remember { mutableStateOf(initial?.responsiblePerson ?: "") }
+
+    var manufacturer by remember { mutableStateOf(initial?.manufacturer ?: "") }
+    var model by remember { mutableStateOf(initial?.model ?: "") }
+    var manufacturingYear by remember { mutableStateOf(initial?.manufacturingYear?.toString() ?: "") }
     var serialNumber by remember { mutableStateOf(initial?.serialNumber ?: "") }
     var assetTag by remember { mutableStateOf(initial?.assetTag ?: "") }
+
+    var lifecycleStatus by remember { mutableStateOf(initial?.lifecycleStatus ?: "Draft") }
+    var operationalStatus by remember { mutableStateOf(initial?.effectiveOperationalStatus() ?: "Standby") }
+    var healthStatus by remember { mutableStateOf(initial?.healthStatus ?: "Good") }
+
+    var safetyImpact by remember { mutableStateOf((initial?.criticalitySafetyImpact ?: 1).toString()) }
+    var productionImpact by remember { mutableStateOf((initial?.criticalityProductionImpact ?: 1).toString()) }
+    var environmentImpact by remember { mutableStateOf((initial?.criticalityEnvironmentalImpact ?: 1).toString()) }
+    var serviceImpact by remember { mutableStateOf((initial?.criticalityServiceImpact ?: 1).toString()) }
+    var financialImpact by remember { mutableStateOf((initial?.criticalityFinancialImpact ?: 1).toString()) }
+
+    var installedAt by remember { mutableStateOf(initial?.installedAt ?: "") }
+    var lastInspectionAt by remember { mutableStateOf(initial?.lastInspectionAt ?: "") }
+    var purchaseDate by remember { mutableStateOf(initial?.purchaseDate ?: "") }
+    var commissioningDate by remember { mutableStateOf(initial?.commissioningDate ?: "") }
+    var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
+
     var supplier by remember { mutableStateOf(initial?.supplier ?: "") }
     var purchaseOrder by remember { mutableStateOf(initial?.purchaseOrder ?: "") }
     var purchaseCost by remember { mutableStateOf((initial?.purchaseCost ?: 0.0).toString()) }
-    var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
+    var financialAssetRef by remember { mutableStateOf(initial?.financialAssetRef ?: "") }
+    var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
+    var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
+    var warrantyEnd by remember { mutableStateOf(initial?.warrantyEnd ?: "") }
+
+    val impactOptions = listOf("1", "2", "3", "4", "5")
+    val score = runCatching {
+        AssetGovernance.calculateCriticalityScore(
+            safetyImpact.toInt(),
+            productionImpact.toInt(),
+            environmentImpact.toInt(),
+            serviceImpact.toInt(),
+            financialImpact.toInt()
+        )
+    }.getOrDefault(5)
+    val criticality = runCatching { AssetGovernance.criticalityRating(score) }.getOrDefault("Low")
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
+        Text("هوية الأصل", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("الكود (Code)", code, { code = it })
         LabeledField("الاسم (Name)", name, { name = it })
-        LabeledField("المجموعة (Group)", group, { group = it })
-        LabeledField("الموقع النصّي (Location)", location, { location = it })
-        if (locations.isNotEmpty()) {
-            LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
-        }
-        if (allAssets.isNotEmpty()) {
-            AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
-        }
+        OptionDropdown("نوع الأصل", listOf("Equipment", "Vehicle", "Tool", "Facility", "Instrument", "IT", "Other"), assetType) { assetType = it }
+        LabeledField("تصنيف الأصل", assetCategory, { assetCategory = it })
+        LabeledField("المجموعة", group, { group = it })
+        LabeledField("الوصف", description, { description = it }, singleLine = false)
+
+        Text("الموقع والهيكل", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("الموقع النصّي", location, { location = it })
+        if (locations.isNotEmpty()) LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+        if (allAssets.isNotEmpty()) AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
+
+        Text("البيانات التنظيمية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("المنظمة / الشركة", organizationCode, { organizationCode = it })
+        LabeledField("المصنع", plantCode, { plantCode = it })
+        LabeledField("مركز عمل الصيانة", workCenter, { workCenter = it })
+        LabeledField("مجموعة التخطيط", planningGroup, { planningGroup = it })
+        LabeledField("مركز التكلفة", costCenter, { costCenter = it })
+        LabeledField("الإدارة المالكة", ownerDepartment, { ownerDepartment = it })
+        LabeledField("المسؤول عن الأصل", responsiblePerson, { responsiblePerson = it })
+
+        Text("المصنّع ودورة الحياة", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
-        LabeledField("الموديل (Model)", model, { model = it })
-        OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
-        OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
-        Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
-        LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
-        LabeledField("المورّد (Supplier)", supplier, { supplier = it })
-        LabeledField("أمر الشراء (PO)", purchaseOrder, { purchaseOrder = it })
+        LabeledField("الموديل", model, { model = it })
+        LabeledField("سنة التصنيع", manufacturingYear, { manufacturingYear = it }, numeric = true)
+        LabeledField("الرقم التسلسلي", serialNumber, { serialNumber = it })
+        LabeledField("وسم الأصل", assetTag, { assetTag = it })
+        OptionDropdown("حالة دورة الحياة", listOf("Draft", "Acquired", "InStorage", "Installed", "InService", "Standby", "Decommissioned", "Disposed"), lifecycleStatus) { lifecycleStatus = it }
+        OptionDropdown("الحالة التشغيلية", listOf("Running", "Stopped", "Standby", "Under Maintenance", "Out of Service", "Retired"), operationalStatus) { operationalStatus = it }
+        OptionDropdown("الحالة الصحية", listOf("Good", "Warning", "Critical", "Failed"), healthStatus) { healthStatus = it }
+        DateField("تاريخ التركيب", installedAt) { installedAt = it }
+        DateField("تاريخ بدء التشغيل", commissioningDate) { commissioningDate = it }
+        DateField("آخر فحص", lastInspectionAt) { lastInspectionAt = it }
+
+        Text("تقييم الأهمية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        OptionDropdown("تأثير السلامة", impactOptions, safetyImpact) { safetyImpact = it }
+        OptionDropdown("تأثير الإنتاج", impactOptions, productionImpact) { productionImpact = it }
+        OptionDropdown("تأثير البيئة", impactOptions, environmentImpact) { environmentImpact = it }
+        OptionDropdown("تأثير الخدمة", impactOptions, serviceImpact) { serviceImpact = it }
+        OptionDropdown("التأثير المالي", impactOptions, financialImpact) { financialImpact = it }
+        Text("النتيجة: $criticality ($score/25)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+
+        Text("المعلومات المالية والضمان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("المورّد", supplier, { supplier = it })
+        LabeledField("أمر الشراء", purchaseOrder, { purchaseOrder = it })
+        LabeledField("مرجع الأصل المالي", financialAssetRef, { financialAssetRef = it })
         LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
+        DateField("تاريخ الشراء", purchaseDate) { purchaseDate = it }
         DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
-        Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
         DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
         DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
+
         SaveButton(code.isNotBlank() && name.isNotBlank()) {
             val today = DateStrings.today()
             onSave(
@@ -423,13 +493,13 @@ internal fun AssetFormSheet(
                     code = code.trim(),
                     name = name.trim(),
                     groupName = group.ifBlank { "General" },
-                    location = location,
-                    manufacturer = manufacturer,
-                    model = model,
-                    status = status,
+                    location = location.trim(),
+                    manufacturer = manufacturer.trim(),
+                    model = model.trim(),
+                    status = operationalStatus,
                     criticality = criticality,
-                    installedAt = initial?.installedAt ?: today,
-                    lastInspectionAt = initial?.lastInspectionAt ?: today,
+                    installedAt = installedAt.ifBlank { initial?.installedAt ?: today },
+                    lastInspectionAt = lastInspectionAt.ifBlank { initial?.lastInspectionAt ?: today },
                     locationId = locationId,
                     warrantyProvider = warrantyProvider.trim(),
                     warrantyStart = warrantyStart.trim(),
@@ -440,7 +510,36 @@ internal fun AssetFormSheet(
                     supplier = supplier.trim(),
                     purchaseOrder = purchaseOrder.trim(),
                     purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
-                    acquiredAt = acquiredAt.trim()
+                    acquiredAt = acquiredAt.trim(),
+                    assetType = assetType,
+                    assetCategory = assetCategory.trim(),
+                    description = description.trim(),
+                    organizationCode = organizationCode.trim(),
+                    plantCode = plantCode.trim(),
+                    maintenanceWorkCenter = workCenter.trim(),
+                    planningGroup = planningGroup.trim(),
+                    costCenter = costCenter.trim(),
+                    ownerDepartment = ownerDepartment.trim(),
+                    responsiblePerson = responsiblePerson.trim(),
+                    manufacturingYear = manufacturingYear.toIntOrNull(),
+                    purchaseDate = purchaseDate.trim(),
+                    commissioningDate = commissioningDate.trim(),
+                    financialAssetRef = financialAssetRef.trim(),
+                    lifecycleStatus = lifecycleStatus,
+                    operationalStatus = operationalStatus,
+                    healthStatus = healthStatus,
+                    criticalitySafetyImpact = safetyImpact.toIntOrNull()?.coerceIn(1, 5) ?: 1,
+                    criticalityProductionImpact = productionImpact.toIntOrNull()?.coerceIn(1, 5) ?: 1,
+                    criticalityEnvironmentalImpact = environmentImpact.toIntOrNull()?.coerceIn(1, 5) ?: 1,
+                    criticalityServiceImpact = serviceImpact.toIntOrNull()?.coerceIn(1, 5) ?: 1,
+                    criticalityFinancialImpact = financialImpact.toIntOrNull()?.coerceIn(1, 5) ?: 1,
+                    criticalityScore = score,
+                    criticalityAssessedAt = initial?.criticalityAssessedAt ?: "",
+                    criticalityAssessedBy = initial?.criticalityAssessedBy ?: "",
+                    createdBy = initial?.createdBy ?: "",
+                    createdAt = initial?.createdAt ?: "",
+                    updatedBy = initial?.updatedBy ?: "",
+                    updatedAt = initial?.updatedAt ?: ""
                 )
             )
         }
@@ -459,6 +558,13 @@ internal fun LocationFormSheet(
     var description by remember { mutableStateOf(initial?.description ?: "") }
     var parentId by remember { mutableStateOf(initial?.parentId) }
     var status by remember { mutableStateOf(initial?.status ?: "Active") }
+    var organizationCode by remember { mutableStateOf(initial?.organizationCode ?: "") }
+    var plantCode by remember { mutableStateOf(initial?.plantCode ?: "") }
+    var category by remember { mutableStateOf(initial?.locationCategory ?: "") }
+    var costCenter by remember { mutableStateOf(initial?.costCenterCode ?: "") }
+    var workCenter by remember { mutableStateOf(initial?.workCenterCode ?: "") }
+    var referenceLocationId by remember { mutableStateOf(initial?.referenceLocationId) }
+    var isReference by remember { mutableStateOf(initial?.isReference ?: false) }
 
     FormSheet(if (initial == null) "إضافة موقع فني" else "تعديل الموقع الفني", onDismiss) {
         LabeledField("الكود (Code)", code, { code = it })
@@ -466,6 +572,18 @@ internal fun LocationFormSheet(
         LabeledField("الوصف", description, { description = it }, singleLine = false)
         LocationDropdown("الموقع الأعلى (Parent)", allLocations, parentId, excludeId = initial?.id) { parentId = it }
         OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+        LabeledField("المنظمة / الشركة", organizationCode, { organizationCode = it })
+        LabeledField("المصنع", plantCode, { plantCode = it })
+        LabeledField("فئة الموقع", category, { category = it })
+        LabeledField("مركز التكلفة", costCenter, { costCenter = it })
+        LabeledField("مركز العمل", workCenter, { workCenter = it })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("موقع مرجعي", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = isReference, onCheckedChange = { isReference = it; if (it) referenceLocationId = null })
+        }
+        if (!isReference) {
+            LocationDropdown("الموقع المرجعي (اختياري)", allLocations, referenceLocationId, excludeId = initial?.id) { referenceLocationId = it }
+        }
         SaveButton(code.isNotBlank() && name.isNotBlank()) {
             onSave(
                 FunctionalLocationEntity(
@@ -473,8 +591,17 @@ internal fun LocationFormSheet(
                     code = code.trim(),
                     name = name.trim(),
                     parentId = parentId,
-                    description = description,
-                    status = status
+                    description = description.trim(),
+                    status = status,
+                    organizationCode = organizationCode.trim(),
+                    plantCode = plantCode.trim(),
+                    locationCategory = category.trim(),
+                    costCenterCode = costCenter.trim(),
+                    workCenterCode = workCenter.trim(),
+                    referenceLocationId = if (isReference) null else referenceLocationId,
+                    isReference = isReference,
+                    createdAt = initial?.createdAt ?: "",
+                    updatedAt = initial?.updatedAt ?: ""
                 )
             )
         }
@@ -1180,8 +1307,10 @@ internal fun MovementFormSheet(
     var locId by remember { mutableStateOf<Long?>(asset.locationId) }
     var notes by remember { mutableStateOf("") }
     val needsLocation = type == MovementType.INSTALL || type == MovementType.TRANSFER
+    val requiresReason = type == MovementType.DISMANTLE || type == MovementType.RETIRE
 
     FormSheet("حركة الأصل: ${asset.code}", onDismiss) {
+        Text("دورة الحياة الحالية: ${asset.lifecycleStatus}", style = MaterialTheme.typography.bodySmall)
         OptionDropdown(
             "نوع الحركة",
             MovementType.all,
@@ -1192,8 +1321,8 @@ internal fun MovementFormSheet(
         if (needsLocation) {
             LocationDropdown("الموقع الوجهة", locations, locId, onSelect = { locId = it })
         }
-        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
-        SaveButton(!needsLocation || locId != null) {
+        LabeledField(if (requiresReason) "السبب (إلزامي)" else "السبب / الملاحظات", notes, { notes = it }, singleLine = false)
+        SaveButton((!needsLocation || locId != null) && (!requiresReason || notes.isNotBlank())) {
             val name = locations.firstOrNull { it.id == locId }?.name ?: ""
             onSave(type, if (needsLocation) locId else null, if (needsLocation) name else "", notes.trim())
         }
