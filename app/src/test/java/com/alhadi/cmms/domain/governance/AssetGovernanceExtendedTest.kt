@@ -1,7 +1,7 @@
 package com.alhadi.cmms.domain.governance
 
 import com.alhadi.cmms.data.BackupBundle
-import com.alhadi.cmms.data.entity.AssetClassificationEntity
+import com.alhadi.cmms.data.entity.AssetClassEntity
 import com.alhadi.cmms.data.entity.AssetPartnerEntity
 import com.alhadi.cmms.data.entity.AssetWarrantyEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
@@ -26,22 +26,22 @@ class AssetGovernanceExtendedTest {
     }
 
     @Test
-    fun partnerAndClassificationKeepGovernanceMetadata() {
+    fun partnerAndClassKeepGovernanceMetadata() {
         val partner = AssetPartnerEntity(
             assetId = 7,
             partnerRole = "Maintenance Responsible",
             partnerName = "Maintenance Team",
             isPrimary = true
         )
-        val classification = AssetClassificationEntity(
-            assetId = 7,
-            classCode = "ROTATING",
-            className = "Rotating Equipment",
-            isPrimary = true
+        val assetClass = AssetClassEntity(
+            code = "ROTATING",
+            name = "Rotating Equipment",
+            assetType = "Equipment",
+            isActive = true
         )
         assertTrue(partner.isPrimary)
-        assertEquals("ROTATING", classification.classCode)
-        assertTrue(classification.isPrimary)
+        assertEquals("ROTATING", assetClass.code)
+        assertTrue(assetClass.isActive)
     }
 
     @Test
