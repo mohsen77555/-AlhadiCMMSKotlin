@@ -1,12 +1,11 @@
-name: App3 Assets Stage 5
+name: App3 Backend Stage 1
 
 on:
   push:
     branches: ["App3"]
     paths:
       - ".github/workflows/app3-assets-stage3.yml"
-      - "scripts/app3_assets_stage5_data.py"
-      - "scripts/app3_assets_stage5_ui.py"
+      - "scripts/app3_backend_stage1.py"
   workflow_dispatch:
 
 permissions:
@@ -29,82 +28,145 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.13"
 
-      - name: Apply, verify and publish stage 5
+      - name: Generate, test and publish backend foundation
         shell: bash
         run: |
           set +e
-          python3 scripts/app3_assets_stage5_data.py > stage5-data.log 2>&1
-          data_status=$?
+          python3 scripts/app3_backend_stage1.py > backend-generate.log 2>&1
+          generate_status=$?
 
-          ui_status=99
-          build_status=99
-          if [ "$data_status" -eq 0 ]; then
-            python3 scripts/app3_assets_stage5_ui.py > stage5-ui.log 2>&1
-            ui_status=$?
+          test_status=99
+          smoke_status=99
+          if [ "$generate_status" -eq 0 ]; then
+            gradle -p backend --no-daemon clean test installDist > backend-build.log 2>&1
+            test_status=$?
           else
-            echo "UI patch was not started because the data patch failed." > stage5-ui.log
+            echo "Backend build was not started because generation failed." > backend-build.log
           fi
 
-          if [ "$data_status" -eq 0 ] && [ "$ui_status" -eq 0 ]; then
-            gradle assembleDebug --no-daemon --stacktrace > stage5-build.log 2>&1
-            build_status=$?
+          if [ "$generate_status" -eq 0 ] && [ "$test_status" -eq 0 ]; then
+            docker run -d --name alhadi-backend-postgres \
+              -e POSTGRES_DB=alhadi_cmms \
+              -e POSTGRES_USER=alhadi \
+              -e POSTGRES_PASSWORD=ci-database-password \
+              -p 54329:5432 postgres:16-alpine > backend-postgres.id
+
+            for attempt in $(seq 1 40); do
+              if docker exec alhadi-backend-postgres pg_isready -U alhadi -d alhadi_cmms >/dev/null 2>&1; then
+                break
+              fi
+              sleep 1
+            done
+
+            export APP_ENV=test
+            export PORT=18080
+            export DB_URL=jdbc:postgresql://127.0.0.1:54329/alhadi_cmms
+            export DB_USER=alhadi
+            export DB_PASSWORD=ci-database-password
+            export JWT_SECRET=ci-jwt-secret-that-is-longer-than-thirty-two-characters
+            export ORGANIZATION_CODE=DEFAULT
+            export ORGANIZATION_NAME="Alhadi Test"
+            export BOOTSTRAP_ADMIN_NAME="CI Administrator"
+            export BOOTSTRAP_ADMIN_USERNAME=ci-admin
+            export BOOTSTRAP_ADMIN_PASSWORD=CI-Strong-Password-1234
+            export CORS_HOSTS=localhost:18080
+
+            backend/build/install/alhadi-cmms-backend/bin/alhadi-cmms-backend > backend-server.log 2>&1 &
+            server_pid=$!
+            echo "$server_pid" > backend-server.pid
+
+            ready=0
+            for attempt in $(seq 1 45); do
+              if curl -fsS http://127.0.0.1:18080/health/ready > backend-health.json; then
+                ready=1
+                break
+              fi
+              sleep 1
+            done
+
+            if [ "$ready" -eq 1 ]; then
+              curl -fsS -X POST http://127.0.0.1:18080/api/v1/auth/login \
+                -H "Content-Type: application/json" \
+                -d '{"username":"ci-admin","password":"CI-Strong-Password-1234","organizationCode":"DEFAULT"}' \
+                > backend-login.json
+
+              python3 - <<'PY' > backend-smoke.log 2>&1
+          import json
+          from pathlib import Path
+
+          health = json.loads(Path("backend-health.json").read_text())
+          login = json.loads(Path("backend-login.json").read_text())
+          assert health["status"] == "UP", health
+          assert login["accessToken"], login
+          assert login["refreshToken"], login
+          assert login["user"]["role"] == "Admin", login
+          assert login["user"]["username"] == "ci-admin", login
+          print("Backend readiness and authentication smoke tests passed.")
+          PY
+              smoke_status=$?
+            else
+              echo "Backend readiness endpoint did not become available." > backend-smoke.log
+              smoke_status=1
+            fi
+
+            kill "$server_pid" >/dev/null 2>&1 || true
+            docker rm -f alhadi-backend-postgres >/dev/null 2>&1 || true
           else
-            echo "Build was not started because a patch step failed." > stage5-build.log
+            echo "Backend smoke test was not started because the build failed." > backend-smoke.log
           fi
 
-          cat stage5-data.log
-          cat stage5-ui.log
-          tail -n 220 stage5-build.log
+          cat backend-generate.log
+          tail -n 220 backend-build.log
+          cat backend-smoke.log
+          cat backend-server.log 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if [ "$data_status" -ne 0 ] || [ "$ui_status" -ne 0 ] || [ "$build_status" -ne 0 ]; then
+          if [ "$generate_status" -ne 0 ] || [ "$test_status" -ne 0 ] || [ "$smoke_status" -ne 0 ]; then
             {
-              echo "Stage 5 diagnostics"
-              echo "data_status=$data_status"
-              echo "ui_status=$ui_status"
-              echo "build_status=$build_status"
+              echo "Backend stage 1 diagnostics"
+              echo "generate_status=$generate_status"
+              echo "test_status=$test_status"
+              echo "smoke_status=$smoke_status"
               echo
-              echo "--- data patch ---"
-              tail -n 160 stage5-data.log
+              echo "--- generation ---"
+              tail -n 160 backend-generate.log
               echo
-              echo "--- UI patch ---"
-              tail -n 160 stage5-ui.log
+              echo "--- build and tests ---"
+              tail -n 280 backend-build.log
               echo
-              echo "--- build ---"
-              tail -n 260 stage5-build.log
-            } > stage5-status.txt
-            git add stage5-status.txt
-            git commit -m "chore(app3): record stage 5 diagnostics [skip ci]" || true
+              echo "--- smoke test ---"
+              cat backend-smoke.log
+              echo
+              echo "--- server ---"
+              tail -n 220 backend-server.log 2>/dev/null || true
+            } > backend-stage1-status.txt
+            git add backend-stage1-status.txt
+            git commit -m "chore(app3): record backend stage 1 diagnostics [skip ci]" || true
             git push origin HEAD:App3
             exit 1
           fi
 
-          rm -f stage5-data.log stage5-ui.log stage5-build.log
-          git rm -f stage5-status.txt 2>/dev/null || true
-          git add app/src/main app/schemas
+          rm -f backend-generate.log backend-build.log backend-smoke.log backend-server.log \
+            backend-health.json backend-login.json backend-postgres.id backend-server.pid
+          git rm -f backend-stage1-status.txt 2>/dev/null || true
+          git add backend docker-compose.backend.yml .env.backend.example
           if git diff --cached --quiet; then
-            echo "No application changes to commit"
+            echo "No backend changes to commit"
             exit 1
           fi
-          git commit -m "feat(assets): add serial number management"
+          git commit -m "feat(backend): add secure API foundation"
           git push origin HEAD:App3
 
-      - name: Upload App3 APK
+      - name: Upload backend distribution
         uses: actions/upload-artifact@v4
         with:
-          name: App3-assets-stage5-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: App3-backend-stage1
+          path: backend/build/distributions/*
           if-no-files-found: error
