@@ -6,9 +6,12 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.alhadi.cmms.data.dao.AssetBomDao
 import com.alhadi.cmms.data.dao.AssetCharacteristicDao
+import com.alhadi.cmms.data.dao.AssetClassDao
 import com.alhadi.cmms.data.dao.AssetDao
 import com.alhadi.cmms.data.dao.AssetDocumentDao
 import com.alhadi.cmms.data.dao.AssetMovementDao
+import com.alhadi.cmms.data.dao.AssetPartnerDao
+import com.alhadi.cmms.data.dao.AssetWarrantyDao
 import com.alhadi.cmms.data.dao.AuditLogDao
 import com.alhadi.cmms.data.dao.CapaDao
 import com.alhadi.cmms.data.dao.FunctionalLocationDao
@@ -30,9 +33,12 @@ import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
 import com.alhadi.cmms.data.dao.WorkPermitDao
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
+import com.alhadi.cmms.data.entity.AssetClassEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
+import com.alhadi.cmms.data.entity.AssetPartnerEntity
+import com.alhadi.cmms.data.entity.AssetWarrantyEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
@@ -40,6 +46,7 @@ import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.MeterReplacementEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
@@ -49,6 +56,7 @@ import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.TrashEntity
 import com.alhadi.cmms.data.entity.UserEntity
+import com.alhadi.cmms.data.entity.WarrantyClaimEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
@@ -66,10 +74,15 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         AuditLogEntity::class,
         MeasuringPointEntity::class,
         MeasurementReadingEntity::class,
+        MeterReplacementEntity::class,
         FunctionalLocationEntity::class,
         CapaEntity::class,
         AssetDocumentEntity::class,
         AssetCharacteristicEntity::class,
+        AssetClassEntity::class,
+        AssetPartnerEntity::class,
+        AssetWarrantyEntity::class,
+        WarrantyClaimEntity::class,
         AssetBomItemEntity::class,
         AssetMovementEntity::class,
         PmChecklistItemEntity::class,
@@ -84,7 +97,7 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         PurchaseOrderEntity::class,
         SupplierEntity::class
     ],
-    version = 26,
+    version = 27,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -100,6 +113,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun capaDao(): CapaDao
     abstract fun assetDocumentDao(): AssetDocumentDao
     abstract fun assetCharacteristicDao(): AssetCharacteristicDao
+    abstract fun assetClassDao(): AssetClassDao
+    abstract fun assetPartnerDao(): AssetPartnerDao
+    abstract fun assetWarrantyDao(): AssetWarrantyDao
     abstract fun assetBomDao(): AssetBomDao
     abstract fun assetMovementDao(): AssetMovementDao
     abstract fun pmChecklistDao(): PmChecklistDao
@@ -124,11 +140,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "alhadi_cmms.db"
                 )
-                    // Real maintenance data must survive app upgrades: apply explicit migrations.
-                    // A missing upgrade path now fails loudly (forcing a migration) instead of
-                    // silently wiping the user's records.
                     .addMigrations(*DbMigrations.ALL)
-                    // Only a downgrade (installing an older build over a newer DB) resets data.
                     .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .build()
                 INSTANCE = instance
