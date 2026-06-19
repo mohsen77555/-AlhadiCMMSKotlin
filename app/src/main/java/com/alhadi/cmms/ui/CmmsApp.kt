@@ -3239,7 +3239,7 @@ private fun InventoryScreen(
                         LtrText("$group (${groupParts.size})", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                items(groupParts, key = { it.id }) { part ->
+                items(groupParts, key = { "part-${it.id}" }) { part ->
                     SparePartCard(
                         part = part,
                         onOrderQty = onOrderByPart[part.id] ?: 0,
@@ -3260,7 +3260,7 @@ private fun InventoryScreen(
             if (transactions.isEmpty()) {
                 item { EmptyState("لا توجد حركات مخزون") }
             }
-            items(transactions, key = { it.id }) { transaction ->
+            items(transactions, key = { "txn-${it.id}" }) { transaction ->
                 TransactionCard(transaction = transaction, partNumber = parts.firstOrNull { it.id == transaction.partId }?.partNumber)
             }
         }
@@ -4258,7 +4258,7 @@ private fun MetersScreen(
             grouped.forEach { (assetId, assetPoints) ->
                 val asset = assetMap[assetId]
                 item { SectionHeader(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #$assetId") }
-                items(assetPoints, key = { it.id }) { point ->
+                items(assetPoints, key = { "pt-${it.id}" }) { point ->
                     MeterCard(
                         point = point,
                         recentReadings = readings.filter { it.pointId == point.id }.take(6),
@@ -4276,7 +4276,7 @@ private fun MetersScreen(
             if (readings.isEmpty()) {
                 item { EmptyState("لا توجد قراءات بعد") }
             }
-            items(readings.take(30), key = { it.id }) { reading ->
+            items(readings.take(30), key = { "rd-${it.id}" }) { reading ->
                 val point = points.firstOrNull { it.id == reading.pointId }
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
