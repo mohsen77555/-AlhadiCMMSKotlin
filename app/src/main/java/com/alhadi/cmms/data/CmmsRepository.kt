@@ -9,6 +9,7 @@ import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -43,6 +44,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val auditLogDao = database.auditLogDao()
     private val measurementDao = database.measurementDao()
     private val locationDao = database.functionalLocationDao()
+    private val orgUnitDao = database.orgUnitDao()
     private val capaDao = database.capaDao()
     private val documentDao = database.assetDocumentDao()
     private val characteristicDao = database.assetCharacteristicDao()
@@ -70,6 +72,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val measuringPoints: Flow<List<MeasuringPointEntity>> = measurementDao.observePoints()
     val readings: Flow<List<MeasurementReadingEntity>> = measurementDao.observeReadings()
     val functionalLocations: Flow<List<FunctionalLocationEntity>> = locationDao.observeLocations()
+    val orgUnits: Flow<List<OrgUnitEntity>> = orgUnitDao.observeOrgUnits()
     val capaActions: Flow<List<CapaEntity>> = capaDao.observeCapa()
     val assetDocuments: Flow<List<AssetDocumentEntity>> = documentDao.observeDocuments()
     val assetCharacteristics: Flow<List<AssetCharacteristicEntity>> = characteristicDao.observeCharacteristics()
@@ -152,6 +155,7 @@ class CmmsRepository(private val database: AppDatabase) {
                 "WorkOrder" -> workOrderDao.insertWorkOrder(backupJson.decodeFromString(WorkOrderEntity.serializer(), item.payload))
                 "PM" -> pmDao.insert(backupJson.decodeFromString(PreventiveMaintenanceEntity.serializer(), item.payload))
                 "Location" -> locationDao.insert(backupJson.decodeFromString(FunctionalLocationEntity.serializer(), item.payload))
+                "OrgUnit" -> orgUnitDao.insert(backupJson.decodeFromString(OrgUnitEntity.serializer(), item.payload))
                 "CAPA" -> capaDao.insert(backupJson.decodeFromString(CapaEntity.serializer(), item.payload))
                 "User" -> userDao.insert(backupJson.decodeFromString(UserEntity.serializer(), item.payload))
                 "Notification" -> notificationDao.insert(backupJson.decodeFromString(MaintenanceNotificationEntity.serializer(), item.payload))
@@ -199,6 +203,7 @@ class CmmsRepository(private val database: AppDatabase) {
             measuringPoints = measuringPoints.first(),
             measurementReadings = measurementDao.dumpAllReadings(),
             functionalLocations = functionalLocations.first(),
+            orgUnits = orgUnits.first(),
             capa = capaActions.first(),
             assetDocuments = assetDocuments.first(),
             assetCharacteristics = assetCharacteristics.first(),
@@ -243,6 +248,7 @@ class CmmsRepository(private val database: AppDatabase) {
             documentDao.deleteAll()
             capaDao.deleteAll()
             locationDao.deleteAll()
+            orgUnitDao.deleteAll()
             measurementDao.deleteAllReadings()
             measurementDao.deleteAllPoints()
             transactionDao.deleteAll()
@@ -256,6 +262,7 @@ class CmmsRepository(private val database: AppDatabase) {
             assetDao.insertAssets(bundle.assets)
             userDao.insertAll(bundle.users)
             locationDao.insertAll(bundle.functionalLocations)
+            orgUnitDao.insertAll(bundle.orgUnits)
             sparePartDao.insertAll(bundle.spareParts)
             workOrderDao.insertWorkOrders(bundle.workOrders)
             pmDao.insertAll(bundle.preventiveMaintenance)
@@ -305,6 +312,7 @@ class CmmsRepository(private val database: AppDatabase) {
                 documentDao.deleteAll()
                 capaDao.deleteAll()
                 locationDao.deleteAll()
+                orgUnitDao.deleteAll()
                 measurementDao.deleteAllReadings()
                 measurementDao.deleteAllPoints()
                 transactionDao.deleteAll()
@@ -397,6 +405,15 @@ class CmmsRepository(private val database: AppDatabase) {
                 FunctionalLocationEntity(6, "MILL-RM", "Rollermill Station", 3, "محطة مطاحن الأسطوانات")
             )
 
+            val orgUnits = listOf(
+                OrgUnitEntity(1, "ALHADI", "مجموعة الهادي", "Company", null),
+                OrgUnitEntity(2, "SITE-N", "موقع الشمال", "Site", 1),
+                OrgUnitEntity(3, "SITE-S", "موقع الجنوب", "Site", 1),
+                OrgUnitEntity(4, "PLANT-FL", "مصنع الدقيق", "Plant", 2),
+                OrgUnitEntity(5, "PLANT-FD", "مصنع الأعلاف", "Plant", 2),
+                OrgUnitEntity(6, "PLANT-PK", "مصنع التعبئة", "Plant", 3)
+            )
+
             assetDao.insertAssets(assets)
             userDao.insertAll(users.map { it.copy(password = PasswordHasher.hash(it.password)) })
             workOrderDao.insertWorkOrders(workOrders)
@@ -473,6 +490,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
+            orgUnitDao.insertAll(orgUnits)
             capaDao.insertAll(capaActions)
             documentDao.insertAll(documents)
             characteristicDao.insertAll(characteristics)
@@ -829,6 +847,22 @@ class CmmsRepository(private val database: AppDatabase) {
         moveToTrash("Location", location.id, "${location.code} — ${location.name}", backupJson.encodeToString(FunctionalLocationEntity.serializer(), location), actor)
         locationDao.deleteById(location.id)
         recordAudit("Delete", "Location", "حذف موقع فني: ${location.code}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Organization units (Company / Site / Plant)
+    // ---------------------------------------------------------------------
+
+    suspend fun saveOrgUnit(unit: OrgUnitEntity, actor: String = "System") {
+        val isNew = unit.id == 0L
+        orgUnitDao.insert(unit)
+        recordAudit(if (isNew) "Create" else "Update", "OrgUnit", "${if (isNew) "إضافة" else "تعديل"} وحدة تنظيمية: ${unit.code}", actor)
+    }
+
+    suspend fun deleteOrgUnit(unit: OrgUnitEntity, actor: String = "System") {
+        moveToTrash("OrgUnit", unit.id, "${unit.code} — ${unit.name}", backupJson.encodeToString(OrgUnitEntity.serializer(), unit), actor)
+        orgUnitDao.deleteById(unit.id)
+        recordAudit("Delete", "OrgUnit", "حذف وحدة تنظيمية: ${unit.code}", actor)
     }
 
     // ---------------------------------------------------------------------

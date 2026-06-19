@@ -71,6 +71,7 @@ import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
@@ -98,6 +99,24 @@ internal fun assetStatusDisplayAr(status: String): String = when (status) {
     "Out of Service" -> "خارج الخدمة"; "Stopped" -> "متوقف"; "In Storage" -> "في المخزن"
     "Sent to Vendor" -> "لدى المورّد"; "Refurbishment" -> "تجديد"; "Retired" -> "متقاعد"
     "Disposed" -> "مشطوب"; "Inactive" -> "غير نشط"; else -> status
+}
+
+/** Arabic label for an organization unit type (governance §5). */
+internal fun orgTypeDisplayAr(type: String): String = when (type) {
+    "Company" -> "شركة"; "Site" -> "موقع"; "Plant" -> "مصنع"; else -> type
+}
+
+/** Walks up the org-unit parent chain from [start] to find the nearest ancestor of [type]. */
+internal fun orgAncestorName(units: List<OrgUnitEntity>, start: OrgUnitEntity?, type: String): String {
+    var cur = start
+    var guard = 0
+    while (cur != null && guard < 20) {
+        if (cur.type == type) return cur.name
+        val parentId = cur.parentId
+        cur = units.firstOrNull { it.id == parentId }
+        guard++
+    }
+    return ""
 }
 
 /** Arabic label for a user role. */
@@ -376,7 +395,8 @@ internal fun AssetFormSheet(
     onDismiss: () -> Unit,
     onSave: (AssetEntity) -> Unit,
     locations: List<FunctionalLocationEntity> = emptyList(),
-    allAssets: List<AssetEntity> = emptyList()
+    allAssets: List<AssetEntity> = emptyList(),
+    orgUnits: List<OrgUnitEntity> = emptyList()
 ) {
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
@@ -414,6 +434,10 @@ internal fun AssetFormSheet(
     var maintenancePlant by remember { mutableStateOf(initial?.maintenancePlant ?: "") }
     var planningPlant by remember { mutableStateOf(initial?.planningPlant ?: "") }
     var plannerGroup by remember { mutableStateOf(initial?.plannerGroup ?: "") }
+    val plants = orgUnits.filter { it.type == "Plant" }
+    var plantUnitId by remember { mutableStateOf(plants.firstOrNull { it.name == initial?.plant }?.id) }
+    var maintPlantUnitId by remember { mutableStateOf(plants.firstOrNull { it.name == initial?.maintenancePlant }?.id) }
+    var planPlantUnitId by remember { mutableStateOf(plants.firstOrNull { it.name == initial?.planningPlant }?.id) }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         LabeledField("الكود (Code)", code, { code = it })
@@ -449,11 +473,36 @@ internal fun AssetFormSheet(
         LabeledField("مركز العمل", workCenter, { workCenter = it })
         LabeledField("مجموعة المخطط (Planner Group)", plannerGroup, { plannerGroup = it })
         Text("هيكل المؤسسة (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        LabeledField("الشركة (Company)", company, { company = it })
-        LabeledField("الموقع/الفرع (Site)", site, { site = it })
-        LabeledField("المصنع (Plant)", plant, { plant = it })
-        LabeledField("مصنع الصيانة (Maintenance Plant)", maintenancePlant, { maintenancePlant = it })
-        LabeledField("مصنع التخطيط (Planning Plant)", planningPlant, { planningPlant = it })
+        if (plants.isNotEmpty()) {
+            OrgUnitDropdown("المصنع (Plant)", orgUnits, plantUnitId, typeFilter = "Plant") { id ->
+                plantUnitId = id
+                val u = orgUnits.firstOrNull { it.id == id }
+                plant = u?.name ?: ""
+                site = u?.let { orgAncestorName(orgUnits, it, "Site") } ?: ""
+                company = u?.let { orgAncestorName(orgUnits, it, "Company") } ?: ""
+            }
+            if (company.isNotBlank() || site.isNotBlank()) {
+                Text(
+                    "الشركة: ${company.ifBlank { "—" }} • الموقع: ${site.ifBlank { "—" }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            OrgUnitDropdown("مصنع الصيانة (Maintenance Plant)", orgUnits, maintPlantUnitId, typeFilter = "Plant") { id ->
+                maintPlantUnitId = id
+                maintenancePlant = orgUnits.firstOrNull { it.id == id }?.name ?: ""
+            }
+            OrgUnitDropdown("مصنع التخطيط (Planning Plant)", orgUnits, planPlantUnitId, typeFilter = "Plant") { id ->
+                planPlantUnitId = id
+                planningPlant = orgUnits.firstOrNull { it.id == id }?.name ?: ""
+            }
+        } else {
+            LabeledField("الشركة (Company)", company, { company = it })
+            LabeledField("الموقع/الفرع (Site)", site, { site = it })
+            LabeledField("المصنع (Plant)", plant, { plant = it })
+            LabeledField("مصنع الصيانة (Maintenance Plant)", maintenancePlant, { maintenancePlant = it })
+            LabeledField("مصنع التخطيط (Planning Plant)", planningPlant, { planningPlant = it })
+        }
         Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
         LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
@@ -512,6 +561,75 @@ internal fun AssetFormSheet(
                     maintenancePlant = maintenancePlant.trim().ifBlank { null },
                     planningPlant = planningPlant.trim().ifBlank { null },
                     plannerGroup = plannerGroup.trim().ifBlank { null }
+                )
+            )
+        }
+    }
+}
+
+@Composable
+@Composable
+internal fun OrgUnitDropdown(
+    label: String,
+    units: List<OrgUnitEntity>,
+    selectedId: Long?,
+    excludeId: Long? = null,
+    typeFilter: String? = null,
+    onSelect: (Long?) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    val options = units.filter { it.id != excludeId && (typeFilter == null || it.type == typeFilter) }
+    val selected = units.firstOrNull { it.id == selectedId }
+    Column {
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Box {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    selected?.let { "${it.code} • ${it.name}" } ?: "بدون",
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
+                options.forEach { u ->
+                    DropdownMenuItem(text = { Text("${u.code} • ${u.name}") }, onClick = { onSelect(u.id); open = false })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun OrgUnitFormSheet(
+    initial: OrgUnitEntity?,
+    allUnits: List<OrgUnitEntity>,
+    onDismiss: () -> Unit,
+    onSave: (OrgUnitEntity) -> Unit
+) {
+    var code by remember { mutableStateOf(initial?.code ?: "") }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var type by remember { mutableStateOf(initial?.type ?: "Plant") }
+    var parentId by remember { mutableStateOf(initial?.parentId) }
+    var status by remember { mutableStateOf(initial?.status ?: "Active") }
+
+    FormSheet(if (initial == null) "إضافة وحدة تنظيمية" else "تعديل الوحدة التنظيمية", onDismiss) {
+        LabeledField("الكود (Code)", code, { code = it })
+        LabeledField("الاسم (Name)", name, { name = it })
+        OptionDropdown("النوع", listOf("Company", "Site", "Plant"), type, display = { orgTypeDisplayAr(it) }) { type = it }
+        OrgUnitDropdown("الوحدة الأعلى (Parent)", allUnits, parentId, excludeId = initial?.id) { parentId = it }
+        OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+        SaveButton(code.isNotBlank() && name.isNotBlank()) {
+            onSave(
+                OrgUnitEntity(
+                    id = initial?.id ?: 0,
+                    code = code.trim(),
+                    name = name.trim(),
+                    type = type,
+                    parentId = parentId,
+                    status = status
                 )
             )
         }

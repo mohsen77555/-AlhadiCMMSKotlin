@@ -110,10 +110,27 @@ object DbMigrations {
         }
     }
 
+    /** v27 -> v28: adds the `org_units` master table (Company → Site → Plant). */
+    val MIGRATION_27_28 = object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `org_units` (" +
+                    "`id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, " +
+                    "`code` TEXT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`type` TEXT NOT NULL, " +
+                    "`parentId` INTEGER, " +
+                    "`status` TEXT NOT NULL)"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_org_units_code` ON `org_units` (`code`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_org_units_parentId` ON `org_units` (`parentId`)")
+        }
+    }
+
     /**
      * All migrations, in order. Append new `Migration` objects here as the schema evolves.
      */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

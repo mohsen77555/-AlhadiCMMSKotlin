@@ -40,6 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.Domain
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -143,6 +144,7 @@ import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -196,7 +198,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Costs, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
+private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Costs, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, OrgUnits, Capa, Failures, Trash }
 
 private fun roleKey(user: UserEntity?): String = user?.role?.lowercase(Locale.getDefault()) ?: ""
 
@@ -241,6 +243,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
+    val orgUnits by viewModel.orgUnits.collectAsStateWithLifecycle()
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
     val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
@@ -422,6 +425,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         workOrders = workOrders,
                         pmItems = preventiveMaintenance,
                         locations = locations,
+                        orgUnits = orgUnits,
                         documents = assetDocuments,
                         characteristics = assetCharacteristics,
                         bomItems = assetBom,
@@ -547,6 +551,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onSave = viewModel::saveFunctionalLocation,
                             onDelete = viewModel::deleteFunctionalLocation
                         )
+                        MoreRoute.OrgUnits -> OrgUnitsScreen(
+                            innerPadding = innerPadding,
+                            orgUnits = orgUnits,
+                            assets = assets,
+                            canManage = canManage,
+                            onSave = viewModel::saveOrgUnit,
+                            onDelete = viewModel::deleteOrgUnit
+                        )
                         MoreRoute.Capa -> CapaScreen(
                             innerPadding = innerPadding,
                             items = capaActions,
@@ -629,6 +641,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.TaskLists -> ScreenMeta("قوالب العمل", "قوالب العمليات للخطط الوقائية", Icons.AutoMirrored.Filled.List, AccentBlue)
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
+        MoreRoute.OrgUnits -> ScreenMeta("هيكل المؤسسة", "الشركات والمواقع والمصانع", Icons.Filled.Domain, AccentBlue)
         MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
         MoreRoute.Failures -> ScreenMeta("تحليل الأعطال", "MTTR و MTBF وتكرار الأعطال", Icons.Filled.TrendingUp, AccentRed)
         MoreRoute.Trash -> ScreenMeta("سلة المحذوفات", "استرجاع أو حذف نهائي", Icons.Filled.Delete, AccentBrown)
@@ -1150,6 +1163,7 @@ private val ALL_MORE_MODULES = listOf(
     MoreModule(MoreRoute.TaskLists, "قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue),
     MoreModule(MoreRoute.Meters, "العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple),
     MoreModule(MoreRoute.Locations, "المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen),
+    MoreModule(MoreRoute.OrgUnits, "هيكل المؤسسة", "شركات/مواقع/مصانع", Icons.Filled.Domain, AccentBlue),
     MoreModule(MoreRoute.Capa, "الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange),
     MoreModule(MoreRoute.Failures, "تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed),
     MoreModule(MoreRoute.Audit, "سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy),
@@ -1269,6 +1283,7 @@ private fun AssetsScreen(
     workOrders: List<WorkOrderEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
     locations: List<FunctionalLocationEntity>,
+    orgUnits: List<OrgUnitEntity>,
     documents: List<AssetDocumentEntity>,
     characteristics: List<AssetCharacteristicEntity>,
     bomItems: List<AssetBomItemEntity>,
@@ -1330,6 +1345,7 @@ private fun AssetsScreen(
             movements = movements.filter { it.assetId == detailAsset.id },
             spareParts = spareParts,
             locations = locations,
+            orgUnits = orgUnits,
             canManage = canManage,
             defaultAssignee = defaultAssignee,
             onBack = { detailId = null },
@@ -1423,7 +1439,7 @@ private fun AssetsScreen(
     }
 
     if (showForm) {
-        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations, allAssets = assets)
+        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations, allAssets = assets, orgUnits = orgUnits)
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
@@ -1483,6 +1499,7 @@ private fun AssetDetailScreen(
     movements: List<AssetMovementEntity>,
     spareParts: List<SparePartEntity>,
     locations: List<FunctionalLocationEntity>,
+    orgUnits: List<OrgUnitEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onBack: () -> Unit,
@@ -2023,7 +2040,7 @@ private fun AssetDetailScreen(
     }
 
     if (showEdit) {
-        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations, allAssets = allAssets)
+        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations, allAssets = allAssets, orgUnits = orgUnits)
     }
     if (showStatus) {
         StatusPickerDialog(
@@ -4612,6 +4629,118 @@ private fun orderedLocations(all: List<FunctionalLocationEntity>): List<Pair<Fun
     visit(null, 0)
     all.filter { it.id !in placed }.sortedBy { it.code }.forEach { result += it to 0 }
     return result
+}
+
+/** Depth-first ordering of the org-unit tree, returning each node with its depth. */
+private fun orderedOrgUnits(all: List<OrgUnitEntity>): List<Pair<OrgUnitEntity, Int>> {
+    val byParent = all.groupBy { it.parentId }
+    val result = mutableListOf<Pair<OrgUnitEntity, Int>>()
+    val placed = mutableSetOf<Long>()
+    fun visit(parentId: Long?, depth: Int) {
+        byParent[parentId]?.sortedBy { it.code }?.forEach { u ->
+            if (placed.add(u.id)) {
+                result += u to depth
+                visit(u.id, depth + 1)
+            }
+        }
+    }
+    visit(null, 0)
+    all.filter { it.id !in placed }.sortedBy { it.code }.forEach { result += it to 0 }
+    return result
+}
+
+@Composable
+private fun OrgUnitsScreen(
+    innerPadding: PaddingValues,
+    orgUnits: List<OrgUnitEntity>,
+    assets: List<AssetEntity>,
+    canManage: Boolean,
+    onSave: (OrgUnitEntity) -> Unit,
+    onDelete: (OrgUnitEntity) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<OrgUnitEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<OrgUnitEntity?>(null) }
+
+    val ordered = remember(orgUnits) { orderedOrgUnits(orgUnits) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                SectionHeader("هيكل المؤسسة")
+                Text("عرّف الشركات والمواقع والمصانع لاستخدامها في الأصول.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("وحدة تنظيمية جديدة") { editing = null; showForm = true } }
+            }
+            if (ordered.isEmpty()) {
+                item { EmptyState("لا توجد وحدات تنظيمية", Icons.Filled.Domain) }
+            }
+            items(ordered, key = { it.first.id }) { (unit, depth) ->
+                OrgUnitCard(
+                    unit = unit,
+                    depth = depth,
+                    assetCount = if (unit.type == "Plant") assets.count { it.plant == unit.name } else 0,
+                    childCount = orgUnits.count { it.parentId == unit.id },
+                    canManage = canManage,
+                    onEdit = { editing = unit; showForm = true },
+                    onDelete = { deleteTarget = unit }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        OrgUnitFormSheet(initial = editing, allUnits = orgUnits, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف الوحدة التنظيمية",
+            text = "هل تريد حذف ${target.code} - ${target.name}؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun OrgUnitCard(
+    unit: OrgUnitEntity,
+    depth: Int,
+    assetCount: Int,
+    childCount: Int,
+    canManage: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 16).dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBubble(Icons.Filled.Domain, AccentBlue, AccentBlue.copy(alpha = 0.14f), 38)
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(unit.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(unit.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(orgTypeDisplayAr(unit.type), statusTone("info"))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (unit.type == "Plant") StatusBadge("أصول: $assetCount", statusTone("info"))
+                StatusBadge("فرعية: $childCount", statusTone("neutral"))
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
 }
 
 @Composable

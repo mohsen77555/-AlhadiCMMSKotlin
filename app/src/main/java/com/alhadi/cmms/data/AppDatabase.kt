@@ -12,6 +12,7 @@ import com.alhadi.cmms.data.dao.AssetMovementDao
 import com.alhadi.cmms.data.dao.AuditLogDao
 import com.alhadi.cmms.data.dao.CapaDao
 import com.alhadi.cmms.data.dao.FunctionalLocationDao
+import com.alhadi.cmms.data.dao.OrgUnitDao
 import com.alhadi.cmms.data.dao.InventoryTransactionDao
 import com.alhadi.cmms.data.dao.MaintenanceNotificationDao
 import com.alhadi.cmms.data.dao.MeasurementDao
@@ -36,6 +37,7 @@ import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -82,9 +84,10 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         WorkPermitEntity::class,
         TrashEntity::class,
         PurchaseOrderEntity::class,
-        SupplierEntity::class
+        SupplierEntity::class,
+        OrgUnitEntity::class
     ],
-    version = 27,
+    version = 28,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -97,6 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun auditLogDao(): AuditLogDao
     abstract fun measurementDao(): MeasurementDao
     abstract fun functionalLocationDao(): FunctionalLocationDao
+    abstract fun orgUnitDao(): OrgUnitDao
     abstract fun capaDao(): CapaDao
     abstract fun assetDocumentDao(): AssetDocumentDao
     abstract fun assetCharacteristicDao(): AssetCharacteristicDao

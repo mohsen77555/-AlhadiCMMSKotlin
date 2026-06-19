@@ -8,6 +8,7 @@ import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -48,6 +49,7 @@ data class BackupBundle(
     val measuringPoints: List<MeasuringPointEntity> = emptyList(),
     val measurementReadings: List<MeasurementReadingEntity> = emptyList(),
     val functionalLocations: List<FunctionalLocationEntity> = emptyList(),
+    val orgUnits: List<OrgUnitEntity> = emptyList(),
     val capa: List<CapaEntity> = emptyList(),
     val assetDocuments: List<AssetDocumentEntity> = emptyList(),
     val assetCharacteristics: List<AssetCharacteristicEntity> = emptyList(),
@@ -68,7 +70,7 @@ data class BackupBundle(
     val totalRecords: Int
         get() = assets.size + workOrders.size + preventiveMaintenance.size + spareParts.size +
             inventoryTransactions.size + users.size + auditLog.size + measuringPoints.size +
-            measurementReadings.size + functionalLocations.size + capa.size + assetDocuments.size +
+            measurementReadings.size + functionalLocations.size + orgUnits.size + capa.size + assetDocuments.size +
             assetCharacteristics.size + assetBom.size + assetMovements.size + pmChecklist.size +
             notifications.size + operations.size + confirmations.size + photos.size +
             taskLists.size + taskListOperations.size + permits.size + purchaseOrders.size + suppliers.size

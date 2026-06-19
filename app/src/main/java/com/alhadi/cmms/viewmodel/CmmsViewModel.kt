@@ -14,6 +14,7 @@ import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -131,6 +132,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val functionalLocations: StateFlow<List<FunctionalLocationEntity>> = repository.functionalLocations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val orgUnits: StateFlow<List<OrgUnitEntity>> = repository.orgUnits
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val capaActions: StateFlow<List<CapaEntity>> = repository.capaActions
@@ -295,6 +299,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     // ----- Functional locations -----
     fun saveFunctionalLocation(location: FunctionalLocationEntity) = launchAction("تم حفظ الموقع الفني") { repository.saveFunctionalLocation(location, actor()) }
     fun deleteFunctionalLocation(location: FunctionalLocationEntity) = launchAction("تم حذف الموقع الفني") { repository.deleteFunctionalLocation(location, actor()) }
+
+    fun saveOrgUnit(unit: OrgUnitEntity) = launchAction("تم حفظ الوحدة التنظيمية") { repository.saveOrgUnit(unit, actor()) }
+    fun deleteOrgUnit(unit: OrgUnitEntity) = launchAction("تم حذف الوحدة التنظيمية") { repository.deleteOrgUnit(unit, actor()) }
 
     // ----- Asset documents -----
     fun saveAssetDocument(doc: AssetDocumentEntity) = launchAction("تم حفظ المستند") { repository.saveAssetDocument(doc, actor()) }
