@@ -1,0 +1,19 @@
+Stage 4 diagnostics
+data_status=0
+ui_status=1
+build_status=99
+
+--- data patch ---
+Structured maintenance component-list data stage 4 patch completed successfully.
+
+--- UI patch ---
+Traceback (most recent call last):
+  File "/home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/scripts/app3_assets_stage4_ui.py", line 671, in <module>
+    text = replace_once(text, "    characteristics: List<AssetCharacteristicEntity>,\n    bomItems: List<AssetBomItemEntity>,", "    characteristics: List<AssetCharacteristicEntity>,\n    bomHeaders: List<AssetBomHeaderEntity>,\n    bomItems: List<AssetBomItemEntity>,", "assets screen header parameter")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/-AlhadiCMMSKotlin/-AlhadiCMMSKotlin/scripts/app3_assets_stage4_ui.py", line 19, in replace_once
+    raise RuntimeError(f"{label}: expected one match, found {count}")
+RuntimeError: assets screen header parameter: expected one match, found 2
+
+--- build ---
+Build was not started because a patch step failed.
