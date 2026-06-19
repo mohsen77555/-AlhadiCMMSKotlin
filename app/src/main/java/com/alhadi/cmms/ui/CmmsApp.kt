@@ -1465,6 +1465,10 @@ private fun AssetsScreen(
                 asset.assetType.lowercase(Locale.getDefault()).contains(q) ||
                 asset.assetCategory.lowercase(Locale.getDefault()).contains(q) ||
                 asset.organizationCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.plantCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetType.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetCategory.lowercase(Locale.getDefault()).contains(q) ||
+                asset.organizationCode.lowercase(Locale.getDefault()).contains(q) ||
                 asset.plantCode.lowercase(Locale.getDefault()).contains(q)
         }
     }
@@ -1571,6 +1575,7 @@ private fun AssetCard(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusBadge(asset.criticality, priorityTone(asset.criticality))
                 AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
+                if (asset.assetCategory.isNotBlank()) AssistChip(onClick = {}, label = { Text(asset.assetCategory, maxLines = 1) })
                 if (asset.assetCategory.isNotBlank()) AssistChip(onClick = {}, label = { Text(asset.assetCategory, maxLines = 1) })
                 if (asset.assetCategory.isNotBlank()) AssistChip(onClick = {}, label = { Text(asset.assetCategory, maxLines = 1) })
                 if (asset.assetCategory.isNotBlank()) AssistChip(onClick = {}, label = { Text(asset.assetCategory, maxLines = 1) })
@@ -1739,6 +1744,7 @@ private fun AssetDetailScreen(
             asset.financialAssetRef.isNotBlank() || asset.purchaseDate.isNotBlank() ||
             asset.financialAssetRef.isNotBlank() || asset.purchaseDate.isNotBlank() ||
             asset.financialAssetRef.isNotBlank() || asset.purchaseDate.isNotBlank() ||
+            asset.financialAssetRef.isNotBlank() || asset.purchaseDate.isNotBlank() ||
             asset.financialAssetRef.isNotBlank()
         if (hasFinancial) {
             item {
@@ -1764,7 +1770,9 @@ private fun AssetDetailScreen(
                         if (asset.purchaseDate.isNotBlank()) InfoRow("تاريخ الشراء", asset.purchaseDate)
                         if (asset.purchaseDate.isNotBlank()) InfoRow("تاريخ الشراء", asset.purchaseDate)
                         if (asset.purchaseDate.isNotBlank()) InfoRow("تاريخ الشراء", asset.purchaseDate)
+                        if (asset.purchaseDate.isNotBlank()) InfoRow("تاريخ الشراء", asset.purchaseDate)
                         if (asset.acquiredAt.isNotBlank()) InfoRow("تاريخ الاقتناء", asset.acquiredAt)
+                        if (asset.financialAssetRef.isNotBlank()) InfoRow("مرجع الأصل المالي", asset.financialAssetRef)
                         if (asset.financialAssetRef.isNotBlank()) InfoRow("مرجع الأصل المالي", asset.financialAssetRef)
                         if (asset.financialAssetRef.isNotBlank()) InfoRow("مرجع الأصل المالي", asset.financialAssetRef)
                         if (asset.financialAssetRef.isNotBlank()) InfoRow("مرجع الأصل المالي", asset.financialAssetRef)
