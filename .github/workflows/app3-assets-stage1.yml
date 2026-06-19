@@ -1,0 +1,539 @@
+name: App3 Assets Stage 1
+
+on:
+  push:
+    branches: ["App3"]
+    paths: [".github/workflows/app3-assets-stage1.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout App3
+        uses: actions/checkout@v4
+        with:
+          ref: App3
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Implement asset master stage 1
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected one match in {path}, found {count}: {old[:90]!r}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # ------------------------------------------------------------------
+          # Asset entity: core classification, organization, responsibility,
+          # partner and address fields. Defaults preserve existing records.
+          # ------------------------------------------------------------------
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/data/entity/AssetEntity.kt",
+              "import androidx.room.Entity\nimport androidx.room.Index\nimport androidx.room.PrimaryKey",
+              "import androidx.room.ColumnInfo\nimport androidx.room.Entity\nimport androidx.room.Index\nimport androidx.room.PrimaryKey",
+          )
+
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/data/entity/AssetEntity.kt",
+              '''    val purchaseCost: Double = 0.0,
+              val acquiredAt: String = ""
+          ) {''',
+              '''    val purchaseCost: Double = 0.0,
+              val acquiredAt: String = "",
+              @ColumnInfo(defaultValue = "'Machine'")
+              val category: String = "Machine",
+              @ColumnInfo(defaultValue = "''")
+              val objectType: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val description: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val maintenancePlant: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val planningPlant: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val plannerGroup: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val mainWorkCenter: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val productionWorkCenter: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val costCenter: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val responsiblePerson: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val assetNumber: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val constructionYear: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val constructionMonth: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val startupDate: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val partnerName: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val partnerRole: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val partnerPhone: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val partnerEmail: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val addressLine: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val city: String = "",
+              @ColumnInfo(defaultValue = "''")
+              val country: String = ""
+          ) {''',
+          )
+
+          # Database version and safe migration for existing App3 installations.
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/data/AppDatabase.kt",
+              "    version = 22,",
+              "    version = 23,",
+          )
+
+          migration_path = Path("app/src/main/java/com/alhadi/cmms/data/DbMigrations.kt")
+          migration_text = migration_path.read_text(encoding="utf-8")
+          start = migration_text.index("object DbMigrations {")
+          end_marker = "\n}\n\n/** Tiny helper"
+          end = migration_text.index(end_marker, start) + 2
+          new_object = '''object DbMigrations {
+
+              /** Adds the first group of extended asset-master fields without losing existing data. */
+              val MIGRATION_22_23 = object : Migration(22, 23) {
+                  override fun migrate(db: SupportSQLiteDatabase) {
+                      db.exec(
+                          "ALTER TABLE assets ADD COLUMN category TEXT NOT NULL DEFAULT 'Machine'",
+                          "ALTER TABLE assets ADD COLUMN objectType TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN maintenancePlant TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN planningPlant TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN plannerGroup TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN mainWorkCenter TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN productionWorkCenter TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN costCenter TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN responsiblePerson TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN assetNumber TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN constructionYear TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN constructionMonth TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN startupDate TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN partnerName TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN partnerRole TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN partnerPhone TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN partnerEmail TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN addressLine TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN city TEXT NOT NULL DEFAULT ''",
+                          "ALTER TABLE assets ADD COLUMN country TEXT NOT NULL DEFAULT ''"
+                      )
+                  }
+              }
+
+              val ALL: Array<Migration> = arrayOf(MIGRATION_22_23)
+          }'''
+          migration_path.write_text(migration_text[:start] + new_object + migration_text[end:], encoding="utf-8")
+
+          # Shared Arabic labels for stable stored codes.
+          Path("app/src/main/java/com/alhadi/cmms/ui/AssetMasterLabels.kt").write_text('''package com.alhadi.cmms.ui
+
+          internal val assetCategoryOptions = listOf(
+              "Machine",
+              "Vehicle",
+              "Tool",
+              "ProductionResource",
+              "CustomerAsset",
+              "Facility",
+              "Assembly",
+              "Other"
+          )
+
+          internal fun assetCategoryLabel(value: String): String = when (value) {
+              "Machine" -> "آلة / معدة"
+              "Vehicle" -> "مركبة"
+              "Tool" -> "أداة"
+              "ProductionResource" -> "مورد إنتاج"
+              "CustomerAsset" -> "أصل عميل"
+              "Facility" -> "مرفق"
+              "Assembly" -> "تجميعة"
+              "Other" -> "أخرى"
+              else -> value.ifBlank { "غير محدد" }
+          }
+
+          internal val assetPartnerRoleOptions = listOf(
+              "",
+              "Manufacturer",
+              "Vendor",
+              "ServiceProvider",
+              "Operator",
+              "Owner",
+              "Responsible"
+          )
+
+          internal fun assetPartnerRoleLabel(value: String): String = when (value) {
+              "Manufacturer" -> "الشركة المصنّعة"
+              "Vendor" -> "المورّد"
+              "ServiceProvider" -> "مقدم الخدمة"
+              "Operator" -> "المشغّل"
+              "Owner" -> "المالك"
+              "Responsible" -> "المسؤول"
+              else -> "بدون"
+          }
+          ''', encoding="utf-8")
+
+          # ------------------------------------------------------------------
+          # Asset form: expose the new data in clear sections.
+          # ------------------------------------------------------------------
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/ui/Forms.kt",
+              '''    var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
+
+              FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {''',
+              '''    var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
+              var category by remember { mutableStateOf(initial?.category ?: "Machine") }
+              var objectType by remember { mutableStateOf(initial?.objectType ?: "") }
+              var description by remember { mutableStateOf(initial?.description ?: "") }
+              var maintenancePlant by remember { mutableStateOf(initial?.maintenancePlant ?: "") }
+              var planningPlant by remember { mutableStateOf(initial?.planningPlant ?: "") }
+              var plannerGroup by remember { mutableStateOf(initial?.plannerGroup ?: "") }
+              var mainWorkCenter by remember { mutableStateOf(initial?.mainWorkCenter ?: "") }
+              var productionWorkCenter by remember { mutableStateOf(initial?.productionWorkCenter ?: "") }
+              var costCenter by remember { mutableStateOf(initial?.costCenter ?: "") }
+              var responsiblePerson by remember { mutableStateOf(initial?.responsiblePerson ?: "") }
+              var assetNumber by remember { mutableStateOf(initial?.assetNumber ?: "") }
+              var constructionYear by remember { mutableStateOf(initial?.constructionYear ?: "") }
+              var constructionMonth by remember { mutableStateOf(initial?.constructionMonth ?: "") }
+              var startupDate by remember { mutableStateOf(initial?.startupDate ?: "") }
+              var partnerName by remember { mutableStateOf(initial?.partnerName ?: "") }
+              var partnerRole by remember { mutableStateOf(initial?.partnerRole ?: "") }
+              var partnerPhone by remember { mutableStateOf(initial?.partnerPhone ?: "") }
+              var partnerEmail by remember { mutableStateOf(initial?.partnerEmail ?: "") }
+              var addressLine by remember { mutableStateOf(initial?.addressLine ?: "") }
+              var city by remember { mutableStateOf(initial?.city ?: "") }
+              var country by remember { mutableStateOf(initial?.country ?: "") }
+
+              FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {''',
+          )
+
+          old_form_fields = '''        LabeledField("الكود (Code)", code, { code = it })
+                  LabeledField("الاسم (Name)", name, { name = it })
+                  LabeledField("المجموعة (Group)", group, { group = it })
+                  LabeledField("الموقع النصّي (Location)", location, { location = it })
+                  if (locations.isNotEmpty()) {
+                      LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+                  }
+                  if (allAssets.isNotEmpty()) {
+                      AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
+                  }
+                  LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
+                  LabeledField("الموديل (Model)", model, { model = it })
+                  OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
+                  OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
+                  Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                  LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
+                  LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
+                  LabeledField("المورّد (Supplier)", supplier, { supplier = it })
+                  LabeledField("أمر الشراء (PO)", purchaseOrder, { purchaseOrder = it })
+                  LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
+                  DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
+                  Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                  LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
+                  DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
+                  DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }'''
+
+          new_form_fields = '''        Text("البيانات الأساسية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                  LabeledField("كود الأصل", code, { code = it })
+                  LabeledField("اسم الأصل", name, { name = it })
+                  LabeledField("الوصف", description, { description = it }, singleLine = false)
+                  OptionDropdown(
+                      label = "فئة الأصل",
+                      options = assetCategoryOptions,
+                      selected = category,
+                      display = ::assetCategoryLabel
+                  ) { category = it }
+                  LabeledField("نوع الأصل (مثال: مضخة، محرك، ناقل)", objectType, { objectType = it })
+                  LabeledField("المجموعة", group, { group = it })
+                  LabeledField("الموقع النصّي", location, { location = it })
+                  if (locations.isNotEmpty()) {
+                      LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+                  }
+                  if (allAssets.isNotEmpty()) {
+                      AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
+                  }
+
+                  Text("البيانات الفنية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                  LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
+                  LabeledField("الموديل", model, { model = it })
+                  LabeledField("سنة الصنع", constructionYear, { constructionYear = it }, numeric = true)
+                  LabeledField("شهر الصنع", constructionMonth, { constructionMonth = it }, numeric = true)
+                  DateField("تاريخ بدء التشغيل", startupDate) { startupDate = it }
+                  OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
+                  OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
+
+                  Text("التنظيم والمسؤولية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                  LabeledField("مصنع الصيانة", maintenancePlant, { maintenancePlant = it })
+                  LabeledField("مصنع التخطيط", planningPlant, { planningPlant = it })
+                  LabeledField("مجموعة المخططين", plannerGroup, { plannerGroup = it })
+                  LabeledField("مركز العمل الرئيسي", mainWorkCenter, { mainWorkCenter = it })
+                  LabeledField("مركز عمل الإنتاج", productionWorkCenter, { productionWorkCenter = it })
+                  LabeledField("مركز التكلفة", costCenter, { costCenter = it })
+                  LabeledField("الشخص المسؤول", responsiblePerson, { responsiblePerson = it })
+
+                  Text("الهوية والمعلومات المالية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                  LabeledField("الرقم التسلسلي", serialNumber, { serialNumber = it })
+                  LabeledField("وسم الأصل", assetTag, { assetTag = it })
+                  LabeledField("رقم الأصل المالي", assetNumber, { assetNumber = it })
+                  LabeledField("المورّد", supplier, { supplier = it })
+                  LabeledField("أمر الشراء", purchaseOrder, { purchaseOrder = it })
+                  LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
+                  DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
+
+                  Text("جهة الاتصال والعنوان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                  LabeledField("اسم الجهة أو الشخص", partnerName, { partnerName = it })
+                  OptionDropdown(
+                      label = "صفة الجهة",
+                      options = assetPartnerRoleOptions,
+                      selected = partnerRole,
+                      display = ::assetPartnerRoleLabel
+                  ) { partnerRole = it }
+                  LabeledField("رقم الهاتف", partnerPhone, { partnerPhone = it })
+                  LabeledField("البريد الإلكتروني", partnerEmail, { partnerEmail = it })
+                  LabeledField("العنوان", addressLine, { addressLine = it }, singleLine = false)
+                  LabeledField("المدينة", city, { city = it })
+                  LabeledField("الدولة", country, { country = it })
+
+                  Text("الضمان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                  LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
+                  DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
+                  DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }'''
+          replace_once("app/src/main/java/com/alhadi/cmms/ui/Forms.kt", old_form_fields, new_form_fields)
+
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/ui/Forms.kt",
+              '''                    purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
+                      acquiredAt = acquiredAt.trim()
+                  )''',
+              '''                    purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
+                      acquiredAt = acquiredAt.trim(),
+                      category = category,
+                      objectType = objectType.trim(),
+                      description = description.trim(),
+                      maintenancePlant = maintenancePlant.trim(),
+                      planningPlant = planningPlant.trim(),
+                      plannerGroup = plannerGroup.trim(),
+                      mainWorkCenter = mainWorkCenter.trim(),
+                      productionWorkCenter = productionWorkCenter.trim(),
+                      costCenter = costCenter.trim(),
+                      responsiblePerson = responsiblePerson.trim(),
+                      assetNumber = assetNumber.trim(),
+                      constructionYear = constructionYear.trim(),
+                      constructionMonth = constructionMonth.trim(),
+                      startupDate = startupDate.trim(),
+                      partnerName = partnerName.trim(),
+                      partnerRole = partnerRole,
+                      partnerPhone = partnerPhone.trim(),
+                      partnerEmail = partnerEmail.trim(),
+                      addressLine = addressLine.trim(),
+                      city = city.trim(),
+                      country = country.trim()
+                  )''',
+          )
+
+          # ------------------------------------------------------------------
+          # Assets list/detail: search, category visibility and structured cards.
+          # ------------------------------------------------------------------
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt",
+              '''                asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.assetTag.lowercase(Locale.getDefault()).contains(q)''',
+              '''                asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.assetTag.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.description.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.category.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.objectType.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.maintenancePlant.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.planningPlant.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.plannerGroup.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.mainWorkCenter.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.costCenter.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.responsiblePerson.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.assetNumber.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.partnerName.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.city.lowercase(Locale.getDefault()).contains(q) ||
+                          asset.country.lowercase(Locale.getDefault()).contains(q)''',
+          )
+
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt",
+              '''            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                          StatusBadge(asset.criticality, priorityTone(asset.criticality))
+                          AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
+                      }
+                      if (canManage) EditDeleteRow(onEdit, onDelete)''',
+              '''            Row(
+                          modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                          horizontalArrangement = Arrangement.spacedBy(8.dp)
+                      ) {
+                          StatusBadge(asset.criticality, priorityTone(asset.criticality))
+                          AssistChip(onClick = {}, label = { Text(assetCategoryLabel(asset.category), maxLines = 1) })
+                          if (asset.objectType.isNotBlank()) {
+                              AssistChip(onClick = {}, label = { Text(asset.objectType, maxLines = 1) })
+                          }
+                      }
+                      if (asset.location.isNotBlank()) {
+                          Text(asset.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                      }
+                      if (canManage) EditDeleteRow(onEdit, onDelete)''',
+          )
+
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt",
+              '''    val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
+              val retired = asset.status.equals("Retired", ignoreCase = true)
+
+              LazyColumn(''',
+              '''    val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
+              val retired = asset.status.equals("Retired", ignoreCase = true)
+              val hasOrganization = listOf(
+                  asset.maintenancePlant,
+                  asset.planningPlant,
+                  asset.plannerGroup,
+                  asset.mainWorkCenter,
+                  asset.productionWorkCenter,
+                  asset.costCenter,
+                  asset.responsiblePerson
+              ).any { it.isNotBlank() }
+              val hasPartner = listOf(asset.partnerName, asset.partnerRole, asset.partnerPhone, asset.partnerEmail).any { it.isNotBlank() }
+              val hasAddress = listOf(asset.addressLine, asset.city, asset.country).any { it.isNotBlank() }
+              val constructionDate = listOf(asset.constructionYear, asset.constructionMonth)
+                  .filter { it.isNotBlank() }
+                  .joinToString(" / ")
+
+              LazyColumn(''',
+          )
+
+          old_info = '''                    SectionHeader("المعلومات")
+                          InfoRow("المجموعة", asset.groupName)
+                          InfoRow("الموقع", asset.location)
+                          InfoRow("الموقع الفني", locationLabel)
+                          InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
+                          InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                          if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
+                          if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
+                          InfoRow("الأهمية", asset.criticality)
+                          InfoRow("تاريخ التركيب", asset.installedAt)
+                          InfoRow("آخر فحص", asset.lastInspectionAt)'''
+          new_info = '''                    SectionHeader("المعلومات الأساسية")
+                          if (asset.description.isNotBlank()) InfoRow("الوصف", asset.description)
+                          InfoRow("فئة الأصل", assetCategoryLabel(asset.category))
+                          if (asset.objectType.isNotBlank()) InfoRow("نوع الأصل", asset.objectType)
+                          InfoRow("المجموعة", asset.groupName)
+                          InfoRow("الموقع", asset.location.ifBlank { "غير محدد" })
+                          InfoRow("الموقع الفني", locationLabel)
+                          InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
+                          InfoRow("الشركة/الموديل", listOf(asset.manufacturer, asset.model).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { "غير محدد" })
+                          if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
+                          if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
+                          if (asset.assetNumber.isNotBlank()) InfoRow("رقم الأصل المالي", asset.assetNumber)
+                          InfoRow("الأهمية", asset.criticality)
+                          if (constructionDate.isNotBlank()) InfoRow("سنة / شهر الصنع", constructionDate)
+                          InfoRow("تاريخ التركيب", asset.installedAt)
+                          if (asset.startupDate.isNotBlank()) InfoRow("تاريخ بدء التشغيل", asset.startupDate)
+                          InfoRow("آخر فحص", asset.lastInspectionAt)'''
+          replace_once("app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt", old_info, new_info)
+
+          replace_once(
+              "app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt",
+              '''                    InfoRow("آخر فحص", asset.lastInspectionAt)
+                      }
+                  }
+              }
+
+              item {
+                  val laborTotal = workOrders.sumOf { it.laborCost() }''',
+              '''                    InfoRow("آخر فحص", asset.lastInspectionAt)
+                      }
+                  }
+              }
+
+              if (hasOrganization) {
+                  item {
+                      ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                          Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                              SectionHeader("التنظيم والمسؤولية")
+                              if (asset.maintenancePlant.isNotBlank()) InfoRow("مصنع الصيانة", asset.maintenancePlant)
+                              if (asset.planningPlant.isNotBlank()) InfoRow("مصنع التخطيط", asset.planningPlant)
+                              if (asset.plannerGroup.isNotBlank()) InfoRow("مجموعة المخططين", asset.plannerGroup)
+                              if (asset.mainWorkCenter.isNotBlank()) InfoRow("مركز العمل الرئيسي", asset.mainWorkCenter)
+                              if (asset.productionWorkCenter.isNotBlank()) InfoRow("مركز عمل الإنتاج", asset.productionWorkCenter)
+                              if (asset.costCenter.isNotBlank()) InfoRow("مركز التكلفة", asset.costCenter)
+                              if (asset.responsiblePerson.isNotBlank()) InfoRow("الشخص المسؤول", asset.responsiblePerson)
+                          }
+                      }
+                  }
+              }
+
+              if (hasPartner || hasAddress) {
+                  item {
+                      ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                          Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                              SectionHeader("جهة الاتصال والعنوان")
+                              if (asset.partnerName.isNotBlank()) InfoRow("الجهة أو الشخص", asset.partnerName)
+                              if (asset.partnerRole.isNotBlank()) InfoRow("الصفة", assetPartnerRoleLabel(asset.partnerRole))
+                              if (asset.partnerPhone.isNotBlank()) InfoRow("الهاتف", asset.partnerPhone)
+                              if (asset.partnerEmail.isNotBlank()) InfoRow("البريد الإلكتروني", asset.partnerEmail)
+                              if (asset.addressLine.isNotBlank()) InfoRow("العنوان", asset.addressLine)
+                              if (asset.city.isNotBlank()) InfoRow("المدينة", asset.city)
+                              if (asset.country.isNotBlank()) InfoRow("الدولة", asset.country)
+                          }
+                      }
+                  }
+              }
+
+              item {
+                  val laborTotal = workOrders.sumOf { it.laborCost() }''',
+          )
+
+          print("Asset master stage 1 changes applied.")
+          PY
+
+      - name: Build App3 debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Commit verified changes to App3 only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main app/schemas 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No application changes to commit"
+            exit 1
+          fi
+          git commit -m "feat(assets): complete core asset master stage 1"
+          git push origin HEAD:App3
