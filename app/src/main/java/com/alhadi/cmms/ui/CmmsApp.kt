@@ -41,6 +41,10 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Domain
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Factory
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -172,6 +176,7 @@ import com.alhadi.cmms.ui.theme.AccentPurple
 import com.alhadi.cmms.ui.theme.AccentRed
 import com.alhadi.cmms.ui.theme.AccentTeal
 import com.alhadi.cmms.ui.theme.StatusInfo
+import com.alhadi.cmms.ui.theme.StatusTone
 import com.alhadi.cmms.ui.theme.StatusRunning
 import com.alhadi.cmms.ui.theme.StatusRunningContainer
 import com.alhadi.cmms.ui.theme.StatusStopped
@@ -1307,6 +1312,7 @@ private fun AssetsScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var plantFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    var typeFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AssetEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<AssetEntity?>(null) }
@@ -1367,9 +1373,10 @@ private fun AssetsScreen(
         return
     }
 
-    val filtered = remember(query, assets, plantFilter) {
+    val filtered = remember(query, assets, plantFilter, typeFilter) {
         assets.filter { asset ->
-            (plantFilter == null || asset.plant == plantFilter) && (query.isBlank() || run {
+            (plantFilter == null || asset.plant == plantFilter) &&
+                (typeFilter == null || asset.assetType == typeFilter) && (query.isBlank() || run {
                 val q = query.lowercase(Locale.getDefault())
                 asset.code.lowercase(Locale.getDefault()).contains(q) ||
                     asset.name.lowercase(Locale.getDefault()).contains(q) ||
@@ -1382,6 +1389,7 @@ private fun AssetsScreen(
     }
     val grouped = filtered.groupBy { it.groupName }
     val plantNames = remember(orgUnits) { orgUnits.filter { it.type == "Plant" }.map { it.name } }
+    val assetTypes = remember(assets) { assets.mapNotNull { it.assetType?.takeIf { t -> t.isNotBlank() } }.distinct() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -1430,6 +1438,24 @@ private fun AssetsScreen(
                         FilterChip(selected = plantFilter == null, onClick = { plantFilter = null }, label = { Text("كل المصانع") })
                         plantNames.forEach { p ->
                             FilterChip(selected = plantFilter == p, onClick = { plantFilter = if (plantFilter == p) null else p }, label = { Text(p) })
+                        }
+                    }
+                }
+            }
+            if (assetTypes.size > 1) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(selected = typeFilter == null, onClick = { typeFilter = null }, label = { Text("كل الأنواع") })
+                        assetTypes.forEach { t ->
+                            FilterChip(
+                                selected = typeFilter == t,
+                                onClick = { typeFilter = if (typeFilter == t) null else t },
+                                label = { Text(assetTypeDisplayAr(t)) },
+                                leadingIcon = { Icon(assetTypeIcon(t), contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            )
                         }
                     }
                 }
@@ -1485,7 +1511,8 @@ private fun AssetCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val tone = statusTone(asset.status)
-                IconBubble(Icons.Filled.PrecisionManufacturing, tone.content, tone.container, 44)
+                val typeColor = assetTypeColor(asset.assetType)
+                IconBubble(assetTypeIcon(asset.assetType), typeColor, typeColor.copy(alpha = 0.14f), 44)
                 Column(modifier = Modifier.weight(1f)) {
                     LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1495,6 +1522,10 @@ private fun AssetCard(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                asset.assetType?.takeIf { it.isNotBlank() }?.let {
+                    val c = assetTypeColor(it)
+                    StatusBadge(assetTypeDisplayAr(it), StatusTone(c, c.copy(alpha = 0.14f)))
+                }
                 StatusBadge(asset.criticality, priorityTone(asset.criticality))
                 AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
             }
@@ -1585,7 +1616,7 @@ private fun AssetDetailScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     SectionHeader("المعلومات")
                     asset.description?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    asset.assetType?.takeIf { it.isNotBlank() }?.let { InfoRow("النوع", it) }
+                    asset.assetType?.takeIf { it.isNotBlank() }?.let { InfoRow("النوع", assetTypeDisplayAr(it)) }
                     InfoRow("المجموعة", asset.groupName)
                     asset.category?.takeIf { it.isNotBlank() }?.let { InfoRow("الفئة", it) }
                     InfoRow("الموقع", asset.location)
@@ -1790,9 +1821,16 @@ private fun AssetDetailScreen(
                 }
             }
             item {
+                val isFunctionalLocation = asset.assetType == "Functional Location"
                 if (retired) {
                     Text(
                         "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else if (isFunctionalLocation) {
+                    Text(
+                        "هذا موقع وظيفي (حاوية تنظيمية) — لا تُنشأ أوامر عمل مباشرة عليه؛ أنشئها على المعدّات بداخله.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -1872,6 +1910,28 @@ private fun AssetDetailScreen(
                             "Open" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "In Progress") }, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
                             "In Progress" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "Technically Completed") }, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
                             "Technically Completed" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "Closed") }, modifier = Modifier.fillMaxWidth()) { Text("إغلاق نهائي") }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (asset.assetType == "Safety Asset") {
+            val lowCriticality = asset.criticality != "Critical" && asset.criticality != "High"
+            if (lowCriticality || pmItems.isEmpty()) {
+                item {
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = AccentRed.copy(alpha = 0.10f))) {
+                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Filled.HealthAndSafety, contentDescription = null, tint = AccentRed, modifier = Modifier.size(20.dp))
+                            Text(
+                                "أصل أمان: يجب أن تكون أهميته عالية/حرجة" +
+                                    (if (lowCriticality) " (الحالية: ${asset.criticality})" else "") +
+                                    " وأن تكون له خطة صيانة وقائية" +
+                                    (if (pmItems.isEmpty()) " — لا توجد خطة حالياً" else "") + ".",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AccentRed,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -2113,6 +2173,31 @@ private fun assetStatusGroup(status: String): String = when (status) {
 
 /** Statuses on which a normal work order is not allowed (governance STAT-002). */
 private fun isDecommissioned(status: String): Boolean = status == "Retired" || status == "Disposed"
+
+/** Icon per asset type (governance §4). */
+private fun assetTypeIcon(type: String?): ImageVector = when (type) {
+    "Functional Location" -> Icons.Filled.AccountTree
+    "Linear Asset" -> Icons.Filled.Timeline
+    "Tool Asset" -> Icons.Filled.Build
+    "Safety Asset" -> Icons.Filled.HealthAndSafety
+    "Utility Asset" -> Icons.Filled.Bolt
+    "Production Asset" -> Icons.Filled.Factory
+    "Mobile Asset" -> Icons.Filled.LocalShipping
+    "Serialized Component" -> Icons.Filled.Memory
+    else -> Icons.Filled.PrecisionManufacturing
+}
+
+/** Accent color per asset type (governance §4). */
+private fun assetTypeColor(type: String?): Color = when (type) {
+    "Functional Location" -> AccentGreen
+    "Linear Asset" -> AccentTeal
+    "Tool Asset" -> AccentBrown
+    "Safety Asset" -> AccentRed
+    "Utility Asset" -> AccentOrange
+    "Production Asset" -> AccentPurple
+    "Mobile Asset" -> AccentNavy
+    else -> AccentBlue
+}
 
 private fun workOrderStatusLabel(status: String): String = when (status) {
     "Open" -> "مفتوح"

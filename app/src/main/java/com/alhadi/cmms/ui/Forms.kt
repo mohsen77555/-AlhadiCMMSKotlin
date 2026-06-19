@@ -101,6 +101,14 @@ internal fun assetStatusDisplayAr(status: String): String = when (status) {
     "Disposed" -> "مشطوب"; "Inactive" -> "غير نشط"; else -> status
 }
 
+/** Arabic label for an asset type (governance §4). */
+internal fun assetTypeDisplayAr(type: String?): String = when (type) {
+    "Equipment" -> "معدّة"; "Functional Location" -> "موقع وظيفي"; "Linear Asset" -> "أصل خطّي"
+    "Tool Asset" -> "أداة"; "Safety Asset" -> "أصل أمان"; "Utility Asset" -> "أصل مرافق"
+    "Production Asset" -> "أصل إنتاج"; "Mobile Asset" -> "أصل متحرك"; "Serialized Component" -> "مكوّن متسلسل"
+    else -> type ?: ""
+}
+
 /** Arabic label for an organization unit type (governance §5). */
 internal fun orgTypeDisplayAr(type: String): String = when (type) {
     "Company" -> "شركة"; "Site" -> "موقع"; "Plant" -> "مصنع"; else -> type
@@ -446,7 +454,8 @@ internal fun AssetFormSheet(
         OptionDropdown(
             "نوع الأصل",
             listOf("Equipment", "Functional Location", "Linear Asset", "Tool Asset", "Safety Asset", "Utility Asset", "Production Asset", "Mobile Asset", "Serialized Component"),
-            assetType
+            assetType,
+            display = { assetTypeDisplayAr(it) }
         ) { assetType = it }
         LabeledField("المجموعة (Group)", group, { group = it })
         LabeledField("الفئة (Category)", category, { category = it })
@@ -518,7 +527,16 @@ internal fun AssetFormSheet(
         DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
         DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
         LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
-        SaveButton(code.isNotBlank() && name.isNotBlank()) {
+        val needsSerial = assetType == "Serialized Component" && serialNumber.isBlank()
+        if (needsSerial) {
+            Text(
+                "المكوّن المتسلسل يتطلب رقماً تسلسلياً قبل الحفظ.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        SaveButton(code.isNotBlank() && name.isNotBlank() && !needsSerial) {
             val today = DateStrings.today()
             onSave(
                 AssetEntity(
