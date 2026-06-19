@@ -1224,7 +1224,7 @@ private fun AssetsScreen(
             workOrders = workOrders.filter { it.assetId == detailAsset.id },
             pmItems = pmItems.filter { it.assetId == detailAsset.id },
             documents = documents.filter { it.assetId == detailAsset.id },
-            characteristics = characteristics.filter { it.assetId == detailAsset.id },
+            characteristics = characteristics,
             bomItems = bomItems.filter { it.assetId == detailAsset.id },
             movements = movements.filter { it.assetId == detailAsset.id },
             spareParts = spareParts,
@@ -1248,7 +1248,7 @@ private fun AssetsScreen(
         return
     }
 
-    val filtered = remember(query, assets) {
+    val filtered = remember(query, assets, characteristics) {
         if (query.isBlank()) assets else assets.filter { asset ->
             val q = query.lowercase(Locale.getDefault())
             asset.code.lowercase(Locale.getDefault()).contains(q) ||
@@ -1269,7 +1269,14 @@ private fun AssetsScreen(
                 asset.assetNumber.lowercase(Locale.getDefault()).contains(q) ||
                 asset.partnerName.lowercase(Locale.getDefault()).contains(q) ||
                 asset.city.lowercase(Locale.getDefault()).contains(q) ||
-                asset.country.lowercase(Locale.getDefault()).contains(q)
+                asset.country.lowercase(Locale.getDefault()).contains(q) ||
+                asset.standardClass.lowercase(Locale.getDefault()).contains(q) ||
+                resolveAssetCharacteristics(asset, assets, characteristics).any { resolved ->
+                    resolved.resolvedClassName.lowercase(Locale.getDefault()).contains(q) ||
+                        resolved.item.name.lowercase(Locale.getDefault()).contains(q) ||
+                        resolved.item.value.lowercase(Locale.getDefault()).contains(q) ||
+                        resolved.item.unit.lowercase(Locale.getDefault()).contains(q)
+                }
         }
     }
     val grouped = filtered.groupBy { it.groupName }
@@ -1381,6 +1388,9 @@ private fun AssetCard(
                 if (asset.objectType.isNotBlank()) {
                     AssistChip(onClick = {}, label = { Text(asset.objectType, maxLines = 1) })
                 }
+                if (asset.standardClass.isNotBlank()) {
+                    AssistChip(onClick = {}, label = { Text(asset.standardClass, maxLines = 1) })
+                }
             }
             if (asset.location.isNotBlank()) {
                 Text(asset.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1454,6 +1464,10 @@ private fun AssetDetailScreen(
     val constructionDate = listOf(asset.constructionYear, asset.constructionMonth)
         .filter { it.isNotBlank() }
         .joinToString(" / ")
+    val resolvedCharacteristics = resolveAssetCharacteristics(asset, allAssets, characteristics)
+    val directCharacteristics = resolvedCharacteristics.filterNot { it.inherited }
+    val inheritedCharacteristics = resolvedCharacteristics.filter { it.inherited }
+    val characteristicGroups = resolvedCharacteristics.groupBy { it.resolvedClassName }
 
     LazyColumn(
         modifier = Modifier
@@ -1575,7 +1589,7 @@ private fun AssetDetailScreen(
 
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                SectionHeader("الخصائص الفنية (${characteristics.size})")
+                SectionHeader("التصنيف والخصائص (${resolvedCharacteristics.size})")
                 Spacer(modifier = Modifier.weight(1f))
                 if (canManage) {
                     OutlinedButton(onClick = { editingChar = null; showCharForm = true }) {
@@ -1586,21 +1600,58 @@ private fun AssetDetailScreen(
                 }
             }
         }
-        if (characteristics.isEmpty()) {
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    InfoRow("التصنيف القياسي", asset.standardClass.ifBlank { "غير محدد" })
+                    InfoRow("توريث خصائص الأصل الأب", if (asset.inheritParentCharacteristics) "مفعّل" else "متوقف")
+                    InfoRow("الخصائص المباشرة", directCharacteristics.size.toString())
+                    if (inheritedCharacteristics.isNotEmpty()) {
+                        InfoRow("الخصائص الموروثة", inheritedCharacteristics.size.toString())
+                    }
+                }
+            }
+        }
+        if (resolvedCharacteristics.isEmpty()) {
             item { EmptyState("لا توجد خصائص مسجّلة") }
         }
-        items(characteristics, key = { "ch2-${it.id}" }) { ch ->
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(ch.name, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                    LtrText("${ch.value} ${ch.unit}".trim(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                    if (canManage) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(onClick = { editingChar = ch; showCharForm = true }) {
-                            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+        characteristicGroups.forEach { (className, classItems) ->
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    SectionHeader("$className (${classItems.size})")
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (asset.standardClass.isNotBlank() && className.equals(asset.standardClass, ignoreCase = true)) {
+                        StatusBadge("قياسي", statusTone("info"))
+                    }
+                }
+            }
+            items(classItems, key = { resolved -> "char-${resolved.sourceAsset.id}-${resolved.item.id}-${resolved.inherited}" }) { resolved ->
+                val ch = resolved.item
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(ch.name, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                            LtrText(characteristicDisplayValue(ch), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                         }
-                        IconButton(onClick = { deleteChar = ch }) {
-                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            StatusBadge(characteristicTypeLabel(ch.dataType), statusTone("info"))
+                            if (ch.isRequired) StatusBadge("إلزامية", statusTone("overdue"))
+                            if (resolved.inherited) {
+                                StatusBadge("موروثة من ${resolved.sourceAsset.code}", statusTone("scheduled"))
+                            }
+                        }
+                        if (canManage && !resolved.inherited) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(onClick = { editingChar = ch; showCharForm = true }, modifier = Modifier.weight(1f)) {
+                                    Text("تعديل")
+                                }
+                                TextButton(onClick = { deleteChar = ch }, modifier = Modifier.weight(1f)) {
+                                    Text("حذف", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }
@@ -1909,6 +1960,7 @@ private fun AssetDetailScreen(
         CharacteristicFormSheet(
             initial = editingChar,
             assetId = asset.id,
+            defaultClass = asset.standardClass,
             onDismiss = { showCharForm = false },
             onSave = { onSaveCharacteristic(it); showCharForm = false }
         )

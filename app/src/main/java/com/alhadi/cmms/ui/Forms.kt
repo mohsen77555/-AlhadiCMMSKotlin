@@ -385,6 +385,8 @@ internal fun AssetFormSheet(
     var addressLine by remember { mutableStateOf(initial?.addressLine ?: "") }
     var city by remember { mutableStateOf(initial?.city ?: "") }
     var country by remember { mutableStateOf(initial?.country ?: "") }
+    var standardClass by remember { mutableStateOf(initial?.standardClass ?: "") }
+    var inheritParentCharacteristics by remember { mutableStateOf(initial?.inheritParentCharacteristics ?: true) }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         Text("البيانات الأساسية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -405,6 +407,13 @@ internal fun AssetFormSheet(
         }
         if (allAssets.isNotEmpty()) {
             AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
+        }
+
+        Text("التصنيف", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("التصنيف القياسي", standardClass, { standardClass = it })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("توريث خصائص الأصل الأب", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = inheritParentCharacteristics, onCheckedChange = { inheritParentCharacteristics = it })
         }
 
         Text("البيانات الفنية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -498,7 +507,9 @@ internal fun AssetFormSheet(
                     partnerEmail = partnerEmail.trim(),
                     addressLine = addressLine.trim(),
                     city = city.trim(),
-                    country = country.trim()
+                    country = country.trim(),
+                    standardClass = standardClass.trim(),
+                    inheritParentCharacteristics = inheritParentCharacteristics
                 )
             )
         }
@@ -978,25 +989,77 @@ internal fun BomFormSheet(
 internal fun CharacteristicFormSheet(
     initial: AssetCharacteristicEntity?,
     assetId: Long,
+    defaultClass: String = "",
     onDismiss: () -> Unit,
     onSave: (AssetCharacteristicEntity) -> Unit
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var value by remember { mutableStateOf(initial?.value ?: "") }
     var unit by remember { mutableStateOf(initial?.unit ?: "") }
+    var className by remember { mutableStateOf(initial?.className ?: defaultClass.ifBlank { "عام" }) }
+    var dataType by remember { mutableStateOf(initial?.dataType ?: "Text") }
+    var allowedValues by remember { mutableStateOf(initial?.allowedValues ?: "") }
+    var isRequired by remember { mutableStateOf(initial?.isRequired ?: false) }
+
+    val listValues = parseCharacteristicAllowedValues(allowedValues)
+    val effectiveValue = when (dataType) {
+        "Boolean" -> value.takeIf { it == "true" || it == "false" } ?: "true"
+        "List" -> value.takeIf { it in listValues } ?: listValues.firstOrNull().orEmpty()
+        else -> value.trim()
+    }
+    val validValue = when (dataType) {
+        "Number" -> effectiveValue.toDoubleOrNull() != null
+        "List" -> listValues.isNotEmpty() && effectiveValue.isNotBlank()
+        else -> effectiveValue.isNotBlank()
+    }
 
     FormSheet(if (initial == null) "إضافة خاصية" else "تعديل الخاصية", onDismiss) {
+        LabeledField("التصنيف", className, { className = it })
         LabeledField("اسم الخاصية", name, { name = it })
-        LabeledField("القيمة", value, { value = it })
+        OptionDropdown(
+            label = "نوع القيمة",
+            options = listOf("Text", "Number", "Boolean", "Date", "List"),
+            selected = dataType,
+            display = ::characteristicTypeLabel
+        ) {
+            dataType = it
+            if (it != "List") allowedValues = ""
+        }
+        if (dataType == "List") {
+            LabeledField("القيم المتاحة (مفصولة بفاصلة)", allowedValues, { allowedValues = it })
+        }
+        when (dataType) {
+            "Boolean" -> OptionDropdown(
+                label = "القيمة",
+                options = listOf("true", "false"),
+                selected = effectiveValue,
+                display = { if (it == "true") "نعم" else "لا" }
+            ) { value = it }
+            "Date" -> DateField("القيمة", value) { value = it }
+            "List" -> if (listValues.isNotEmpty()) {
+                OptionDropdown("القيمة", listValues, effectiveValue) { value = it }
+            } else {
+                LabeledField("القيمة", value, { value = it })
+            }
+            else -> LabeledField("القيمة", value, { value = it }, numeric = dataType == "Number")
+        }
         LabeledField("الوحدة (اختياري)", unit, { unit = it })
-        SaveButton(name.isNotBlank() && value.isNotBlank()) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("خاصية إلزامية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = isRequired, onCheckedChange = { isRequired = it })
+        }
+        SaveButton(name.isNotBlank() && className.isNotBlank() && validValue) {
             onSave(
                 AssetCharacteristicEntity(
                     id = initial?.id ?: 0,
                     assetId = assetId,
                     name = name.trim(),
-                    value = value.trim(),
-                    unit = unit.trim()
+                    value = effectiveValue,
+                    unit = unit.trim(),
+                    className = className.trim().ifBlank { "عام" },
+                    dataType = dataType,
+                    allowedValues = allowedValues.trim(),
+                    isRequired = isRequired
                 )
             )
         }

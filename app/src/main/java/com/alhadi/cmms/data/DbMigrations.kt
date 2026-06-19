@@ -31,11 +31,50 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 object DbMigrations {
 
-    /**
-     * All migrations, in order. Empty while the schema is stable at the current version.
-     * Append new `Migration` objects here as the schema evolves.
-     */
-    val ALL: Array<Migration> = arrayOf()
+    /** Adds extended asset identity, organization, partner and address fields. */
+    val MIGRATION_22_23 = object : Migration(22, 23) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN category TEXT NOT NULL DEFAULT 'Machine'",
+                "ALTER TABLE assets ADD COLUMN objectType TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN maintenancePlant TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN planningPlant TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN plannerGroup TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN mainWorkCenter TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN productionWorkCenter TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN costCenter TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN responsiblePerson TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN assetNumber TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN constructionYear TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN constructionMonth TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN startupDate TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN partnerName TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN partnerRole TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN partnerPhone TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN partnerEmail TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN addressLine TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN city TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN country TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    /** Adds classification metadata and characteristic inheritance controls. */
+    val MIGRATION_23_24 = object : Migration(23, 24) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN standardClass TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN inheritParentCharacteristics INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE asset_characteristics ADD COLUMN className TEXT NOT NULL DEFAULT 'عام'",
+                "ALTER TABLE asset_characteristics ADD COLUMN dataType TEXT NOT NULL DEFAULT 'Text'",
+                "ALTER TABLE asset_characteristics ADD COLUMN allowedValues TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_characteristics ADD COLUMN isRequired INTEGER NOT NULL DEFAULT 0"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

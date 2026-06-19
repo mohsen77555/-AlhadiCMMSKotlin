@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -21,5 +22,13 @@ data class AssetCharacteristicEntity(
     val assetId: Long,
     val name: String,
     val value: String,
-    val unit: String
+    val unit: String,
+    @ColumnInfo(defaultValue = "'عام'")
+    val className: String = "عام",
+    @ColumnInfo(defaultValue = "'Text'")
+    val dataType: String = "Text",
+    @ColumnInfo(defaultValue = "''")
+    val allowedValues: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val isRequired: Boolean = false
 )

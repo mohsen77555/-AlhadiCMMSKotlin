@@ -77,7 +77,11 @@ data class AssetEntity(
     @ColumnInfo(defaultValue = "''")
     val city: String = "",
     @ColumnInfo(defaultValue = "''")
-    val country: String = ""
+    val country: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val standardClass: String = "",
+    @ColumnInfo(defaultValue = "1")
+    val inheritParentCharacteristics: Boolean = true
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =
