@@ -6,7 +6,7 @@ marker = "# AssetDetailScreen signature."
 insert_tag = "# Ensure the asset-detail call receives all structured component-list data."
 
 if insert_tag not in text:
-    block = '''# Ensure the asset-detail call receives all structured component-list data.
+    block = r'''# Ensure the asset-detail call receives all structured component-list data.
 assets_start = text.find("private fun AssetsScreen(")
 assets_end = text.find("private fun AssetCard", assets_start)
 if assets_start < 0 or assets_end < 0:
