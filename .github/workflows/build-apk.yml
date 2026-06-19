@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,6 +17,20 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+
+      - name: Apply App2 UI grouping
+        if: github.ref == 'refs/heads/App2'
+        run: |
+          if [ -f scripts/app2_ui_reorg.py ]; then
+            python3 scripts/app2_ui_reorg.py
+            if ! git diff --quiet; then
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt
+              git commit -m "ui(app2): group More screen modules"
+              git push origin HEAD:App2
+            fi
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
