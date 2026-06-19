@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 
 @Entity(
     tableName = "assets",
-    indices = [Index(value = ["code"], unique = true)]
+    indices = [Index(value = ["code"], unique = true), Index(value = ["assetClassId"])]
 )
 @Serializable
 data class AssetEntity(
@@ -36,7 +36,6 @@ data class AssetEntity(
     val purchaseCost: Double = 0.0,
     val acquiredAt: String = "",
 
-    // Governed master-data fields (stages 11-15).
     @ColumnInfo(defaultValue = "'Equipment'")
     val assetType: String = "Equipment",
     @ColumnInfo(defaultValue = "''")
@@ -64,8 +63,8 @@ data class AssetEntity(
     val commissioningDate: String = "",
     @ColumnInfo(defaultValue = "''")
     val financialAssetRef: String = "",
+    val assetClassId: Long? = null,
 
-    // Separate lifecycle, operational, and health dimensions.
     @ColumnInfo(defaultValue = "'InService'")
     val lifecycleStatus: String = "InService",
     @ColumnInfo(defaultValue = "''")
@@ -73,7 +72,6 @@ data class AssetEntity(
     @ColumnInfo(defaultValue = "'Good'")
     val healthStatus: String = "Good",
 
-    // Criticality assessment inputs (1..5) and governed result.
     @ColumnInfo(defaultValue = "1")
     val criticalitySafetyImpact: Int = 1,
     @ColumnInfo(defaultValue = "1")
@@ -91,7 +89,6 @@ data class AssetEntity(
     @ColumnInfo(defaultValue = "''")
     val criticalityAssessedBy: String = "",
 
-    // Record provenance.
     @ColumnInfo(defaultValue = "''")
     val createdBy: String = "",
     @ColumnInfo(defaultValue = "''")
@@ -101,11 +98,9 @@ data class AssetEntity(
     @ColumnInfo(defaultValue = "''")
     val updatedAt: String = ""
 ) {
-    /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =
         warrantyEnd.isNotBlank() && today <= warrantyEnd && (warrantyStart.isBlank() || warrantyStart <= today)
 
-    /** Legacy status is kept for compatibility while operational status is adopted. */
     fun effectiveOperationalStatus(): String = operationalStatus.ifBlank { status }
 
     fun calculatedCriticalityScore(): Int = listOf(
