@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/app3-assets-stage3.yml"
       - "scripts/app3_backend_stage1.py"
+      - "scripts/app3_backend_stage1_fix.py"
   workflow_dispatch:
 
 permissions:
@@ -39,11 +40,15 @@ jobs:
           set +e
           python3 scripts/app3_backend_stage1.py > backend-generate.log 2>&1
           generate_status=$?
+          if [ "$generate_status" -eq 0 ]; then
+            python3 scripts/app3_backend_stage1_fix.py >> backend-generate.log 2>&1
+            generate_status=$?
+          fi
 
           test_status=99
           smoke_status=99
           if [ "$generate_status" -eq 0 ]; then
-            gradle -p backend --no-daemon clean test installDist > backend-build.log 2>&1
+            gradle -p backend --no-daemon clean test installDist distZip > backend-build.log 2>&1
             test_status=$?
           else
             echo "Backend build was not started because generation failed." > backend-build.log
