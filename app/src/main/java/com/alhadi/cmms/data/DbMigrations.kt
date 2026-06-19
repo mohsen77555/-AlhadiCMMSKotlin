@@ -146,7 +146,36 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26)
+    /** Adds serial-number profiles, individual units, stock fields, and movement history. */
+    val MIGRATION_26_27 = object : Migration(26, 27) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE spare_parts ADD COLUMN serializationActive INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE spare_parts ADD COLUMN serialProfileId INTEGER",
+                "ALTER TABLE assets ADD COLUMN linkedSerialId INTEGER",
+                "ALTER TABLE assets ADD COLUMN serializedPartId INTEGER",
+                "ALTER TABLE inventory_transactions ADD COLUMN serialNumbers TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE inventory_transactions ADD COLUMN stockType TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE inventory_transactions ADD COLUMN storageLocation TEXT NOT NULL DEFAULT ''",
+                "CREATE TABLE IF NOT EXISTS serial_number_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, code TEXT NOT NULL, name TEXT NOT NULL, requireOnReceipt INTEGER NOT NULL DEFAULT 1, requireOnIssue INTEGER NOT NULL DEFAULT 1, autoCreate INTEGER NOT NULL DEFAULT 1, equipmentRequired INTEGER NOT NULL DEFAULT 0, stockCheckMode TEXT NOT NULL DEFAULT 'Block', allowManualStockEdit INTEGER NOT NULL DEFAULT 0, equipmentCategory TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '')",
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_serial_number_profiles_code ON serial_number_profiles(code)",
+                "CREATE TABLE IF NOT EXISTS serial_numbers (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, partId INTEGER NOT NULL, serialNumber TEXT NOT NULL, profileId INTEGER, assetId INTEGER, currentWorkOrderId INTEGER, status TEXT NOT NULL DEFAULT 'Created', stockType TEXT NOT NULL DEFAULT '', plant TEXT NOT NULL DEFAULT '', storageLocation TEXT NOT NULL DEFAULT '', batch TEXT NOT NULL DEFAULT '', vendor TEXT NOT NULL DEFAULT '', customer TEXT NOT NULL DEFAULT '', salesOrder TEXT NOT NULL DEFAULT '', specialStock TEXT NOT NULL DEFAULT '', createdAt TEXT NOT NULL DEFAULT '', lastMovementAt TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '')",
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_serial_numbers_partId_serialNumber ON serial_numbers(partId, serialNumber)",
+                "CREATE INDEX IF NOT EXISTS index_serial_numbers_profileId ON serial_numbers(profileId)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_serial_numbers_assetId ON serial_numbers(assetId)",
+                "CREATE INDEX IF NOT EXISTS index_serial_numbers_currentWorkOrderId ON serial_numbers(currentWorkOrderId)",
+                "CREATE INDEX IF NOT EXISTS index_serial_numbers_status ON serial_numbers(status)",
+                "CREATE INDEX IF NOT EXISTS index_serial_numbers_storageLocation ON serial_numbers(storageLocation)",
+                "CREATE TABLE IF NOT EXISTS serial_number_movements (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, serialId INTEGER NOT NULL, partId INTEGER NOT NULL, workOrderId INTEGER, movementType TEXT NOT NULL, fromStatus TEXT NOT NULL DEFAULT '', toStatus TEXT NOT NULL DEFAULT '', fromPlant TEXT NOT NULL DEFAULT '', toPlant TEXT NOT NULL DEFAULT '', fromStorageLocation TEXT NOT NULL DEFAULT '', toStorageLocation TEXT NOT NULL DEFAULT '', fromStockType TEXT NOT NULL DEFAULT '', toStockType TEXT NOT NULL DEFAULT '', createdAt TEXT NOT NULL, createdBy TEXT NOT NULL, note TEXT NOT NULL DEFAULT '')",
+                "CREATE INDEX IF NOT EXISTS index_serial_number_movements_serialId ON serial_number_movements(serialId)",
+                "CREATE INDEX IF NOT EXISTS index_serial_number_movements_partId ON serial_number_movements(partId)",
+                "CREATE INDEX IF NOT EXISTS index_serial_number_movements_workOrderId ON serial_number_movements(workOrderId)",
+                "CREATE INDEX IF NOT EXISTS index_serial_number_movements_createdAt ON serial_number_movements(createdAt)"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

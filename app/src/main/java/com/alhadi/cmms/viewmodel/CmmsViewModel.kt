@@ -6,6 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.alhadi.cmms.data.CmmsRepository
+import com.alhadi.cmms.data.SerialInstallRequest
+import com.alhadi.cmms.data.SerialMasterRequest
+import com.alhadi.cmms.data.SerialTransferRequest
+import com.alhadi.cmms.data.SerializedIssueRequest
+import com.alhadi.cmms.data.SerializedReceiptRequest
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
@@ -21,6 +26,9 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -99,6 +107,15 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val preventiveMaintenance: StateFlow<List<PreventiveMaintenanceEntity>> = repository.preventiveMaintenance
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val serialNumberProfiles: StateFlow<List<SerialNumberProfileEntity>> = repository.serialNumberProfiles
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val serialNumbers: StateFlow<List<SerialNumberEntity>> = repository.serialNumbers
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val serialNumberMovements: StateFlow<List<SerialNumberMovementEntity>> = repository.serialNumberMovements
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val spareParts: StateFlow<List<SparePartEntity>> = repository.spareParts
@@ -248,6 +265,39 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun resetSampleData() = launchAction("تمت إعادة تعبئة البيانات التجريبية") {
         repository.seedSampleData(replace = true)
     }
+
+
+    // ----- Serial number management -----
+    fun saveSerialProfile(profile: SerialNumberProfileEntity) =
+        launchAction("تم حفظ ملف التتبع") { repository.saveSerialProfile(profile, actor()) }
+
+    fun deleteSerialProfile(profile: SerialNumberProfileEntity) =
+        launchAction("تم حذف ملف التتبع") { repository.deleteSerialProfile(profile, actor()) }
+
+    fun createSerialMaster(request: SerialMasterRequest) =
+        launchAction("تم إنشاء الرقم التسلسلي") { repository.createSerialMaster(request, actor()) }
+
+    fun receiveSerializedPart(request: SerializedReceiptRequest) =
+        launchAction("تم استلام الوحدات المتسلسلة") { repository.receiveSerializedPart(request, actor()) }
+
+    fun issueSerializedPart(request: SerializedIssueRequest) =
+        launchAction("تم صرف الوحدات المتسلسلة") { repository.issueSerializedPart(request, actor()) }
+
+    fun transferSerialNumber(request: SerialTransferRequest) =
+        launchAction("تم نقل الرقم التسلسلي") { repository.transferSerialNumber(request, actor()) }
+
+    fun installSerialNumber(request: SerialInstallRequest) =
+        launchAction("تم تركيب الرقم التسلسلي") { repository.installSerialNumber(request, actor()) }
+
+    fun dismantleSerialNumber(serialId: Long, note: String = "") =
+        launchAction("تم فك الرقم التسلسلي") { repository.dismantleSerialNumber(serialId, note, actor()) }
+
+    fun reconcileSerializedStock(partId: Long) =
+        launchAction("تمت تسوية المخزون المتسلسل") { repository.reconcileSerializedStock(partId, actor()) }
+
+    fun deleteSerialNumber(serial: SerialNumberEntity) =
+        launchAction("تم حذف الرقم التسلسلي") { repository.deleteSerialNumber(serial, actor()) }
+
 
     // ----- CRUD: Assets -----
     fun saveAsset(asset: AssetEntity) = launchAction("تم حفظ الأصل") { repository.saveAsset(asset, actor()) }

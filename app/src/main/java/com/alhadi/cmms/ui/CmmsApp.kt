@@ -147,6 +147,9 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -190,7 +193,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures }
+private enum class MoreRoute { Notifications, Inventory, SerialNumbers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures }
 
 private data class ScreenMeta(
     val title: String,
@@ -206,6 +209,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val assets by viewModel.assets.collectAsStateWithLifecycle()
     val workOrders by viewModel.workOrders.collectAsStateWithLifecycle()
     val preventiveMaintenance by viewModel.preventiveMaintenance.collectAsStateWithLifecycle()
+    val serialNumberProfiles by viewModel.serialNumberProfiles.collectAsStateWithLifecycle()
+    val serialNumbers by viewModel.serialNumbers.collectAsStateWithLifecycle()
+    val serialNumberMovements by viewModel.serialNumberMovements.collectAsStateWithLifecycle()
     val spareParts by viewModel.spareParts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val users by viewModel.users.collectAsStateWithLifecycle()
@@ -383,6 +389,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         bomItems = assetBom,
                         movements = assetMovements,
                         spareParts = spareParts,
+                        serials = serialNumbers,
+                        serialMovements = serialNumberMovements,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveAsset,
@@ -425,13 +433,36 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         MoreRoute.Inventory -> InventoryScreen(
                             innerPadding = innerPadding,
                             parts = spareParts,
+                            profiles = serialNumberProfiles,
+                            serials = serialNumbers,
                             transactions = transactions,
                             canReceive = canManage,
                             canManage = canManage,
+                            onOpenSerialNumbers = { moreRoute = MoreRoute.SerialNumbers },
                             onIssue = viewModel::issuePart,
                             onReceive = viewModel::receivePart,
                             onSave = viewModel::savePart,
                             onDelete = viewModel::deletePart
+                        )
+                        MoreRoute.SerialNumbers -> SerialNumbersScreen(
+                            innerPadding = innerPadding,
+                            profiles = serialNumberProfiles,
+                            serials = serialNumbers,
+                            movements = serialNumberMovements,
+                            parts = spareParts,
+                            assets = assets,
+                            workOrders = workOrders,
+                            canManage = canManage,
+                            onSaveProfile = viewModel::saveSerialProfile,
+                            onDeleteProfile = viewModel::deleteSerialProfile,
+                            onCreateMaster = viewModel::createSerialMaster,
+                            onReceive = viewModel::receiveSerializedPart,
+                            onIssue = viewModel::issueSerializedPart,
+                            onTransfer = viewModel::transferSerialNumber,
+                            onInstall = viewModel::installSerialNumber,
+                            onDismantle = viewModel::dismantleSerialNumber,
+                            onReconcile = viewModel::reconcileSerializedStock,
+                            onDeleteSerial = viewModel::deleteSerialNumber
                         )
                         MoreRoute.Reports -> ReportsScreen(
                             innerPadding = innerPadding,
@@ -533,6 +564,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         null -> ScreenMeta("المزيد", "كل الوحدات والإعدادات", Icons.Filled.GridView, AccentBrown)
         MoreRoute.Notifications -> ScreenMeta("البلاغات", "بلاغات الصيانة وتحويلها لأوامر", Icons.Filled.NotificationsActive, AccentRed)
         MoreRoute.Inventory -> ScreenMeta("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple)
+        MoreRoute.SerialNumbers -> ScreenMeta("الأرقام التسلسلية", "تتبّع الوحدات والحركات والمواقع", Icons.Filled.QrCodeScanner, AccentTeal)
         MoreRoute.Reports -> ScreenMeta("التقارير", "مؤشرات وتصدير وتحليلات", Icons.Filled.Analytics, AccentBlue)
         MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
         MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
@@ -1091,8 +1123,14 @@ private fun MoreGrid(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("الأرقام التسلسلية", "تتبّع الوحدات والحركات", Icons.Filled.QrCodeScanner, AccentTeal, Modifier.weight(1f)) { onOpen(MoreRoute.SerialNumbers) }
                 ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
         item {
@@ -1181,6 +1219,8 @@ private fun AssetsScreen(
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
     spareParts: List<SparePartEntity>,
+    serials: List<SerialNumberEntity>,
+    serialMovements: List<SerialNumberMovementEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onSave: (AssetEntity) -> Unit,
@@ -1238,6 +1278,8 @@ private fun AssetsScreen(
             bomItems = bomItems,
             movements = movements.filter { it.assetId == detailAsset.id },
             spareParts = spareParts,
+            serials = serials,
+            serialMovements = serialMovements,
             locations = locations,
             canManage = canManage,
             defaultAssignee = defaultAssignee,
@@ -1435,6 +1477,8 @@ private fun AssetDetailScreen(
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
     spareParts: List<SparePartEntity>,
+    serials: List<SerialNumberEntity>,
+    serialMovements: List<SerialNumberMovementEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
     defaultAssignee: String,
@@ -1578,6 +1622,15 @@ private fun AssetDetailScreen(
                     }
                 }
             }
+        }
+
+        item {
+            AssetSerialSection(
+                asset = asset,
+                serials = serials,
+                movements = serialMovements,
+                parts = spareParts
+            )
         }
 
         if (hasOrganization) {
@@ -2843,7 +2896,7 @@ private fun MaterialPickerSheet(
         }
         filtered.take(30).forEach { part ->
             ElevatedCard(
-                modifier = Modifier.fillMaxWidth().clickable { onPick(part) },
+                modifier = Modifier.fillMaxWidth().then(if (part.serializationActive) Modifier else Modifier.clickable { onPick(part) }),
                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2851,8 +2904,12 @@ private fun MaterialPickerSheet(
                         LtrText(part.partNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                         Text(part.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (part.id in bomPartIds) StatusBadge("موصى بها", statusTone("info"))
-                    StatusBadge("متوفر ${part.onHandQty}", statusTone("running"))
+                    if (part.serializationActive) {
+                        StatusBadge("صرف تسلسلي فقط", statusTone("scheduled"))
+                    } else {
+                        if (part.id in bomPartIds) StatusBadge("موصى بها", statusTone("info"))
+                        StatusBadge("متوفر ${part.onHandQty}", statusTone("running"))
+                    }
                 }
             }
         }
@@ -3212,9 +3269,12 @@ private fun TaskListCard(
 private fun InventoryScreen(
     innerPadding: PaddingValues,
     parts: List<SparePartEntity>,
+    profiles: List<SerialNumberProfileEntity>,
+    serials: List<SerialNumberEntity>,
     transactions: List<InventoryTransactionEntity>,
     canReceive: Boolean,
     canManage: Boolean,
+    onOpenSerialNumbers: () -> Unit,
     onIssue: (SparePartEntity, Int) -> Unit,
     onReceive: (SparePartEntity, Int) -> Unit,
     onSave: (SparePartEntity) -> Unit,
@@ -3292,11 +3352,14 @@ private fun InventoryScreen(
                 items(groupParts, key = { it.id }) { part ->
                     SparePartCard(
                         part = part,
+                        profile = part.serialProfileId?.let { id -> profiles.firstOrNull { it.id == id } },
+                        serials = serials.filter { it.partId == part.id },
                         canReceive = canReceive,
                         canManage = canManage,
                         onIssue = onIssue,
                         onReceive = onReceive,
                         onEdit = { editing = part; showForm = true },
+                        onOpenSerialNumbers = onOpenSerialNumbers,
                         onDelete = { deleteTarget = part }
                     )
                 }
@@ -3315,7 +3378,7 @@ private fun InventoryScreen(
     }
 
     if (showForm) {
-        PartFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+        PartFormSheet(initial = editing, profiles = profiles, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
@@ -3330,14 +3393,18 @@ private fun InventoryScreen(
 @Composable
 private fun SparePartCard(
     part: SparePartEntity,
+    profile: SerialNumberProfileEntity?,
+    serials: List<SerialNumberEntity>,
     canReceive: Boolean,
     canManage: Boolean,
     onIssue: (SparePartEntity, Int) -> Unit,
     onReceive: (SparePartEntity, Int) -> Unit,
     onEdit: () -> Unit,
+    onOpenSerialNumbers: () -> Unit,
     onDelete: () -> Unit
 ) {
     val lowStock = part.onHandQty <= part.minQty
+    val serialInStock = serials.count { it.status == "InStock" }
     var moveMode by remember { mutableStateOf<String?>(null) } // "issue" | "receive"
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -3358,17 +3425,30 @@ private fun SparePartCard(
             InfoRow("الموقع", part.location)
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
             InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = { moveMode = "issue" }, enabled = part.onHandQty > 0, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("صرف")
+            if (part.serializationActive) {
+                InfoRow("ملف التتبع", profile?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
+                InfoRow("الوحدات المتسلسلة في المخزون", serialInStock.toString())
+                if (serialInStock != part.onHandQty) {
+                    StatusBadge("اختلاف بين الكمية والوحدات", statusTone("stopped"))
                 }
-                if (canReceive) {
-                    Button(onClick = { moveMode = "receive" }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Button(onClick = onOpenSerialNumbers, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("إدارة الأرقام التسلسلية")
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { moveMode = "issue" }, enabled = part.onHandQty > 0, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("استلام")
+                        Text("صرف")
+                    }
+                    if (canReceive) {
+                        Button(onClick = { moveMode = "receive" }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("استلام")
+                        }
                     }
                 }
             }
@@ -3376,7 +3456,7 @@ private fun SparePartCard(
         }
     }
 
-    moveMode?.let { mode ->
+    if (!part.serializationActive) moveMode?.let { mode ->
         val isIssue = mode == "issue"
         QuantityDialog(
             title = if (isIssue) "صرف ${part.partNumber}" else "استلام ${part.partNumber}",
@@ -3448,6 +3528,9 @@ private fun TransactionCard(transaction: InventoryTransactionEntity, partNumber:
                 )
                 LtrText(partNumber ?: "Part #${transaction.partId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("${transaction.createdAt} • ${transaction.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (transaction.serialNumbers.isNotBlank()) {
+                    Text("الأرقام: ${transaction.serialNumbers}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
             }
             if (transaction.workOrderId != null) {
                 StatusBadge("أمر #${transaction.workOrderId}", statusTone("info"))

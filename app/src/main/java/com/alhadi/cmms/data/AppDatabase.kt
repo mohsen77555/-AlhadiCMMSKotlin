@@ -17,6 +17,7 @@ import com.alhadi.cmms.data.dao.InventoryTransactionDao
 import com.alhadi.cmms.data.dao.MaintenanceNotificationDao
 import com.alhadi.cmms.data.dao.MeasurementDao
 import com.alhadi.cmms.data.dao.PmChecklistDao
+import com.alhadi.cmms.data.dao.SerialNumberDao
 import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
 import com.alhadi.cmms.data.dao.SparePartDao
 import com.alhadi.cmms.data.dao.TaskListDao
@@ -41,6 +42,9 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -56,6 +60,9 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         AssetEntity::class,
         WorkOrderEntity::class,
         PreventiveMaintenanceEntity::class,
+        SerialNumberProfileEntity::class,
+        SerialNumberEntity::class,
+        SerialNumberMovementEntity::class,
         SparePartEntity::class,
         InventoryTransactionEntity::class,
         UserEntity::class,
@@ -78,7 +85,7 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         TaskListOperationEntity::class,
         WorkPermitEntity::class
     ],
-    version = 26,
+    version = 27,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -86,6 +93,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workOrderDao(): WorkOrderDao
     abstract fun preventiveMaintenanceDao(): PreventiveMaintenanceDao
     abstract fun sparePartDao(): SparePartDao
+    abstract fun serialNumberDao(): SerialNumberDao
     abstract fun inventoryTransactionDao(): InventoryTransactionDao
     abstract fun userDao(): UserDao
     abstract fun auditLogDao(): AuditLogDao

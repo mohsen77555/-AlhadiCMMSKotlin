@@ -18,6 +18,9 @@ interface SparePartDao {
     @Query("SELECT COUNT(*) FROM spare_parts")
     suspend fun countOnce(): Int
 
+    @Query("SELECT * FROM spare_parts WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): SparePartEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(parts: List<SparePartEntity>)
 
@@ -26,6 +29,12 @@ interface SparePartDao {
 
     @Query("UPDATE spare_parts SET onHandQty = onHandQty + :delta WHERE id = :id")
     suspend fun adjustStock(id: Long, delta: Int)
+
+    @Query("UPDATE spare_parts SET onHandQty = onHandQty + :delta WHERE id = :id AND onHandQty + :delta >= 0")
+    suspend fun adjustStockSafe(id: Long, delta: Int): Int
+
+    @Query("UPDATE spare_parts SET onHandQty = :quantity WHERE id = :id")
+    suspend fun setStock(id: Long, quantity: Int)
 
     @Query("DELETE FROM spare_parts WHERE id = :id")
     suspend fun deleteById(id: Long)

@@ -18,6 +18,9 @@ interface WorkOrderDao {
     @Query("SELECT COUNT(*) FROM work_orders")
     suspend fun countOnce(): Int
 
+    @Query("SELECT * FROM work_orders WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): WorkOrderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkOrders(workOrders: List<WorkOrderEntity>)
 

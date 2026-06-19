@@ -15,6 +15,9 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -40,6 +43,9 @@ data class BackupBundle(
     val assets: List<AssetEntity> = emptyList(),
     val workOrders: List<WorkOrderEntity> = emptyList(),
     val preventiveMaintenance: List<PreventiveMaintenanceEntity> = emptyList(),
+    val serialNumberProfiles: List<SerialNumberProfileEntity> = emptyList(),
+    val serialNumbers: List<SerialNumberEntity> = emptyList(),
+    val serialNumberMovements: List<SerialNumberMovementEntity> = emptyList(),
     val spareParts: List<SparePartEntity> = emptyList(),
     val inventoryTransactions: List<InventoryTransactionEntity> = emptyList(),
     val users: List<UserEntity> = emptyList(),
@@ -64,7 +70,8 @@ data class BackupBundle(
 ) {
     /** Total number of records across all tables — handy for a restore summary. */
     val totalRecords: Int
-        get() = assets.size + workOrders.size + preventiveMaintenance.size + spareParts.size +
+        get() = assets.size + workOrders.size + preventiveMaintenance.size + serialNumberProfiles.size +
+            serialNumbers.size + serialNumberMovements.size + spareParts.size +
             inventoryTransactions.size + users.size + auditLog.size + measuringPoints.size +
             measurementReadings.size + functionalLocations.size + capa.size + assetDocuments.size +
             assetCharacteristics.size + assetBomHeaders.size + assetBom.size + assetMovements.size + pmChecklist.size +
@@ -72,6 +79,6 @@ data class BackupBundle(
             taskLists.size + taskListOperations.size + permits.size
 
     companion object {
-        const val CURRENT_FORMAT_VERSION = 2
+        const val CURRENT_FORMAT_VERSION = 3
     }
 }

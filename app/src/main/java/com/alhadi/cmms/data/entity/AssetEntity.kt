@@ -125,7 +125,9 @@ data class AssetEntity(
     val linearStartLatitude: Double? = null,
     val linearStartLongitude: Double? = null,
     val linearEndLatitude: Double? = null,
-    val linearEndLongitude: Double? = null
+    val linearEndLongitude: Double? = null,
+    val linkedSerialId: Long? = null,
+    val serializedPartId: Long? = null
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

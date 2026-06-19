@@ -16,6 +16,9 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -36,6 +39,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val workOrderDao = database.workOrderDao()
     private val pmDao = database.preventiveMaintenanceDao()
     private val sparePartDao = database.sparePartDao()
+    private val serialDao = database.serialNumberDao()
     private val transactionDao = database.inventoryTransactionDao()
     private val userDao = database.userDao()
     private val auditLogDao = database.auditLogDao()
@@ -54,10 +58,14 @@ class CmmsRepository(private val database: AppDatabase) {
     private val photoDao = database.workOrderPhotoDao()
     private val taskListDao = database.taskListDao()
     private val permitDao = database.workPermitDao()
+    private val serialService = SerialNumberService(database, ::recordAudit)
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
     val preventiveMaintenance: Flow<List<PreventiveMaintenanceEntity>> = pmDao.observePreventiveMaintenance()
+    val serialNumberProfiles: Flow<List<SerialNumberProfileEntity>> = serialService.profiles
+    val serialNumbers: Flow<List<SerialNumberEntity>> = serialService.serialNumbers
+    val serialNumberMovements: Flow<List<SerialNumberMovementEntity>> = serialService.movements
     val spareParts: Flow<List<SparePartEntity>> = sparePartDao.observeSpareParts()
     val recentTransactions: Flow<List<InventoryTransactionEntity>> = transactionDao.observeRecentTransactions()
     val users: Flow<List<UserEntity>> = userDao.observeUsers()
@@ -167,11 +175,14 @@ class CmmsRepository(private val database: AppDatabase) {
     /** Serializes every table into a portable JSON backup string. */
     suspend fun exportBackup(): String {
         val bundle = BackupBundle(
-            appDbVersion = 26,
+            appDbVersion = 27,
             exportedAt = DateStrings.now(),
             assets = assets.first(),
             workOrders = workOrders.first(),
             preventiveMaintenance = preventiveMaintenance.first(),
+            serialNumberProfiles = serialDao.dumpProfiles(),
+            serialNumbers = serialDao.dumpSerialNumbers(),
+            serialNumberMovements = serialDao.dumpMovements(),
             spareParts = spareParts.first(),
             inventoryTransactions = transactionDao.dumpAll(),
             users = users.first(),
@@ -206,6 +217,9 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             // Clear everything first.
             auditLogDao.deleteAll()
+            serialDao.deleteAllMovements()
+            serialDao.deleteAllSerialNumbers()
+            serialDao.deleteAllProfiles()
             permitDao.deleteAll()
             taskListDao.deleteAllOperations()
             taskListDao.deleteAllTaskLists()
@@ -234,8 +248,11 @@ class CmmsRepository(private val database: AppDatabase) {
             assetDao.insertAssets(bundle.assets)
             userDao.insertAll(bundle.users)
             locationDao.insertAll(bundle.functionalLocations)
+            if (bundle.serialNumberProfiles.isNotEmpty()) serialDao.insertProfiles(bundle.serialNumberProfiles)
             sparePartDao.insertAll(bundle.spareParts)
             workOrderDao.insertWorkOrders(bundle.workOrders)
+            if (bundle.serialNumbers.isNotEmpty()) serialDao.insertSerials(bundle.serialNumbers)
+            if (bundle.serialNumberMovements.isNotEmpty()) serialDao.insertMovements(bundle.serialNumberMovements)
             pmDao.insertAll(bundle.preventiveMaintenance)
             checklistDao.insertAll(bundle.pmChecklist)
             transactionDao.insertAll(bundle.inventoryTransactions)
@@ -267,6 +284,9 @@ class CmmsRepository(private val database: AppDatabase) {
         database.withTransaction {
             if (replace) {
                 auditLogDao.deleteAll()
+                serialDao.deleteAllMovements()
+                serialDao.deleteAllSerialNumbers()
+                serialDao.deleteAllProfiles()
                 permitDao.deleteAll()
                 taskListDao.deleteAllOperations()
                 taskListDao.deleteAllTaskLists()
@@ -336,13 +356,38 @@ class CmmsRepository(private val database: AppDatabase) {
                 PreventiveMaintenanceEntity(5, 12, "Scale calibration verification", 90, DateStrings.daysFromToday(-70), DateStrings.daysFromToday(20), "Scheduled", 120)
             )
 
+            val serialProfiles = listOf(
+                SerialNumberProfileEntity(
+                    id = 1,
+                    code = "S001",
+                    name = "تتبع فردي قياسي",
+                    requireOnReceipt = true,
+                    requireOnIssue = true,
+                    autoCreate = true,
+                    equipmentRequired = false,
+                    stockCheckMode = "Block",
+                    allowManualStockEdit = true,
+                    description = "تتبع كامل للاستلام والصرف والموقع"
+                )
+            )
+
             val spareParts = listOf(
                 SparePartEntity(1, "BRG-6205", "Bearing 6205 ZZ", "Rollermills", "pcs", 12, 6, "Store A-01", 4.5),
                 SparePartEntity(2, "BELT-A45", "V-Belt A45", "Bucket Elevators", "pcs", 3, 5, "Store B-03", 8.0),
                 SparePartEntity(3, "CHAIN-16B", "Chain 16B", "Chain Conveyors", "meter", 18, 10, "Store C-01", 12.5),
-                SparePartEntity(4, "SENSOR-PNP", "PNP Proximity Sensor", "Sensors", "pcs", 2, 4, "Electrical Cabinet", 18.0),
+                SparePartEntity(4, "SENSOR-PNP", "PNP Proximity Sensor", "Sensors", "pcs", 2, 4, "Electrical Cabinet", 18.0, serializationActive = true, serialProfileId = 1),
                 SparePartEntity(5, "FILTER-GA37", "Compressor Air Filter", "Compressors", "pcs", 7, 3, "Utility Store", 25.0),
                 SparePartEntity(6, "BAG-NEEDLE", "Packing Stitching Needle", "Packing Machines", "pcs", 40, 20, "Packing Store", 0.8)
+            )
+
+            val sampleSerials = listOf(
+                SerialNumberEntity(1, 4, "PNP-0001", 1, status = "InStock", stockType = "Unrestricted", plant = "FAC-01", storageLocation = "Electrical Cabinet", createdAt = today, lastMovementAt = today),
+                SerialNumberEntity(2, 4, "PNP-0002", 1, status = "InStock", stockType = "Unrestricted", plant = "FAC-01", storageLocation = "Electrical Cabinet", createdAt = today, lastMovementAt = today)
+            )
+
+            val sampleSerialMovements = listOf(
+                SerialNumberMovementEntity(1, 1, 4, movementType = "Receive", toStatus = "InStock", toPlant = "FAC-01", toStorageLocation = "Electrical Cabinet", toStockType = "Unrestricted", createdAt = today, createdBy = "System", note = "رصيد افتتاحي"),
+                SerialNumberMovementEntity(2, 2, 4, movementType = "Receive", toStatus = "InStock", toPlant = "FAC-01", toStorageLocation = "Electrical Cabinet", toStockType = "Unrestricted", createdAt = today, createdBy = "System", note = "رصيد افتتاحي")
             )
 
             val transactions = listOf(
@@ -378,7 +423,10 @@ class CmmsRepository(private val database: AppDatabase) {
             userDao.insertAll(users.map { it.copy(password = PasswordHasher.hash(it.password)) })
             workOrderDao.insertWorkOrders(workOrders)
             pmDao.insertAll(preventiveMaintenance)
+            serialDao.insertProfiles(serialProfiles)
             sparePartDao.insertAll(spareParts)
+            serialDao.insertSerials(sampleSerials)
+            serialDao.insertMovements(sampleSerialMovements)
             transactionDao.insertAll(transactions)
             val documents = listOf(
                 AssetDocumentEntity(1, 7, "Manual", "دليل تشغيل Rollermill", "https://example.com/rm01-manual.pdf", "Mohsen Alhadi", today),
@@ -562,44 +610,80 @@ class CmmsRepository(private val database: AppDatabase) {
         recordAudit("Complete", "PreventiveMaintenance", "تنفيذ صيانة دورية: ${item.title}", actor)
     }
 
+
+    // ---------------------------------------------------------------------
+    // Serial number profiles, units, stock checks, and movement history
+    // ---------------------------------------------------------------------
+
+    suspend fun saveSerialProfile(profile: SerialNumberProfileEntity, actor: String = "System") =
+        serialService.saveProfile(profile, actor)
+
+    suspend fun deleteSerialProfile(profile: SerialNumberProfileEntity, actor: String = "System") =
+        serialService.deleteProfile(profile, actor)
+
+    suspend fun createSerialMaster(request: SerialMasterRequest, actor: String = "System") =
+        serialService.createMaster(request, actor)
+
+    suspend fun receiveSerializedPart(request: SerializedReceiptRequest, actor: String = "System") =
+        serialService.receive(request, actor)
+
+    suspend fun issueSerializedPart(request: SerializedIssueRequest, actor: String = "System") =
+        serialService.issue(request, actor)
+
+    suspend fun transferSerialNumber(request: SerialTransferRequest, actor: String = "System") =
+        serialService.transfer(request, actor)
+
+    suspend fun installSerialNumber(request: SerialInstallRequest, actor: String = "System") =
+        serialService.install(request, actor)
+
+    suspend fun dismantleSerialNumber(serialId: Long, note: String = "", actor: String = "System") =
+        serialService.dismantle(serialId, note, actor)
+
+    suspend fun reconcileSerializedStock(partId: Long, actor: String = "System") =
+        serialService.reconcileStock(partId, actor)
+
+    suspend fun deleteSerialNumber(serial: SerialNumberEntity, actor: String = "System") =
+        serialService.deleteSerial(serial, actor)
+
+
     // ---------------------------------------------------------------------
     // Inventory
     // ---------------------------------------------------------------------
 
     suspend fun issuePart(part: SparePartEntity, quantity: Int = 1, actor: String = "System") {
-        if (quantity > part.onHandQty) {
-            throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${part.onHandQty})")
-        }
+        require(quantity > 0) { "الكمية يجب أن تكون أكبر من صفر" }
+        val current = sparePartDao.getById(part.id) ?: throw IllegalStateException("قطعة الغيار غير موجودة")
+        if (current.serializationActive) throw IllegalStateException("استخدم شاشة الأرقام التسلسلية لصرف هذه القطعة")
         database.withTransaction {
-            sparePartDao.adjustStock(part.id, -quantity)
+            if (sparePartDao.adjustStockSafe(current.id, -quantity) == 0) {
+                throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${current.onHandQty})")
+            }
             transactionDao.insert(
                 InventoryTransactionEntity(
-                    partId = part.id,
+                    partId = current.id,
                     workOrderId = null,
                     transactionType = "Issue",
                     quantity = quantity,
                     createdAt = DateStrings.today(),
                     createdBy = actor,
-                    note = "Manual issue from mobile inventory screen."
+                    note = "صرف يدوي من شاشة المخزون"
                 )
             )
-            recordAudit("Issue", "Inventory", "صرف $quantity من ${part.partNumber}", actor)
+            recordAudit("Issue", "Inventory", "صرف $quantity من ${current.partNumber}", actor)
         }
     }
 
-    /**
-     * Issues a spare part against a specific work order: decrements stock, records a transaction
-     * linked to the order, and rolls the consumed value into the order's parts cost (MAT-ORD-007).
-     */
     suspend fun issuePartToWorkOrder(order: WorkOrderEntity, part: SparePartEntity, quantity: Int, actor: String = "System") {
-        if (quantity > part.onHandQty) {
-            throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${part.onHandQty})")
-        }
+        require(quantity > 0) { "الكمية يجب أن تكون أكبر من صفر" }
+        val current = sparePartDao.getById(part.id) ?: throw IllegalStateException("قطعة الغيار غير موجودة")
+        if (current.serializationActive) throw IllegalStateException("استخدم شاشة الأرقام التسلسلية لصرف هذه القطعة لأمر العمل")
         database.withTransaction {
-            sparePartDao.adjustStock(part.id, -quantity)
+            if (sparePartDao.adjustStockSafe(current.id, -quantity) == 0) {
+                throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${current.onHandQty})")
+            }
             transactionDao.insert(
                 InventoryTransactionEntity(
-                    partId = part.id,
+                    partId = current.id,
                     workOrderId = order.id,
                     transactionType = "Issue",
                     quantity = quantity,
@@ -608,26 +692,31 @@ class CmmsRepository(private val database: AppDatabase) {
                     note = "صرف لأمر العمل: ${order.title}"
                 )
             )
-            workOrderDao.insertWorkOrder(order.copy(partsCost = order.partsCost + quantity * part.lastPrice))
-            recordAudit("Issue", "Inventory", "صرف $quantity من ${part.partNumber} لأمر العمل #${order.id}", actor)
+            workOrderDao.insertWorkOrder(order.copy(partsCost = order.partsCost + quantity * current.lastPrice))
+            recordAudit("Issue", "Inventory", "صرف $quantity من ${current.partNumber} لأمر العمل #${order.id}", actor)
         }
     }
 
     suspend fun receivePart(part: SparePartEntity, quantity: Int = 1, actor: String = "System") {
+        require(quantity > 0) { "الكمية يجب أن تكون أكبر من صفر" }
+        val current = sparePartDao.getById(part.id) ?: throw IllegalStateException("قطعة الغيار غير موجودة")
+        if (current.serializationActive) throw IllegalStateException("استخدم شاشة الأرقام التسلسلية لاستلام هذه القطعة")
         database.withTransaction {
-            sparePartDao.adjustStock(part.id, quantity)
+            if (sparePartDao.adjustStockSafe(current.id, quantity) == 0) {
+                throw IllegalStateException("تعذّر تحديث كمية المخزون")
+            }
             transactionDao.insert(
                 InventoryTransactionEntity(
-                    partId = part.id,
+                    partId = current.id,
                     workOrderId = null,
                     transactionType = "Receive",
                     quantity = quantity,
                     createdAt = DateStrings.today(),
                     createdBy = actor,
-                    note = "Manual receipt from mobile inventory screen."
+                    note = "استلام يدوي من شاشة المخزون"
                 )
             )
-            recordAudit("Receive", "Inventory", "استلام $quantity من ${part.partNumber}", actor)
+            recordAudit("Receive", "Inventory", "استلام $quantity من ${current.partNumber}", actor)
         }
     }
 
@@ -698,6 +787,7 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteAsset(asset: AssetEntity, actor: String = "System") {
+        serialService.ensureAssetDeletable(asset.id)
         database.withTransaction {
             bomHeaderDao.headersForAsset(asset.id).forEach { header ->
                 bomDao.deleteForHeader(header.id)
@@ -718,12 +808,14 @@ class CmmsRepository(private val database: AppDatabase) {
     // ---------------------------------------------------------------------
 
     suspend fun savePart(part: SparePartEntity, actor: String = "System") {
+        serialService.validatePartChange(part)
         val isNew = part.id == 0L
         sparePartDao.insert(part)
         recordAudit(if (isNew) "Create" else "Update", "Inventory", "${if (isNew) "إضافة" else "تعديل"} قطعة: ${part.partNumber}", actor)
     }
 
     suspend fun deletePart(part: SparePartEntity, actor: String = "System") {
+        serialService.ensurePartDeletable(part.id)
         sparePartDao.deleteById(part.id)
         recordAudit("Delete", "Inventory", "حذف قطعة: ${part.partNumber}", actor)
     }
