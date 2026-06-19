@@ -9,6 +9,7 @@ on:
       - "scripts/app3_assets_stage4_ui.py"
       - "scripts/app3_assets_stage4_ui_fix.py"
       - "scripts/app3_assets_stage4_ui_fix2.py"
+      - "scripts/app3_assets_stage4_ui_fix3.py"
   workflow_dispatch:
 
 permissions:
@@ -56,6 +57,10 @@ jobs:
             fix_status=$?
             if [ "$fix_status" -eq 0 ]; then
               python3 scripts/app3_assets_stage4_ui_fix2.py >> stage4-fix.log 2>&1
+              fix_status=$?
+            fi
+            if [ "$fix_status" -eq 0 ]; then
+              python3 scripts/app3_assets_stage4_ui_fix3.py >> stage4-fix.log 2>&1
               fix_status=$?
             fi
             if [ "$fix_status" -eq 0 ]; then
