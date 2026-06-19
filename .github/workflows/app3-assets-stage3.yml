@@ -40,28 +40,64 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Implement component-list data model
-        run: python3 scripts/app3_assets_stage4_data.py
-
-      - name: Implement component-list user interface
-        run: python3 scripts/app3_assets_stage4_ui.py
-
-      - name: Build App3 debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
-
-      - name: Commit verified changes to App3 only
+      - name: Apply, verify and publish stage 4
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
+          python3 scripts/app3_assets_stage4_data.py > stage4-data.log 2>&1
+          data_status=$?
+
+          ui_status=99
+          build_status=99
+          if [ "$data_status" -eq 0 ]; then
+            python3 scripts/app3_assets_stage4_ui.py > stage4-ui.log 2>&1
+            ui_status=$?
+          else
+            echo "UI patch was not started because the data patch failed." > stage4-ui.log
+          fi
+
+          if [ "$data_status" -eq 0 ] && [ "$ui_status" -eq 0 ]; then
+            gradle assembleDebug --no-daemon --stacktrace > stage4-build.log 2>&1
+            build_status=$?
+          else
+            echo "Build was not started because a patch step failed." > stage4-build.log
+          fi
+
+          cat stage4-data.log
+          cat stage4-ui.log
+          tail -n 200 stage4-build.log
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main app/schemas 2>/dev/null || true
 
+          if [ "$data_status" -ne 0 ] || [ "$ui_status" -ne 0 ] || [ "$build_status" -ne 0 ]; then
+            {
+              echo "Stage 4 diagnostics"
+              echo "data_status=$data_status"
+              echo "ui_status=$ui_status"
+              echo "build_status=$build_status"
+              echo
+              echo "--- data patch ---"
+              tail -n 120 stage4-data.log
+              echo
+              echo "--- UI patch ---"
+              tail -n 120 stage4-ui.log
+              echo
+              echo "--- build ---"
+              tail -n 220 stage4-build.log
+            } > stage4-status.txt
+            git add stage4-status.txt
+            git commit -m "chore(app3): record stage 4 diagnostics [skip ci]" || true
+            git push origin HEAD:App3
+            exit 1
+          fi
+
+          rm -f stage4-status.txt stage4-data.log stage4-ui.log stage4-build.log
+          git add app/src/main app/schemas
           if git diff --cached --quiet; then
             echo "No application changes to commit"
             exit 1
           fi
-
           git commit -m "feat(assets): add structured maintenance component lists"
           git push origin HEAD:App3
 
