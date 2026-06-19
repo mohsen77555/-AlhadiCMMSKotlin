@@ -203,7 +203,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Costs, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, OrgUnits, Capa, Failures, Trash }
+private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Costs, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, OrgUnits, OrgReports, Capa, Failures, Trash }
 
 private fun roleKey(user: UserEntity?): String = user?.role?.lowercase(Locale.getDefault()) ?: ""
 
@@ -564,6 +564,12 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onSave = viewModel::saveOrgUnit,
                             onDelete = viewModel::deleteOrgUnit
                         )
+                        MoreRoute.OrgReports -> OrgReportsScreen(
+                            innerPadding = innerPadding,
+                            assets = assets,
+                            workOrders = workOrders,
+                            orgUnits = orgUnits
+                        )
                         MoreRoute.Capa -> CapaScreen(
                             innerPadding = innerPadding,
                             items = capaActions,
@@ -647,6 +653,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
         MoreRoute.OrgUnits -> ScreenMeta("هيكل المؤسسة", "الشركات والمواقع والمصانع", Icons.Filled.Domain, AccentBlue)
+        MoreRoute.OrgReports -> ScreenMeta("تقارير المؤسسة", "التكاليف حسب المصنع ومركز التكلفة", Icons.Filled.Payments, AccentPurple)
         MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
         MoreRoute.Failures -> ScreenMeta("تحليل الأعطال", "MTTR و MTBF وتكرار الأعطال", Icons.Filled.TrendingUp, AccentRed)
         MoreRoute.Trash -> ScreenMeta("سلة المحذوفات", "استرجاع أو حذف نهائي", Icons.Filled.Delete, AccentBrown)
@@ -1169,6 +1176,7 @@ private val ALL_MORE_MODULES = listOf(
     MoreModule(MoreRoute.Meters, "العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple),
     MoreModule(MoreRoute.Locations, "المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen),
     MoreModule(MoreRoute.OrgUnits, "هيكل المؤسسة", "شركات/مواقع/مصانع", Icons.Filled.Domain, AccentBlue),
+    MoreModule(MoreRoute.OrgReports, "تقارير المؤسسة", "تكاليف المصانع", Icons.Filled.Payments, AccentPurple),
     MoreModule(MoreRoute.Capa, "الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange),
     MoreModule(MoreRoute.Failures, "تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed),
     MoreModule(MoreRoute.Audit, "سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy),
@@ -4841,6 +4849,90 @@ private fun OrgUnitCard(
                 StatusBadge("فرعية: $childCount", statusTone("neutral"))
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+private data class OrgReportRow(
+    val name: String,
+    val assetCount: Int,
+    val working: Int,
+    val down: Int,
+    val woCount: Int,
+    val cost: Double
+)
+
+@Composable
+private fun OrgReportsScreen(
+    innerPadding: PaddingValues,
+    assets: List<AssetEntity>,
+    workOrders: List<WorkOrderEntity>,
+    orgUnits: List<OrgUnitEntity>
+) {
+    val assetMap = remember(assets) { assets.associateBy { it.id } }
+    val plantRows = remember(assets, workOrders) {
+        assets.mapNotNull { it.plant?.takeIf { p -> p.isNotBlank() } }.distinct().map { plant ->
+            val plantAssets = assets.filter { it.plant == plant }
+            val wos = workOrders.filter { assetMap[it.assetId]?.plant == plant }
+            OrgReportRow(
+                plant, plantAssets.size,
+                plantAssets.count { assetStatusGroup(it.status) == "working" },
+                plantAssets.count { assetStatusGroup(it.status) == "down" },
+                wos.size, wos.sumOf { it.totalCost() }
+            )
+        }.sortedByDescending { it.cost }
+    }
+    val costRows = remember(assets, workOrders) {
+        assets.mapNotNull { it.costCenter?.takeIf { c -> c.isNotBlank() } }.distinct().map { cc ->
+            val ccAssets = assets.filter { it.costCenter == cc }
+            val wos = workOrders.filter { assetMap[it.assetId]?.costCenter == cc }
+            OrgReportRow(cc, ccAssets.size, 0, 0, wos.size, wos.sumOf { it.totalCost() })
+        }.sortedByDescending { it.cost }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionHeader("التكاليف حسب المصنع")
+            Text("توزيع الأصول وأوامر العمل والتكاليف على المصانع.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (plantRows.isEmpty()) {
+            item { EmptyState("لا توجد مصانع مرتبطة بأصول", Icons.Filled.Factory) }
+        }
+        items(plantRows, key = { "p-${it.name}" }) { row ->
+            OrgReportCard(row, Icons.Filled.Factory, AccentPurple, showStatus = true)
+        }
+        item { SectionHeader("التكاليف حسب مركز التكلفة") }
+        if (costRows.isEmpty()) {
+            item { EmptyState("لا توجد مراكز تكلفة مرتبطة بأصول", Icons.Filled.Payments) }
+        }
+        items(costRows, key = { "c-${it.name}" }) { row ->
+            OrgReportCard(row, Icons.Filled.Payments, AccentTeal, showStatus = false)
+        }
+    }
+}
+
+@Composable
+private fun OrgReportCard(row: OrgReportRow, icon: ImageVector, color: Color, showStatus: Boolean) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBubble(icon, color, color.copy(alpha = 0.14f), 40)
+                Text(row.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                StatusBadge(money(row.cost), statusTone("info"))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusBadge("أصول: ${row.assetCount}", statusTone("neutral"))
+                StatusBadge("أوامر: ${row.woCount}", statusTone("info"))
+                if (showStatus) {
+                    StatusBadge("تعمل: ${row.working}", statusTone("running"))
+                    StatusBadge("متوقفة: ${row.down}", statusTone("stopped"))
+                }
+            }
         }
     }
 }
