@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PrecisionManufacturing
@@ -195,7 +196,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
+private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Costs, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
 
 private fun roleKey(user: UserEntity?): String = user?.role?.lowercase(Locale.getDefault()) ?: ""
 
@@ -481,6 +482,16 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onSave = viewModel::savePart,
                             onDelete = viewModel::deletePart
                         )
+                        MoreRoute.Costs -> CostsScreen(
+                            innerPadding = innerPadding,
+                            workOrders = workOrders,
+                            assets = assets,
+                            parts = spareParts,
+                            purchaseOrders = purchaseOrders,
+                            onOpenTab = { selectedTab = it; if (it != BottomTab.More) moreRoute = null },
+                            onOpenMore = { moreRoute = it },
+                            onExportPdf = { reportPdfLauncher.launch("maintenance-report-${DateStrings.today()}.pdf") }
+                        )
                         MoreRoute.Reports -> ReportsScreen(
                             innerPadding = innerPadding,
                             stats = stats,
@@ -610,6 +621,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Inventory -> ScreenMeta("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple)
         MoreRoute.Procurement -> ScreenMeta("المشتريات", "طلبات الشراء واستلامها", Icons.Filled.ShoppingCart, AccentGreen)
         MoreRoute.Suppliers -> ScreenMeta("الموردون", "إدارة الموردين", Icons.Filled.Store, AccentTeal)
+        MoreRoute.Costs -> ScreenMeta("التكاليف", "تكاليف الصيانة والتوريد", Icons.Filled.Payments, AccentGreen)
         MoreRoute.Reports -> ScreenMeta("التقارير", "مؤشرات وتصدير وتحليلات", Icons.Filled.Analytics, AccentBlue)
         MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
         MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
@@ -1132,6 +1144,7 @@ private val ALL_MORE_MODULES = listOf(
     MoreModule(MoreRoute.Inventory, "المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple),
     MoreModule(MoreRoute.Procurement, "المشتريات", "طلبات الشراء والاستلام", Icons.Filled.ShoppingCart, AccentGreen),
     MoreModule(MoreRoute.Suppliers, "الموردون", "إدارة الموردين", Icons.Filled.Store, AccentTeal),
+    MoreModule(MoreRoute.Costs, "التكاليف", "تكاليف الصيانة والتوريد", Icons.Filled.Payments, AccentGreen),
     MoreModule(MoreRoute.Reports, "التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue),
     MoreModule(MoreRoute.PreventiveMaintenance, "الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal),
     MoreModule(MoreRoute.TaskLists, "قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue),
@@ -3426,6 +3439,163 @@ private fun TransactionCard(transaction: InventoryTransactionEntity, partNumber:
 // ---------------------------------------------------------------------------
 // Reports
 // ---------------------------------------------------------------------------
+
+@Composable
+private fun CostsScreen(
+    innerPadding: PaddingValues,
+    workOrders: List<WorkOrderEntity>,
+    assets: List<AssetEntity>,
+    parts: List<SparePartEntity>,
+    purchaseOrders: List<PurchaseOrderEntity>,
+    onOpenTab: (BottomTab) -> Unit,
+    onOpenMore: (MoreRoute) -> Unit,
+    onExportPdf: () -> Unit
+) {
+    // All figures are derived from existing data — no separate ledger, no double counting.
+    val laborCost = workOrders.sumOf { it.laborCost() }
+    val partsCost = workOrders.sumOf { it.partsCost }
+    val totalMaintenance = laborCost + partsCost
+    val correctiveCost = workOrders.filter { it.isFailure }.sumOf { it.totalCost() }
+    val preventiveCost = (totalMaintenance - correctiveCost).coerceAtLeast(0.0)
+    val openEstimated = workOrders.filter { it.status != "Closed" }.sumOf { it.estimatedCost }
+    val countWithCost = workOrders.count { it.totalCost() > 0.0 }
+    val avgPerOrder = if (countWithCost > 0) totalMaintenance / countWithCost else 0.0
+    val procurementSpend = purchaseOrders.filter { it.status == "Received" }.sumOf { it.total }
+    val inventoryValue = parts.sumOf { it.onHandQty * it.lastPrice }
+
+    val assetName = assets.associate { it.id to "${it.code} — ${it.name}" }
+    val topCostAssets = workOrders.groupBy { it.assetId }
+        .mapValues { (_, list) -> list.sumOf { it.totalCost() } }
+        .entries.filter { it.value > 0 }
+        .sortedByDescending { it.value }
+        .take(5)
+
+    // Monthly maintenance cost trend (last 6 months present in the data).
+    val monthly = workOrders
+        .filter { it.createdAt.length >= 7 && it.totalCost() > 0 }
+        .groupBy { it.createdAt.take(7) }
+        .mapValues { (_, list) -> list.sumOf { it.totalCost() } }
+        .toSortedMap()
+    val monthEntries = monthly.entries.toList().takeLast(6)
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    SectionHeader("تكاليف الصيانة")
+                    Text("مجمّعة تلقائياً من أوامر العمل والمخزون والمشتريات.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = onExportPdf) {
+                    Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("PDF")
+                }
+            }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("إجمالي تكلفة الصيانة المنفّذة", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(money(totalMaintenance), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = AccentGreen)
+                    Text("عمالة ${money(laborCost)} + قطع غيار ${money(partsCost)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiTile("العمالة", money(laborCost), AccentBlue, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+                KpiTile("قطع الغيار", money(partsCost), AccentPurple, Modifier.weight(1f), onClick = { onOpenMore(MoreRoute.Inventory) })
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiTile("متوسط تكلفة الأمر", money(avgPerOrder), AccentTeal, Modifier.weight(1f))
+                KpiTile("تقديرية مفتوحة", money(openEstimated), AccentOrange, Modifier.weight(1f), onClick = { onOpenTab(BottomTab.WorkOrders) })
+            }
+        }
+
+        if (totalMaintenance > 0) {
+            item {
+                val seg = listOf(
+                    ChartSegment("عمالة", laborCost.toInt().coerceAtLeast(0), AccentBlue),
+                    ChartSegment("قطع غيار", partsCost.toInt().coerceAtLeast(0), AccentPurple)
+                )
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DotSectionTitle("تفصيل التكلفة", AccentGreen)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            DonutChart(segments = seg, centerValue = money(totalMaintenance), centerLabel = "")
+                            ChartLegend(seg, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+            item {
+                val maxC = maxOf(correctiveCost, preventiveCost, 1.0)
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        DotSectionTitle("التكلفة حسب نوع الصيانة", AccentRed)
+                        BarMeter("تصحيحية (أعطال)", (correctiveCost / maxC).toFloat(), AccentRed, money(correctiveCost))
+                        BarMeter("وقائية/أخرى", (preventiveCost / maxC).toFloat(), AccentTeal, money(preventiveCost))
+                    }
+                }
+            }
+        }
+
+        if (topCostAssets.isNotEmpty()) {
+            item {
+                val maxA = (topCostAssets.maxOfOrNull { it.value } ?: 1.0).coerceAtLeast(1.0)
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            DotSectionTitle("الأصول الأعلى تكلفة", AccentNavy)
+                            Spacer(modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onOpenTab(BottomTab.Assets) }) { Text("الأصول") }
+                        }
+                        topCostAssets.forEach {
+                            BarMeter(assetName[it.key] ?: "#${it.key}", (it.value / maxA).toFloat(), AccentNavy, money(it.value))
+                        }
+                    }
+                }
+            }
+        }
+
+        if (monthEntries.size >= 2) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DotSectionTitle("الاتجاه الشهري للتكلفة", AccentBlue)
+                        Sparkline(values = monthEntries.map { it.value.toFloat() }, color = AccentBlue)
+                        LtrText(monthEntries.joinToString("   ") { it.key }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DotSectionTitle("التوريد والمخزون", AccentPurple)
+                    InfoRow("إنفاق التوريد (مستلم)", money(procurementSpend))
+                    InfoRow("قيمة المخزون الحالية", money(inventoryValue))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(onClick = { onOpenMore(MoreRoute.Procurement) }, modifier = Modifier.weight(1f)) { Text("المشتريات") }
+                        OutlinedButton(onClick = { onOpenMore(MoreRoute.Reports) }, modifier = Modifier.weight(1f)) { Text("التقارير") }
+                    }
+                    Text("ملاحظة: إنفاق التوريد منفصل عن تكلفة الصيانة المنفّذة لتفادي ازدواج حساب القطع.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun ReportsScreen(
