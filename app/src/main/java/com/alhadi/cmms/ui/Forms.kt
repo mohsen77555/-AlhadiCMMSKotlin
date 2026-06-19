@@ -91,6 +91,15 @@ import com.alhadi.cmms.util.DateStrings
 // Reusable building blocks
 // ---------------------------------------------------------------------------
 
+/** Arabic label for an asset lifecycle status (governance §9). */
+internal fun assetStatusDisplayAr(status: String): String = when (status) {
+    "Draft" -> "مسودة"; "Active" -> "نشط"; "Running" -> "يعمل"; "Standby" -> "احتياطي"
+    "Under Maintenance" -> "تحت الصيانة"; "Breakdown" -> "معطّل"; "Warning" -> "تحذير"
+    "Out of Service" -> "خارج الخدمة"; "Stopped" -> "متوقف"; "In Storage" -> "في المخزن"
+    "Sent to Vendor" -> "لدى المورّد"; "Refurbishment" -> "تجديد"; "Retired" -> "متقاعد"
+    "Disposed" -> "مشطوب"; "Inactive" -> "غير نشط"; else -> status
+}
+
 /** Arabic label for a user role. */
 internal fun roleLabelAr(role: String): String = when (role.lowercase(Locale.getDefault())) {
     "admin" -> "مدير"
@@ -129,11 +138,11 @@ internal fun StatusPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text("تغيير حالة الأصل", fontWeight = FontWeight.Bold) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 options.forEach { opt ->
                     TextButton(onClick = { onPick(opt) }, modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            (if (opt == current) "• " else "") + opt,
+                            (if (opt == current) "• " else "") + assetStatusDisplayAr(opt),
                             modifier = Modifier.fillMaxWidth(),
                             fontWeight = if (opt == current) FontWeight.Bold else FontWeight.Normal
                         )
@@ -420,7 +429,12 @@ internal fun AssetFormSheet(
         }
         LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
         LabeledField("الموديل (Model)", model, { model = it })
-        OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
+        OptionDropdown(
+            "الحالة",
+            listOf("Active", "Running", "Standby", "Under Maintenance", "Breakdown", "Warning", "Out of Service", "Stopped", "In Storage", "Sent to Vendor", "Refurbishment", "Retired", "Disposed", "Draft", "Inactive"),
+            status,
+            display = { assetStatusDisplayAr(it) }
+        ) { status = it }
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
         Text("التنظيم والمسؤولية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("المسؤول", responsiblePerson, { responsiblePerson = it })

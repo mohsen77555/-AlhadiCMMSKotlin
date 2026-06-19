@@ -898,7 +898,7 @@ private fun DashboardScreen(
 ) {
     val today = DateStrings.today()
     val soon = DateStrings.daysFromToday(30)
-    val criticalAssets = assets.count { it.status != "Running" }
+    val criticalAssets = assets.count { assetStatusGroup(it.status) != "working" }
     val overdue = workOrders.count { it.status != "Closed" && it.dueAt < today }
     val inProgress = workOrders.count { it.status == "In Progress" }
     val urgent = workOrders.count { it.priority == "Critical" || it.priority == "High" }
@@ -991,7 +991,7 @@ private fun DashboardScreen(
 
         item { DotSectionTitle("يحتاج انتباهك", AccentRed) }
 
-        val warningAssets = assets.filter { it.status != "Running" }.take(4)
+        val warningAssets = assets.filter { assetStatusGroup(it.status) != "working" }.take(4)
         val lowStockParts = parts.filter { it.onHandQty <= it.minQty }.take(4)
         val duePm = pmItems.filter { DateStrings.isDueOrOverdue(it.nextDueAt) }.take(4)
         val openNotifications = notifications.filter {
@@ -1373,9 +1373,9 @@ private fun AssetsScreen(
         ) {
             if (query.isBlank() && assets.isNotEmpty()) {
                 item {
-                    val running = assets.count { it.status == "Running" }
-                    val stopped = assets.count { it.status == "Stopped" || it.status == "Retired" }
-                    val warning = assets.count { it.status == "Warning" || it.status == "Under Maintenance" }
+                    val running = assets.count { assetStatusGroup(it.status) == "working" }
+                    val warning = assets.count { assetStatusGroup(it.status) == "attention" }
+                    val stopped = assets.count { assetStatusGroup(it.status) == "down" }
                     val other = assets.size - running - stopped - warning
                     val seg = listOf(
                         ChartSegment("تعمل", running, AccentGreen),
@@ -1457,7 +1457,7 @@ private fun AssetCard(
                     LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(asset.status, tone)
+                StatusBadge(assetStatusLabelAr(asset.status), tone)
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
@@ -1519,8 +1519,8 @@ private fun AssetDetailScreen(
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
     var showMoveForm by remember { mutableStateOf(false) }
-    val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
-    val retired = asset.status.equals("Retired", ignoreCase = true)
+    val lifecycle = ASSET_STATUS_OPTIONS
+    val retired = isDecommissioned(asset.status)
 
     LazyColumn(
         modifier = Modifier
@@ -1542,7 +1542,7 @@ private fun AssetDetailScreen(
                     LtrText(asset.code, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(asset.status, statusTone(asset.status))
+                StatusBadge(assetStatusLabelAr(asset.status), statusTone(asset.status))
             }
         }
 
@@ -1787,7 +1787,7 @@ private fun AssetDetailScreen(
                             LtrText(child.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                             LtrText(child.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        StatusBadge(child.status, statusTone(child.status))
+                        StatusBadge(assetStatusLabelAr(child.status), statusTone(child.status))
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -1840,6 +1840,21 @@ private fun AssetDetailScreen(
 
         item { SectionHeader("الصيانة الدورية المرتبطة (${pmItems.size})") }
         if (pmItems.isEmpty()) {
+            if (asset.criticality == "Critical" || asset.criticality == "High") {
+                item {
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = AccentRed.copy(alpha = 0.10f))) {
+                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Filled.Warning, contentDescription = null, tint = AccentRed, modifier = Modifier.size(20.dp))
+                            Text(
+                                "أصل ${if (asset.criticality == "Critical") "حرج" else "عالي الأهمية"} بلا خطة صيانة وقائية — يُنصح بإضافة مهمة وقائية.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AccentRed,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
             item { EmptyState("لا توجد مهام صيانة لهذا الأصل") }
         }
         items(pmItems, key = { "pm-${it.id}" }) { pm ->
@@ -2038,6 +2053,26 @@ private fun notificationStatusLabel(status: String): String = when (status) {
 }
 
 private fun roleLabel(role: String): String = roleLabelAr(role)
+
+/** Full asset lifecycle statuses (governance §9). */
+private val ASSET_STATUS_OPTIONS = listOf(
+    "Active", "Running", "Standby", "Under Maintenance", "Breakdown", "Warning",
+    "Out of Service", "Stopped", "In Storage", "Sent to Vendor", "Refurbishment",
+    "Retired", "Disposed", "Draft", "Inactive"
+)
+
+private fun assetStatusLabelAr(status: String): String = assetStatusDisplayAr(status)
+
+/** Smart grouping of statuses for count panels (chosen by the user). */
+private fun assetStatusGroup(status: String): String = when (status) {
+    "Active", "Running", "Standby" -> "working"
+    "Breakdown", "Warning", "Under Maintenance", "Refurbishment" -> "attention"
+    "Out of Service", "Stopped", "Retired", "Disposed", "In Storage", "Sent to Vendor" -> "down"
+    else -> "other"
+}
+
+/** Statuses on which a normal work order is not allowed (governance STAT-002). */
+private fun isDecommissioned(status: String): Boolean = status == "Retired" || status == "Disposed"
 
 private fun workOrderStatusLabel(status: String): String = when (status) {
     "Open" -> "مفتوح"
@@ -4759,7 +4794,7 @@ private fun LocationDetailScreen(
                         LtrText(asset.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                         LtrText(asset.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    StatusBadge(asset.status, statusTone(asset.status))
+                    StatusBadge(assetStatusLabelAr(asset.status), statusTone(asset.status))
                 }
             }
         }

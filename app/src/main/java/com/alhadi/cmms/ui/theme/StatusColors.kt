@@ -9,13 +9,15 @@ data class StatusTone(val content: Color, val container: Color)
 /** Maps an asset / work-order status string to a semantic color tone. */
 fun statusTone(status: String): StatusTone {
     return when (status.lowercase(Locale.US)) {
-        "running", "closed", "done", "completed", "ok", "active" ->
+        "running", "closed", "done", "completed", "ok", "active", "standby" ->
             StatusTone(StatusRunning, StatusRunningContainer)
         "technically completed" ->
             StatusTone(StatusInfo, StatusInfoContainer)
-        "warning", "in progress", "scheduled", "pending", "due" ->
+        "warning", "in progress", "scheduled", "pending", "due",
+        "under maintenance", "breakdown", "refurbishment" ->
             StatusTone(StatusWarning, StatusWarningContainer)
-        "stopped", "overdue", "failed", "critical" ->
+        "stopped", "overdue", "failed", "critical",
+        "out of service", "retired", "disposed", "in storage", "sent to vendor" ->
             StatusTone(StatusStopped, StatusStoppedContainer)
         "open", "new" ->
             StatusTone(StatusInfo, StatusInfoContainer)
