@@ -35,6 +35,32 @@ class GovernanceRulesTest {
         assertTrue(result.errors.isNotEmpty())
     }
 
+    @Test
+    fun assetCriticalityUsesFiveGovernedImpactDimensions() {
+        val score = AssetGovernance.calculateCriticalityScore(
+            safety = 5,
+            production = 5,
+            environment = 3,
+            service = 4,
+            financial = 4
+        )
+        assertEquals(21, score)
+        assertEquals("Critical", AssetGovernance.criticalityRating(score))
+        assertThrowsArgument {
+            AssetGovernance.calculateCriticalityScore(0, 1, 1, 1, 1)
+        }
+    }
+
+    @Test
+    fun assetLifecycleBlocksInvalidJumpsAndRequiresApprovalForExit() {
+        assertTrue(AssetGovernance.canTransitionLifecycle("Draft", "Acquired"))
+        assertTrue(AssetGovernance.canTransitionLifecycle("InService", "Standby"))
+        assertFalse(AssetGovernance.canTransitionLifecycle("Draft", "InService"))
+        assertTrue(AssetGovernance.requiresApproval("Decommissioned"))
+        assertTrue(AssetGovernance.requiresApproval("Disposed"))
+        assertFalse(AssetGovernance.requiresApproval("InService"))
+    }
+
     private fun assertThrowsArgument(block: () -> Unit) {
         try {
             block()
