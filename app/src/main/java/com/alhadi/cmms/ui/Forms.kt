@@ -568,7 +568,6 @@ internal fun AssetFormSheet(
 }
 
 @Composable
-@Composable
 internal fun OrgUnitDropdown(
     label: String,
     units: List<OrgUnitEntity>,
