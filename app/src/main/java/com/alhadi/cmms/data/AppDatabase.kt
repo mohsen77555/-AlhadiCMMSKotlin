@@ -9,11 +9,13 @@ import com.alhadi.cmms.data.dao.AssetCharacteristicDao
 import com.alhadi.cmms.data.dao.AssetClassDao
 import com.alhadi.cmms.data.dao.AssetDao
 import com.alhadi.cmms.data.dao.AssetDocumentDao
+import com.alhadi.cmms.data.dao.AssetFinancialDao
 import com.alhadi.cmms.data.dao.AssetMovementDao
 import com.alhadi.cmms.data.dao.AssetPartnerDao
 import com.alhadi.cmms.data.dao.AssetWarrantyDao
 import com.alhadi.cmms.data.dao.AuditLogDao
 import com.alhadi.cmms.data.dao.CapaDao
+import com.alhadi.cmms.data.dao.DataQualityDao
 import com.alhadi.cmms.data.dao.FunctionalLocationDao
 import com.alhadi.cmms.data.dao.InventoryTransactionDao
 import com.alhadi.cmms.data.dao.MaintenanceNotificationDao
@@ -21,6 +23,7 @@ import com.alhadi.cmms.data.dao.MeasurementDao
 import com.alhadi.cmms.data.dao.PmChecklistDao
 import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
 import com.alhadi.cmms.data.dao.PurchaseOrderDao
+import com.alhadi.cmms.data.dao.SerializedItemDao
 import com.alhadi.cmms.data.dao.SparePartDao
 import com.alhadi.cmms.data.dao.SupplierDao
 import com.alhadi.cmms.data.dao.TaskListDao
@@ -32,16 +35,23 @@ import com.alhadi.cmms.data.dao.WorkOrderOperationDao
 import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
 import com.alhadi.cmms.data.dao.WorkPermitDao
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
+import com.alhadi.cmms.data.entity.AssetBomRevisionEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetClassEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetFinancialRecordEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AssetPartnerEntity
 import com.alhadi.cmms.data.entity.AssetWarrantyEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.BomAlternativeEntity
 import com.alhadi.cmms.data.entity.CapaEntity
+import com.alhadi.cmms.data.entity.DataQualityIssueEntity
+import com.alhadi.cmms.data.entity.FinancialPostingEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.ImportBatchEntity
+import com.alhadi.cmms.data.entity.ImportIssueEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
@@ -50,6 +60,8 @@ import com.alhadi.cmms.data.entity.MeterReplacementEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
+import com.alhadi.cmms.data.entity.SerialMovementEntity
+import com.alhadi.cmms.data.entity.SerializedItemEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
@@ -84,6 +96,15 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         AssetWarrantyEntity::class,
         WarrantyClaimEntity::class,
         AssetBomItemEntity::class,
+        AssetBomRevisionEntity::class,
+        BomAlternativeEntity::class,
+        SerializedItemEntity::class,
+        SerialMovementEntity::class,
+        AssetFinancialRecordEntity::class,
+        FinancialPostingEntity::class,
+        ImportBatchEntity::class,
+        ImportIssueEntity::class,
+        DataQualityIssueEntity::class,
         AssetMovementEntity::class,
         PmChecklistItemEntity::class,
         MaintenanceNotificationEntity::class,
@@ -97,7 +118,7 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         PurchaseOrderEntity::class,
         SupplierEntity::class
     ],
-    version = 27,
+    version = 28,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -117,6 +138,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun assetPartnerDao(): AssetPartnerDao
     abstract fun assetWarrantyDao(): AssetWarrantyDao
     abstract fun assetBomDao(): AssetBomDao
+    abstract fun serializedItemDao(): SerializedItemDao
+    abstract fun assetFinancialDao(): AssetFinancialDao
+    abstract fun dataQualityDao(): DataQualityDao
     abstract fun assetMovementDao(): AssetMovementDao
     abstract fun pmChecklistDao(): PmChecklistDao
     abstract fun maintenanceNotificationDao(): MaintenanceNotificationDao
