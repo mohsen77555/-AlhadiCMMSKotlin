@@ -333,6 +333,49 @@ private fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
     }
 }
 
+
+@Composable
+private fun LinearMaintenancePositionFields(
+    asset: AssetEntity,
+    startPoint: String,
+    onStartPointChange: (String) -> Unit,
+    endPoint: String,
+    onEndPointChange: (String) -> Unit,
+    marker: String,
+    onMarkerChange: (String) -> Unit,
+    horizontalOffset: String,
+    onHorizontalOffsetChange: (String) -> Unit,
+    verticalOffset: String,
+    onVerticalOffsetChange: (String) -> Unit
+) {
+    Text("الموقع على الأصل الخطي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text(
+        "النطاق المتاح: ${linearRangeLabel(asset)}",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.weight(1f)) {
+            LabeledField("نقطة البداية (${asset.linearUnit})", startPoint, onStartPointChange, numeric = true)
+        }
+        Box(modifier = Modifier.weight(1f)) {
+            LabeledField("نقطة النهاية (${asset.linearUnit})", endPoint, onEndPointChange, numeric = true)
+        }
+    }
+    LabeledField("العلامة المرجعية (اختياري)", marker, onMarkerChange)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.weight(1f)) {
+            LabeledField("إزاحة أفقية (${asset.linearOffsetUnit})", horizontalOffset, onHorizontalOffsetChange, numeric = true)
+        }
+        Box(modifier = Modifier.weight(1f)) {
+            LabeledField("إزاحة رأسية (${asset.linearOffsetUnit})", verticalOffset, onVerticalOffsetChange, numeric = true)
+        }
+    }
+    if (!optionalLinearRangeValid(asset, startPoint, endPoint)) {
+        Text("يجب أن يكون النطاق داخل حدود الأصل وأن تكون النهاية أكبر من أو مساوية للبداية.", color = MaterialTheme.colorScheme.error)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Asset form
 // ---------------------------------------------------------------------------
@@ -387,6 +430,41 @@ internal fun AssetFormSheet(
     var country by remember { mutableStateOf(initial?.country ?: "") }
     var standardClass by remember { mutableStateOf(initial?.standardClass ?: "") }
     var inheritParentCharacteristics by remember { mutableStateOf(initial?.inheritParentCharacteristics ?: true) }
+    var isLinearAsset by remember { mutableStateOf(initial?.isLinearAsset ?: false) }
+    var linearStartPoint by remember { mutableStateOf(formatLinearNumber(initial?.linearStartPoint ?: 0.0)) }
+    var linearEndPoint by remember { mutableStateOf(formatLinearNumber(initial?.linearEndPoint ?: 0.0)) }
+    var linearUnit by remember { mutableStateOf(initial?.linearUnit ?: "km") }
+    var linearReferencePattern by remember { mutableStateOf(initial?.linearReferencePattern ?: "") }
+    var linearRouteCode by remember { mutableStateOf(initial?.linearRouteCode ?: "") }
+    var linearStartMarker by remember { mutableStateOf(initial?.linearStartMarker ?: "") }
+    var linearEndMarker by remember { mutableStateOf(initial?.linearEndMarker ?: "") }
+    var linearStartMarkerDistance by remember { mutableStateOf(formatLinearNumber(initial?.linearStartMarkerDistance ?: 0.0)) }
+    var linearEndMarkerDistance by remember { mutableStateOf(formatLinearNumber(initial?.linearEndMarkerDistance ?: 0.0)) }
+    var linearMarkerUnit by remember { mutableStateOf(initial?.linearMarkerUnit ?: "km") }
+    var linearHorizontalOffset by remember { mutableStateOf(formatLinearNumber(initial?.linearHorizontalOffset ?: 0.0)) }
+    var linearVerticalOffset by remember { mutableStateOf(formatLinearNumber(initial?.linearVerticalOffset ?: 0.0)) }
+    var linearOffsetUnit by remember { mutableStateOf(initial?.linearOffsetUnit ?: "m") }
+    var linearDirection by remember { mutableStateOf(initial?.linearDirection ?: "Both") }
+    var networkObjectCode by remember { mutableStateOf(initial?.networkObjectCode ?: "") }
+    var networkObjectType by remember { mutableStateOf(initial?.networkObjectType ?: "") }
+    var networkRelation by remember { mutableStateOf(initial?.networkRelation ?: "") }
+    var networkAttributes by remember { mutableStateOf(initial?.networkAttributes ?: "") }
+    var linearStartLatitude by remember { mutableStateOf(initial?.linearStartLatitude?.let(::formatLinearNumber) ?: "") }
+    var linearStartLongitude by remember { mutableStateOf(initial?.linearStartLongitude?.let(::formatLinearNumber) ?: "") }
+    var linearEndLatitude by remember { mutableStateOf(initial?.linearEndLatitude?.let(::formatLinearNumber) ?: "") }
+    var linearEndLongitude by remember { mutableStateOf(initial?.linearEndLongitude?.let(::formatLinearNumber) ?: "") }
+
+    val linearStartValue = linearStartPoint.toDoubleOrNull()
+    val linearEndValue = linearEndPoint.toDoubleOrNull()
+    val linearRangeValid = !isLinearAsset || (linearStartValue != null && linearEndValue != null && linearEndValue > linearStartValue)
+    val markerDistancesValid = !isLinearAsset ||
+        ((linearStartMarkerDistance.toDoubleOrNull() ?: -1.0) >= 0.0 && (linearEndMarkerDistance.toDoubleOrNull() ?: -1.0) >= 0.0)
+    val coordinatesValid = !isLinearAsset || listOf(
+        linearStartLatitude to (-90.0..90.0),
+        linearEndLatitude to (-90.0..90.0),
+        linearStartLongitude to (-180.0..180.0),
+        linearEndLongitude to (-180.0..180.0)
+    ).all { (value, range) -> value.isBlank() || value.toDoubleOrNull()?.let { it in range } == true }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         Text("البيانات الأساسية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -414,6 +492,67 @@ internal fun AssetFormSheet(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("توريث خصائص الأصل الأب", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = inheritParentCharacteristics, onCheckedChange = { inheritParentCharacteristics = it })
+        }
+
+        Text("الأصل الخطي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("تفعيل البيانات الخطية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = isLinearAsset, onCheckedChange = { isLinearAsset = it })
+        }
+        if (isLinearAsset) {
+            LabeledField("رمز المسار / الخط", linearRouteCode, { linearRouteCode = it })
+            LabeledField("نمط المرجع الخطي", linearReferencePattern, { linearReferencePattern = it })
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.weight(1f)) { LabeledField("نقطة البداية", linearStartPoint, { linearStartPoint = it }, numeric = true) }
+                Box(modifier = Modifier.weight(1f)) { LabeledField("نقطة النهاية", linearEndPoint, { linearEndPoint = it }, numeric = true) }
+            }
+            OptionDropdown("وحدة القياس", linearUnitOptions, linearUnit, display = ::linearUnitLabel) { linearUnit = it }
+            if (linearRangeValid) {
+                Text(
+                    "الطول: ${formatLinearNumber((linearEndValue ?: 0.0) - (linearStartValue ?: 0.0))} $linearUnit",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            } else {
+                Text("يجب أن تكون نقطة النهاية أكبر من نقطة البداية.", color = MaterialTheme.colorScheme.error)
+            }
+
+            Text("العلامات المرجعية", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.weight(1f)) { LabeledField("علامة البداية", linearStartMarker, { linearStartMarker = it }) }
+                Box(modifier = Modifier.weight(1f)) { LabeledField("علامة النهاية", linearEndMarker, { linearEndMarker = it }) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.weight(1f)) { LabeledField("المسافة من علامة البداية", linearStartMarkerDistance, { linearStartMarkerDistance = it }, numeric = true) }
+                Box(modifier = Modifier.weight(1f)) { LabeledField("المسافة إلى علامة النهاية", linearEndMarkerDistance, { linearEndMarkerDistance = it }, numeric = true) }
+            }
+            OptionDropdown("وحدة مسافة العلامات", linearUnitOptions, linearMarkerUnit, display = ::linearUnitLabel) { linearMarkerUnit = it }
+
+            Text("الإزاحات والاتجاه", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.weight(1f)) { LabeledField("الإزاحة الأفقية", linearHorizontalOffset, { linearHorizontalOffset = it }, numeric = true) }
+                Box(modifier = Modifier.weight(1f)) { LabeledField("الإزاحة الرأسية", linearVerticalOffset, { linearVerticalOffset = it }, numeric = true) }
+            }
+            OptionDropdown("وحدة الإزاحة", linearOffsetUnitOptions, linearOffsetUnit, display = ::linearUnitLabel) { linearOffsetUnit = it }
+            OptionDropdown("اتجاه الأصل", linearDirectionOptions, linearDirection, display = ::linearDirectionLabel) { linearDirection = it }
+
+            Text("الإحداثيات (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.weight(1f)) { LabeledField("خط عرض البداية", linearStartLatitude, { linearStartLatitude = it }, numeric = true) }
+                Box(modifier = Modifier.weight(1f)) { LabeledField("خط طول البداية", linearStartLongitude, { linearStartLongitude = it }, numeric = true) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.weight(1f)) { LabeledField("خط عرض النهاية", linearEndLatitude, { linearEndLatitude = it }, numeric = true) }
+                Box(modifier = Modifier.weight(1f)) { LabeledField("خط طول النهاية", linearEndLongitude, { linearEndLongitude = it }, numeric = true) }
+            }
+            if (!coordinatesValid) Text("تحقق من صحة الإحداثيات.", color = MaterialTheme.colorScheme.error)
+
+            Text("ربط الشبكة", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            LabeledField("رمز كائن الشبكة", networkObjectCode, { networkObjectCode = it })
+            OptionDropdown("نوع كائن الشبكة", networkObjectTypeOptions, networkObjectType, display = ::networkObjectTypeLabel) { networkObjectType = it }
+            OptionDropdown("نوع العلاقة", networkRelationOptions, networkRelation, display = ::networkRelationLabel) { networkRelation = it }
+            LabeledField("سمات الشبكة", networkAttributes, { networkAttributes = it }, singleLine = false)
         }
 
         Text("البيانات الفنية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -461,7 +600,7 @@ internal fun AssetFormSheet(
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
         DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
         DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
-        SaveButton(code.isNotBlank() && name.isNotBlank()) {
+        SaveButton(code.isNotBlank() && name.isNotBlank() && linearRangeValid && markerDistancesValid && coordinatesValid) {
             val today = DateStrings.today()
             onSave(
                 AssetEntity(
@@ -509,7 +648,30 @@ internal fun AssetFormSheet(
                     city = city.trim(),
                     country = country.trim(),
                     standardClass = standardClass.trim(),
-                    inheritParentCharacteristics = inheritParentCharacteristics
+                    inheritParentCharacteristics = inheritParentCharacteristics,
+                    isLinearAsset = isLinearAsset,
+                    linearStartPoint = if (isLinearAsset) linearStartValue ?: 0.0 else 0.0,
+                    linearEndPoint = if (isLinearAsset) linearEndValue ?: 0.0 else 0.0,
+                    linearUnit = linearUnit,
+                    linearReferencePattern = if (isLinearAsset) linearReferencePattern.trim() else "",
+                    linearRouteCode = if (isLinearAsset) linearRouteCode.trim() else "",
+                    linearStartMarker = if (isLinearAsset) linearStartMarker.trim() else "",
+                    linearEndMarker = if (isLinearAsset) linearEndMarker.trim() else "",
+                    linearStartMarkerDistance = if (isLinearAsset) linearStartMarkerDistance.toDoubleOrNull() ?: 0.0 else 0.0,
+                    linearEndMarkerDistance = if (isLinearAsset) linearEndMarkerDistance.toDoubleOrNull() ?: 0.0 else 0.0,
+                    linearMarkerUnit = linearMarkerUnit,
+                    linearHorizontalOffset = if (isLinearAsset) linearHorizontalOffset.toDoubleOrNull() ?: 0.0 else 0.0,
+                    linearVerticalOffset = if (isLinearAsset) linearVerticalOffset.toDoubleOrNull() ?: 0.0 else 0.0,
+                    linearOffsetUnit = linearOffsetUnit,
+                    linearDirection = linearDirection,
+                    networkObjectCode = if (isLinearAsset) networkObjectCode.trim() else "",
+                    networkObjectType = if (isLinearAsset) networkObjectType else "",
+                    networkRelation = if (isLinearAsset) networkRelation else "",
+                    networkAttributes = if (isLinearAsset) networkAttributes.trim() else "",
+                    linearStartLatitude = if (isLinearAsset) linearStartLatitude.toDoubleOrNull() else null,
+                    linearStartLongitude = if (isLinearAsset) linearStartLongitude.toDoubleOrNull() else null,
+                    linearEndLatitude = if (isLinearAsset) linearEndLatitude.toDoubleOrNull() else null,
+                    linearEndLongitude = if (isLinearAsset) linearEndLongitude.toDoubleOrNull() else null
                 )
             )
         }
@@ -618,11 +780,38 @@ internal fun WorkOrderFormSheet(
     var laborRate by remember { mutableStateOf((initial?.laborRate ?: 0.0).toString()) }
     var partsCost by remember { mutableStateOf((initial?.partsCost ?: 0.0).toString()) }
     var requiresPermit by remember { mutableStateOf(initial?.requiresPermit ?: false) }
+    var linearStartPoint by remember { mutableStateOf(initial?.linearStartPoint?.let(::formatLinearNumber) ?: "") }
+    var linearEndPoint by remember { mutableStateOf(initial?.linearEndPoint?.let(::formatLinearNumber) ?: "") }
+    var linearMarker by remember { mutableStateOf(initial?.linearMarker ?: "") }
+    var linearHorizontalOffset by remember { mutableStateOf(initial?.linearHorizontalOffset?.let(::formatLinearNumber) ?: "") }
+    var linearVerticalOffset by remember { mutableStateOf(initial?.linearVerticalOffset?.let(::formatLinearNumber) ?: "") }
+    val selectedAsset = assets.firstOrNull { it.id == assetId }
+    val linearReferenceValid = selectedAsset?.let { asset ->
+        !asset.isLinearAsset || (
+            optionalLinearRangeValid(asset, linearStartPoint, linearEndPoint) &&
+                optionalLinearNumberValid(linearHorizontalOffset) && optionalLinearNumberValid(linearVerticalOffset)
+        )
+    } ?: true
 
     FormSheet(if (initial == null) "إنشاء أمر عمل" else "تعديل أمر العمل", onDismiss) {
         LabeledField("العنوان", title, { title = it })
         LabeledField("الوصف", description, { description = it }, singleLine = false)
         AssetDropdown(assets, assetId) { assetId = it }
+        if (selectedAsset?.isLinearAsset == true) {
+            LinearMaintenancePositionFields(
+                asset = selectedAsset,
+                startPoint = linearStartPoint,
+                onStartPointChange = { linearStartPoint = it },
+                endPoint = linearEndPoint,
+                onEndPointChange = { linearEndPoint = it },
+                marker = linearMarker,
+                onMarkerChange = { linearMarker = it },
+                horizontalOffset = linearHorizontalOffset,
+                onHorizontalOffsetChange = { linearHorizontalOffset = it },
+                verticalOffset = linearVerticalOffset,
+                onVerticalOffsetChange = { linearVerticalOffset = it }
+            )
+        }
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
         OptionDropdown("الحالة", listOf("Open", "In Progress", "Technically Completed", "Closed"), status) { status = it }
         LabeledField("المسؤول", assignedTo, { assignedTo = it })
@@ -646,7 +835,7 @@ internal fun WorkOrderFormSheet(
         if (initial == null) {
             LabeledField("الاستحقاق خلال (أيام)", dueDays, { dueDays = it }, numeric = true)
         }
-        SaveButton(title.isNotBlank() && assetId != 0L) {
+        SaveButton(title.isNotBlank() && assetId != 0L && linearReferenceValid) {
             val today = DateStrings.today()
             val due = initial?.dueAt ?: DateStrings.daysFromToday(dueDays.toIntOrNull() ?: 3)
             onSave(
@@ -669,7 +858,12 @@ internal fun WorkOrderFormSheet(
                     partsCost = partsCost.toDoubleOrNull() ?: 0.0,
                     approvalStatus = initial?.approvalStatus ?: "NotRequired",
                     approvedBy = initial?.approvedBy ?: "",
-                    requiresPermit = requiresPermit
+                    requiresPermit = requiresPermit,
+                    linearStartPoint = if (selectedAsset?.isLinearAsset == true) linearStartPoint.toDoubleOrNull() else null,
+                    linearEndPoint = if (selectedAsset?.isLinearAsset == true) linearEndPoint.toDoubleOrNull() else null,
+                    linearMarker = if (selectedAsset?.isLinearAsset == true) linearMarker.trim() else "",
+                    linearHorizontalOffset = if (selectedAsset?.isLinearAsset == true) linearHorizontalOffset.toDoubleOrNull() else null,
+                    linearVerticalOffset = if (selectedAsset?.isLinearAsset == true) linearVerticalOffset.toDoubleOrNull() else null
                 )
             )
         }
@@ -1279,17 +1473,44 @@ internal fun NotificationFormSheet(
     var damageCode by remember { mutableStateOf(initial?.damageCode ?: "") }
     var causeCode by remember { mutableStateOf(initial?.causeCode ?: "") }
     var requiredEnd by remember { mutableStateOf(initial?.requiredEnd ?: "") }
+    var linearStartPoint by remember { mutableStateOf(initial?.linearStartPoint?.let(::formatLinearNumber) ?: "") }
+    var linearEndPoint by remember { mutableStateOf(initial?.linearEndPoint?.let(::formatLinearNumber) ?: "") }
+    var linearMarker by remember { mutableStateOf(initial?.linearMarker ?: "") }
+    var linearHorizontalOffset by remember { mutableStateOf(initial?.linearHorizontalOffset?.let(::formatLinearNumber) ?: "") }
+    var linearVerticalOffset by remember { mutableStateOf(initial?.linearVerticalOffset?.let(::formatLinearNumber) ?: "") }
+    val selectedAsset = assetId?.let { id -> assets.firstOrNull { it.id == id } }
+    val linearReferenceValid = selectedAsset?.let { asset ->
+        !asset.isLinearAsset || (
+            optionalLinearRangeValid(asset, linearStartPoint, linearEndPoint) &&
+                optionalLinearNumberValid(linearHorizontalOffset) && optionalLinearNumberValid(linearVerticalOffset)
+        )
+    } ?: true
 
     FormSheet(if (initial == null) "بلاغ صيانة جديد" else "تعديل البلاغ", onDismiss) {
         OptionDropdown("النوع", listOf("Corrective", "Breakdown", "Inspection", "Request"), type) { type = it }
         LabeledField("العنوان", title, { title = it })
         LabeledField("وصف المشكلة", description, { description = it }, singleLine = false)
         AssetDropdownOptional(assets, assetId, onSelect = { assetId = it })
+        if (selectedAsset?.isLinearAsset == true) {
+            LinearMaintenancePositionFields(
+                asset = selectedAsset,
+                startPoint = linearStartPoint,
+                onStartPointChange = { linearStartPoint = it },
+                endPoint = linearEndPoint,
+                onEndPointChange = { linearEndPoint = it },
+                marker = linearMarker,
+                onMarkerChange = { linearMarker = it },
+                horizontalOffset = linearHorizontalOffset,
+                onHorizontalOffsetChange = { linearHorizontalOffset = it },
+                verticalOffset = linearVerticalOffset,
+                onVerticalOffsetChange = { linearVerticalOffset = it }
+            )
+        }
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
         LabeledField("كود الضرر (اختياري)", damageCode, { damageCode = it })
         LabeledField("كود السبب (اختياري)", causeCode, { causeCode = it })
         DateField("مطلوب الإنجاز قبل", requiredEnd) { requiredEnd = it }
-        SaveButton(title.isNotBlank()) {
+        SaveButton(title.isNotBlank() && linearReferenceValid) {
             onSave(
                 MaintenanceNotificationEntity(
                     id = initial?.id ?: 0,
@@ -1305,7 +1526,12 @@ internal fun NotificationFormSheet(
                     reportedAt = initial?.reportedAt ?: "",
                     requiredEnd = requiredEnd.trim(),
                     status = initial?.status ?: "New",
-                    linkedOrderId = initial?.linkedOrderId
+                    linkedOrderId = initial?.linkedOrderId,
+                    linearStartPoint = if (selectedAsset?.isLinearAsset == true) linearStartPoint.toDoubleOrNull() else null,
+                    linearEndPoint = if (selectedAsset?.isLinearAsset == true) linearEndPoint.toDoubleOrNull() else null,
+                    linearMarker = if (selectedAsset?.isLinearAsset == true) linearMarker.trim() else "",
+                    linearHorizontalOffset = if (selectedAsset?.isLinearAsset == true) linearHorizontalOffset.toDoubleOrNull() else null,
+                    linearVerticalOffset = if (selectedAsset?.isLinearAsset == true) linearVerticalOffset.toDoubleOrNull() else null
                 )
             )
         }

@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -31,7 +32,13 @@ data class WorkOrderEntity(
     val partsCost: Double = 0.0,
     val approvalStatus: String = "NotRequired",
     val approvedBy: String = "",
-    val requiresPermit: Boolean = false
+    val requiresPermit: Boolean = false,
+    val linearStartPoint: Double? = null,
+    val linearEndPoint: Double? = null,
+    @ColumnInfo(defaultValue = "''")
+    val linearMarker: String = "",
+    val linearHorizontalOffset: Double? = null,
+    val linearVerticalOffset: Double? = null
 ) {
     /** Recorded labour cost (hours × rate). */
     fun laborCost(): Double = laborHours * laborRate
@@ -47,6 +54,10 @@ data class WorkOrderEntity(
 
     /** Pending approval blocks starting/closing the work order. */
     fun isBlockedByApproval(): Boolean = approvalStatus == "Pending" || approvalStatus == "Rejected"
+
+    fun hasLinearReference(): Boolean =
+        linearStartPoint != null || linearEndPoint != null || linearMarker.isNotBlank() ||
+            linearHorizontalOffset != null || linearVerticalOffset != null
 
     companion object {
         const val APPROVAL_THRESHOLD = 1000.0

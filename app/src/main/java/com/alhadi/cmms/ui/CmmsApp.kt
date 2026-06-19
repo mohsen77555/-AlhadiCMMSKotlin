@@ -1271,6 +1271,12 @@ private fun AssetsScreen(
                 asset.city.lowercase(Locale.getDefault()).contains(q) ||
                 asset.country.lowercase(Locale.getDefault()).contains(q) ||
                 asset.standardClass.lowercase(Locale.getDefault()).contains(q) ||
+                asset.linearRouteCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.linearReferencePattern.lowercase(Locale.getDefault()).contains(q) ||
+                asset.linearStartMarker.lowercase(Locale.getDefault()).contains(q) ||
+                asset.linearEndMarker.lowercase(Locale.getDefault()).contains(q) ||
+                asset.networkObjectCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.networkAttributes.lowercase(Locale.getDefault()).contains(q) ||
                 resolveAssetCharacteristics(asset, assets, characteristics).any { resolved ->
                     resolved.resolvedClassName.lowercase(Locale.getDefault()).contains(q) ||
                         resolved.item.name.lowercase(Locale.getDefault()).contains(q) ||
@@ -1391,6 +1397,9 @@ private fun AssetCard(
                 if (asset.standardClass.isNotBlank()) {
                     AssistChip(onClick = {}, label = { Text(asset.standardClass, maxLines = 1) })
                 }
+                if (asset.isLinearAsset) {
+                    StatusBadge("أصل خطي", statusTone("info"))
+                }
             }
             if (asset.location.isNotBlank()) {
                 Text(asset.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1468,6 +1477,7 @@ private fun AssetDetailScreen(
     val directCharacteristics = resolvedCharacteristics.filterNot { it.inherited }
     val inheritedCharacteristics = resolvedCharacteristics.filter { it.inherited }
     val characteristicGroups = resolvedCharacteristics.groupBy { it.resolvedClassName }
+    val hasLinearData = asset.isLinearAsset
 
     LazyColumn(
         modifier = Modifier
@@ -1513,6 +1523,42 @@ private fun AssetDetailScreen(
                     InfoRow("تاريخ التركيب", asset.installedAt)
                     if (asset.startupDate.isNotBlank()) InfoRow("تاريخ بدء التشغيل", asset.startupDate)
                     InfoRow("آخر فحص", asset.lastInspectionAt)
+                }
+            }
+        }
+
+        if (hasLinearData) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            SectionHeader("البيانات الخطية")
+                            Spacer(modifier = Modifier.weight(1f))
+                            StatusBadge("${formatLinearNumber(asset.linearLength())} ${asset.linearUnit}", statusTone("info"))
+                        }
+                        InfoRow("النطاق", linearRangeLabel(asset))
+                        if (asset.linearRouteCode.isNotBlank()) InfoRow("رمز المسار / الخط", asset.linearRouteCode)
+                        if (asset.linearReferencePattern.isNotBlank()) InfoRow("نمط المرجع", asset.linearReferencePattern)
+                        InfoRow("الاتجاه", linearDirectionLabel(asset.linearDirection))
+                        if (asset.linearStartMarker.isNotBlank()) {
+                            InfoRow("علامة البداية", "${asset.linearStartMarker} • ${formatLinearNumber(asset.linearStartMarkerDistance)} ${asset.linearMarkerUnit}")
+                        }
+                        if (asset.linearEndMarker.isNotBlank()) {
+                            InfoRow("علامة النهاية", "${asset.linearEndMarker} • ${formatLinearNumber(asset.linearEndMarkerDistance)} ${asset.linearMarkerUnit}")
+                        }
+                        if (asset.linearHorizontalOffset != 0.0) InfoRow("الإزاحة الأفقية", "${formatLinearNumber(asset.linearHorizontalOffset)} ${asset.linearOffsetUnit}")
+                        if (asset.linearVerticalOffset != 0.0) InfoRow("الإزاحة الرأسية", "${formatLinearNumber(asset.linearVerticalOffset)} ${asset.linearOffsetUnit}")
+                        if (asset.linearStartLatitude != null && asset.linearStartLongitude != null) {
+                            InfoRow("إحداثيات البداية", "${formatLinearNumber(asset.linearStartLatitude)}، ${formatLinearNumber(asset.linearStartLongitude)}")
+                        }
+                        if (asset.linearEndLatitude != null && asset.linearEndLongitude != null) {
+                            InfoRow("إحداثيات النهاية", "${formatLinearNumber(asset.linearEndLatitude)}، ${formatLinearNumber(asset.linearEndLongitude)}")
+                        }
+                        if (asset.networkObjectCode.isNotBlank()) InfoRow("كائن الشبكة", asset.networkObjectCode)
+                        if (asset.networkObjectType.isNotBlank()) InfoRow("نوع كائن الشبكة", networkObjectTypeLabel(asset.networkObjectType))
+                        if (asset.networkRelation.isNotBlank()) InfoRow("العلاقة", networkRelationLabel(asset.networkRelation))
+                        if (asset.networkAttributes.isNotBlank()) InfoRow("سمات الشبكة", asset.networkAttributes)
+                    }
                 }
             }
         }
@@ -1832,6 +1878,9 @@ private fun AssetDetailScreen(
                         StatusBadge(workOrderStatusLabel(wo.status), statusTone(wo.status))
                     }
                     Text("الاستحقاق: ${wo.dueAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (asset.isLinearAsset && wo.hasLinearReference()) {
+                        InfoRow("الموقع الخطي", linearMaintenancePositionLabel(asset, wo.linearStartPoint, wo.linearEndPoint, wo.linearMarker, wo.linearHorizontalOffset, wo.linearVerticalOffset))
+                    }
                     if (wo.approvalStatus == "Pending") {
                         StatusBadge("بانتظار الاعتماد", statusTone("overdue"))
                     }
@@ -2170,6 +2219,9 @@ private fun NotificationCard(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             if (asset != null) InfoRow("الأصل", "${asset.code} • ${asset.name}")
+            if (asset?.isLinearAsset == true && notification.hasLinearReference()) {
+                InfoRow("الموقع الخطي", linearMaintenancePositionLabel(asset, notification.linearStartPoint, notification.linearEndPoint, notification.linearMarker, notification.linearHorizontalOffset, notification.linearVerticalOffset))
+            }
             if (notification.damageCode.isNotBlank()) InfoRow("كود الضرر", notification.damageCode)
             if (notification.causeCode.isNotBlank()) InfoRow("كود السبب", notification.causeCode)
             InfoRow("المُبلِّغ", notification.reportedBy)
@@ -2259,6 +2311,9 @@ private fun WorkOrdersScreen(
                 (!pendingOnly || wo.approvalStatus == "Pending") &&
                 (q.isBlank() ||
                     wo.title.lowercase(Locale.getDefault()).contains(q) ||
+                    wo.linearMarker.lowercase(Locale.getDefault()).contains(q) ||
+                    (asset?.linearRouteCode?.lowercase(Locale.getDefault())?.contains(q) == true) ||
+                    (asset?.networkObjectCode?.lowercase(Locale.getDefault())?.contains(q) == true) ||
                     (asset?.code?.lowercase(Locale.getDefault())?.contains(q) == true) ||
                     (asset?.name?.lowercase(Locale.getDefault())?.contains(q) == true))
         }.sortedWith(compareBy({ it.status == "Closed" }, { it.dueAt }))
@@ -2463,6 +2518,9 @@ private fun WorkOrderCard(
             InfoRow("تاريخ الإنشاء", workOrder.createdAt)
             InfoRow("تاريخ الاستحقاق", workOrder.dueAt)
             InfoRow("التكلفة التقديرية", "%.2f".format(workOrder.estimatedCost))
+            if (asset?.isLinearAsset == true && workOrder.hasLinearReference()) {
+                InfoRow("الموقع الخطي", linearMaintenancePositionLabel(asset, workOrder.linearStartPoint, workOrder.linearEndPoint, workOrder.linearMarker, workOrder.linearHorizontalOffset, workOrder.linearVerticalOffset))
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { showOperations = !showOperations },

@@ -598,11 +598,49 @@ class CmmsRepository(private val database: AppDatabase) {
         recordAudit("Create", "User", "إضافة فني جديد tech$number", actor)
     }
 
+
+    private fun validateLinearAssetMaster(asset: AssetEntity) {
+        if (!asset.isLinearAsset) return
+        require(asset.linearEndPoint > asset.linearStartPoint) {
+            "يجب أن تكون نقطة نهاية الأصل الخطي أكبر من نقطة البداية"
+        }
+        require(asset.linearStartMarkerDistance >= 0.0 && asset.linearEndMarkerDistance >= 0.0) {
+            "مسافات العلامات المرجعية لا يمكن أن تكون سالبة"
+        }
+        asset.linearStartLatitude?.let { require(it in -90.0..90.0) { "خط عرض البداية غير صالح" } }
+        asset.linearEndLatitude?.let { require(it in -90.0..90.0) { "خط عرض النهاية غير صالح" } }
+        asset.linearStartLongitude?.let { require(it in -180.0..180.0) { "خط طول البداية غير صالح" } }
+        asset.linearEndLongitude?.let { require(it in -180.0..180.0) { "خط طول النهاية غير صالح" } }
+    }
+
+    private suspend fun validateLinearMaintenanceReference(
+        assetId: Long?,
+        startPoint: Double?,
+        endPoint: Double?,
+        marker: String,
+        horizontalOffset: Double?,
+        verticalOffset: Double?
+    ) {
+        val hasReference = startPoint != null || endPoint != null || marker.isNotBlank() ||
+            horizontalOffset != null || verticalOffset != null
+        if (!hasReference) return
+
+        val id = assetId ?: throw IllegalStateException("يجب تحديد أصل للموقع الخطي")
+        val asset = assetDao.getAssetById(id) ?: throw IllegalStateException("الأصل المحدد غير موجود")
+        if (!asset.isLinearAsset) throw IllegalStateException("الأصل المحدد غير مفعّل كأصل خطي")
+        val start = startPoint ?: throw IllegalStateException("أدخل نقطة بداية الموقع الخطي")
+        val end = endPoint ?: throw IllegalStateException("أدخل نقطة نهاية الموقع الخطي")
+        if (!asset.containsLinearRange(start, end)) {
+            throw IllegalStateException("الموقع الخطي خارج نطاق الأصل ${asset.linearStartPoint} – ${asset.linearEndPoint} ${asset.linearUnit}")
+        }
+    }
+
     // ---------------------------------------------------------------------
     // CRUD — Assets
     // ---------------------------------------------------------------------
 
     suspend fun saveAsset(asset: AssetEntity, actor: String = "System") {
+        validateLinearAssetMaster(asset)
         val isNew = asset.id == 0L
         assetDao.insertAsset(asset)
         recordAudit(if (isNew) "Create" else "Update", "Asset", "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code}", actor)
@@ -638,6 +676,14 @@ class CmmsRepository(private val database: AppDatabase) {
     // ---------------------------------------------------------------------
 
     suspend fun saveWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
+        validateLinearMaintenanceReference(
+            workOrder.assetId,
+            workOrder.linearStartPoint,
+            workOrder.linearEndPoint,
+            workOrder.linearMarker,
+            workOrder.linearHorizontalOffset,
+            workOrder.linearVerticalOffset
+        )
         val isNew = workOrder.id == 0L
         // Keep an existing decision; otherwise (re)derive whether sign-off is needed.
         val toSave = if (workOrder.approvalStatus == "Approved" || workOrder.approvalStatus == "Rejected") {
@@ -911,6 +957,14 @@ class CmmsRepository(private val database: AppDatabase) {
     // ---------------------------------------------------------------------
 
     suspend fun saveNotification(notification: MaintenanceNotificationEntity, actor: String = "System") {
+        validateLinearMaintenanceReference(
+            notification.assetId,
+            notification.linearStartPoint,
+            notification.linearEndPoint,
+            notification.linearMarker,
+            notification.linearHorizontalOffset,
+            notification.linearVerticalOffset
+        )
         val isNew = notification.id == 0L
         val toSave = if (isNew) {
             val seq = notificationDao.countOnce() + 1
@@ -942,6 +996,14 @@ class CmmsRepository(private val database: AppDatabase) {
         dueAt: String,
         actor: String = "System"
     ) {
+        validateLinearMaintenanceReference(
+            notification.assetId,
+            notification.linearStartPoint,
+            notification.linearEndPoint,
+            notification.linearMarker,
+            notification.linearHorizontalOffset,
+            notification.linearVerticalOffset
+        )
         database.withTransaction {
             val now = DateStrings.today()
             val orderId = workOrderDao.insertWorkOrder(
@@ -956,7 +1018,12 @@ class CmmsRepository(private val database: AppDatabase) {
                     dueAt = dueAt,
                     estimatedCost = 0.0,
                     isFailure = notification.type == "Breakdown",
-                    approvalStatus = if (notification.priority == "Critical") "Pending" else "NotRequired"
+                    approvalStatus = if (notification.priority == "Critical") "Pending" else "NotRequired",
+                    linearStartPoint = notification.linearStartPoint,
+                    linearEndPoint = notification.linearEndPoint,
+                    linearMarker = notification.linearMarker,
+                    linearHorizontalOffset = notification.linearHorizontalOffset,
+                    linearVerticalOffset = notification.linearVerticalOffset
                 )
             )
             notificationDao.insert(notification.copy(status = "OrderCreated", linkedOrderId = orderId))

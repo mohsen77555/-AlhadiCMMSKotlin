@@ -81,9 +81,59 @@ data class AssetEntity(
     @ColumnInfo(defaultValue = "''")
     val standardClass: String = "",
     @ColumnInfo(defaultValue = "1")
-    val inheritParentCharacteristics: Boolean = true
+    val inheritParentCharacteristics: Boolean = true,
+    @ColumnInfo(defaultValue = "0")
+    val isLinearAsset: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val linearStartPoint: Double = 0.0,
+    @ColumnInfo(defaultValue = "0")
+    val linearEndPoint: Double = 0.0,
+    @ColumnInfo(defaultValue = "'km'")
+    val linearUnit: String = "km",
+    @ColumnInfo(defaultValue = "''")
+    val linearReferencePattern: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val linearRouteCode: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val linearStartMarker: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val linearEndMarker: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val linearStartMarkerDistance: Double = 0.0,
+    @ColumnInfo(defaultValue = "0")
+    val linearEndMarkerDistance: Double = 0.0,
+    @ColumnInfo(defaultValue = "'km'")
+    val linearMarkerUnit: String = "km",
+    @ColumnInfo(defaultValue = "0")
+    val linearHorizontalOffset: Double = 0.0,
+    @ColumnInfo(defaultValue = "0")
+    val linearVerticalOffset: Double = 0.0,
+    @ColumnInfo(defaultValue = "'m'")
+    val linearOffsetUnit: String = "m",
+    @ColumnInfo(defaultValue = "'Both'")
+    val linearDirection: String = "Both",
+    @ColumnInfo(defaultValue = "''")
+    val networkObjectCode: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val networkObjectType: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val networkRelation: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val networkAttributes: String = "",
+    val linearStartLatitude: Double? = null,
+    val linearStartLongitude: Double? = null,
+    val linearEndLatitude: Double? = null,
+    val linearEndLongitude: Double? = null
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =
         warrantyEnd.isNotBlank() && today <= warrantyEnd && (warrantyStart.isBlank() || warrantyStart <= today)
+
+    fun hasValidLinearRange(): Boolean = !isLinearAsset || linearEndPoint > linearStartPoint
+
+    fun linearLength(): Double =
+        if (isLinearAsset && linearEndPoint >= linearStartPoint) linearEndPoint - linearStartPoint else 0.0
+
+    fun containsLinearRange(start: Double, end: Double): Boolean =
+        isLinearAsset && start <= end && start >= linearStartPoint && end <= linearEndPoint
 }
