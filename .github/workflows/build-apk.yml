@@ -18,18 +18,23 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Apply App2 UI grouping
+      - name: Apply App2 implementation patches
         if: github.ref == 'refs/heads/App2'
         run: |
           if [ -f scripts/app2_ui_reorg.py ]; then
             python3 scripts/app2_ui_reorg.py
-            if ! git diff --quiet; then
-              git config user.name "github-actions[bot]"
-              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              git add app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt
-              git commit -m "ui(app2): group More screen modules"
-              git push origin HEAD:App2
-            fi
+          fi
+          if [ -f scripts/app2_stages_11_15.py ]; then
+            python3 scripts/app2_stages_11_15.py
+          fi
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/src/main/java/com/alhadi/cmms/data/CmmsRepository.kt
+            git add app/src/main/java/com/alhadi/cmms/ui/Forms.kt
+            git add app/src/main/java/com/alhadi/cmms/ui/CmmsApp.kt
+            git commit -m "feat(app2): implement governed asset stages 11-15"
+            git push origin HEAD:App2
           fi
 
       - name: Set up JDK 17
