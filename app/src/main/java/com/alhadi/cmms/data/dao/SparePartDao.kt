@@ -12,6 +12,12 @@ interface SparePartDao {
     @Query("SELECT * FROM spare_parts ORDER BY equipmentGroup ASC, partNumber ASC")
     fun observeSpareParts(): Flow<List<SparePartEntity>>
 
+    @Query("SELECT * FROM spare_parts ORDER BY id ASC")
+    suspend fun dumpAll(): List<SparePartEntity>
+
+    @Query("SELECT * FROM spare_parts WHERE partNumber = :partNumber LIMIT 1")
+    suspend fun findByPartNumber(partNumber: String): SparePartEntity?
+
     @Query("SELECT COUNT(*) FROM spare_parts WHERE onHandQty <= minQty")
     fun observeLowStockCount(): Flow<Int>
 
