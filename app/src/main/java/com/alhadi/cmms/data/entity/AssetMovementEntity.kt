@@ -1,10 +1,10 @@
 package com.alhadi.cmms.data.entity
 
-import kotlinx.serialization.Serializable
-
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * A lifecycle / movement event for an asset: install, transfer, dismantle, retire...
@@ -30,5 +30,16 @@ data class AssetMovementEntity(
     val toLocationName: String = "",
     val notes: String = "",
     val performedBy: String,
-    val occurredAt: String
+    val occurredAt: String,
+    @ColumnInfo(defaultValue = "''")
+    val reason: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val previousLifecycleStatus: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val newLifecycleStatus: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val approvedBy: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val referenceType: String = "",
+    val referenceId: Long? = null
 )
