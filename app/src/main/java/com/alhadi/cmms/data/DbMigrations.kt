@@ -7,27 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Database migrations for [AppDatabase].
  *
  * IMPORTANT (data safety): the database is the user's real maintenance record. It must NOT be
- * wiped on app upgrades. Therefore the builder no longer uses destructive migration on upgrade —
- * every schema change MUST ship a [Migration] here.
- *
- * Process for any future schema change:
- *  1. Edit the entity/DAO.
- *  2. Bump `version` in [AppDatabase] by 1 (e.g. 22 -> 23).
- *  3. Add a `Migration(old, new)` below that applies the exact SQL change, then register it in [ALL].
- *  4. Build once; the exported schema JSON under `app/schemas` updates. Commit it.
- *
- * Common patterns:
- *  - Add a nullable column:  ALTER TABLE x ADD COLUMN c TEXT
- *  - Add a NOT NULL column:  ALTER TABLE x ADD COLUMN c INTEGER NOT NULL DEFAULT 0
- *  - Add an index:           CREATE INDEX IF NOT EXISTS idx_x_c ON x(c)
- *
- * Example (kept for reference; uncomment and adapt when needed):
- *
- *   val MIGRATION_22_23 = object : Migration(22, 23) {
- *       override fun migrate(db: SupportSQLiteDatabase) {
- *           db.execSQL("ALTER TABLE spare_parts ADD COLUMN reorderQty INTEGER NOT NULL DEFAULT 0")
- *       }
- *   }
+ * wiped on app upgrades. Every schema change must ship an explicit migration.
  */
 object DbMigrations {
 
@@ -87,9 +67,69 @@ object DbMigrations {
     }
 
     /**
-     * All migrations, in order. Append new `Migration` objects here as the schema evolves.
+     * v25 -> v26: governed asset master data, functional-location governance,
+     * criticality assessment, and richer asset lifecycle history.
      */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
+    val MIGRATION_25_26 = object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN assetType TEXT NOT NULL DEFAULT 'Equipment'",
+                "ALTER TABLE assets ADD COLUMN assetCategory TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN organizationCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN plantCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN maintenanceWorkCenter TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN planningGroup TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN costCenter TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN ownerDepartment TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN responsiblePerson TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN manufacturingYear INTEGER",
+                "ALTER TABLE assets ADD COLUMN purchaseDate TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN commissioningDate TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN financialAssetRef TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN lifecycleStatus TEXT NOT NULL DEFAULT 'InService'",
+                "ALTER TABLE assets ADD COLUMN operationalStatus TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN healthStatus TEXT NOT NULL DEFAULT 'Good'",
+                "ALTER TABLE assets ADD COLUMN criticalitySafetyImpact INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE assets ADD COLUMN criticalityProductionImpact INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE assets ADD COLUMN criticalityEnvironmentalImpact INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE assets ADD COLUMN criticalityServiceImpact INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE assets ADD COLUMN criticalityFinancialImpact INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE assets ADD COLUMN criticalityScore INTEGER NOT NULL DEFAULT 5",
+                "ALTER TABLE assets ADD COLUMN criticalityAssessedAt TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN criticalityAssessedBy TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN createdBy TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN createdAt TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN updatedBy TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN updatedAt TEXT NOT NULL DEFAULT ''",
+
+                "ALTER TABLE functional_locations ADD COLUMN organizationCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN plantCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN locationCategory TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN costCenterCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN workCenterCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN referenceLocationId INTEGER",
+                "ALTER TABLE functional_locations ADD COLUMN isReference INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE functional_locations ADD COLUMN createdAt TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN updatedAt TEXT NOT NULL DEFAULT ''",
+
+                "ALTER TABLE asset_movements ADD COLUMN reason TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_movements ADD COLUMN previousLifecycleStatus TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_movements ADD COLUMN newLifecycleStatus TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_movements ADD COLUMN approvedBy TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_movements ADD COLUMN referenceType TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE asset_movements ADD COLUMN referenceId INTEGER"
+            )
+        }
+    }
+
+    /** All migrations, in order. Append new migration objects as the schema evolves. */
+    val ALL: Array<Migration> = arrayOf(
+        MIGRATION_22_23,
+        MIGRATION_23_24,
+        MIGRATION_24_25,
+        MIGRATION_25_26
+    )
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */
