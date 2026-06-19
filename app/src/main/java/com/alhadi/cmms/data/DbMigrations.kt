@@ -86,10 +86,23 @@ object DbMigrations {
         }
     }
 
+    /** v25 -> v26: adds governance registry fields to `assets` (all nullable). */
+    val MIGRATION_25_26 = object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            listOf(
+                "description", "assetType", "category", "costCenter", "workCenter",
+                "department", "responsiblePerson", "commissioningDate", "constructionType",
+                "financialAssetRef", "notes"
+            ).forEach { col ->
+                db.execSQL("ALTER TABLE `assets` ADD COLUMN `$col` TEXT")
+            }
+        }
+    }
+
     /**
      * All migrations, in order. Append new `Migration` objects here as the schema evolves.
      */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

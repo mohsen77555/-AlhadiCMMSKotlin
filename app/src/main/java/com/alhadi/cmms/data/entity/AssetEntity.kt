@@ -34,7 +34,19 @@ data class AssetEntity(
     val supplier: String = "",
     val purchaseOrder: String = "",
     val purchaseCost: Double = 0.0,
-    val acquiredAt: String = ""
+    val acquiredAt: String = "",
+    // Governance §5 additional registry fields (nullable for safe schema migration).
+    val description: String? = null,
+    val assetType: String? = null,
+    val category: String? = null,
+    val costCenter: String? = null,
+    val workCenter: String? = null,
+    val department: String? = null,
+    val responsiblePerson: String? = null,
+    val commissioningDate: String? = null,
+    val constructionType: String? = null,
+    val financialAssetRef: String? = null,
+    val notes: String? = null
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

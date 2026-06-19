@@ -1550,16 +1550,27 @@ private fun AssetDetailScreen(
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     SectionHeader("المعلومات")
+                    asset.description?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    asset.assetType?.takeIf { it.isNotBlank() }?.let { InfoRow("النوع", it) }
                     InfoRow("المجموعة", asset.groupName)
+                    asset.category?.takeIf { it.isNotBlank() }?.let { InfoRow("الفئة", it) }
                     InfoRow("الموقع", asset.location)
                     InfoRow("الموقع الفني", locationLabel)
                     InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
                     InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                    asset.constructionType?.takeIf { it.isNotBlank() }?.let { InfoRow("نوع البناء", it) }
                     if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
                     if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
                     InfoRow("الأهمية", asset.criticality)
+                    asset.responsiblePerson?.takeIf { it.isNotBlank() }?.let { InfoRow("المسؤول", it) }
+                    asset.department?.takeIf { it.isNotBlank() }?.let { InfoRow("الإدارة المالكة", it) }
+                    asset.costCenter?.takeIf { it.isNotBlank() }?.let { InfoRow("مركز التكلفة", it) }
+                    asset.workCenter?.takeIf { it.isNotBlank() }?.let { InfoRow("مركز العمل", it) }
                     InfoRow("تاريخ التركيب", asset.installedAt)
+                    asset.commissioningDate?.takeIf { it.isNotBlank() }?.let { InfoRow("تاريخ التشغيل", it) }
+                    asset.financialAssetRef?.takeIf { it.isNotBlank() }?.let { InfoRow("المرجع المالي", it) }
                     InfoRow("آخر فحص", asset.lastInspectionAt)
+                    asset.notes?.takeIf { it.isNotBlank() }?.let { InfoRow("ملاحظات", it) }
                 }
             }
         }

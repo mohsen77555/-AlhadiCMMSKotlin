@@ -388,11 +388,29 @@ internal fun AssetFormSheet(
     var purchaseOrder by remember { mutableStateOf(initial?.purchaseOrder ?: "") }
     var purchaseCost by remember { mutableStateOf((initial?.purchaseCost ?: 0.0).toString()) }
     var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var assetType by remember { mutableStateOf(initial?.assetType ?: "Equipment") }
+    var category by remember { mutableStateOf(initial?.category ?: "") }
+    var costCenter by remember { mutableStateOf(initial?.costCenter ?: "") }
+    var workCenter by remember { mutableStateOf(initial?.workCenter ?: "") }
+    var department by remember { mutableStateOf(initial?.department ?: "") }
+    var responsiblePerson by remember { mutableStateOf(initial?.responsiblePerson ?: "") }
+    var commissioningDate by remember { mutableStateOf(initial?.commissioningDate ?: "") }
+    var constructionType by remember { mutableStateOf(initial?.constructionType ?: "") }
+    var financialAssetRef by remember { mutableStateOf(initial?.financialAssetRef ?: "") }
+    var notes by remember { mutableStateOf(initial?.notes ?: "") }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         LabeledField("الكود (Code)", code, { code = it })
         LabeledField("الاسم (Name)", name, { name = it })
+        LabeledField("الوصف", description, { description = it }, singleLine = false)
+        OptionDropdown(
+            "نوع الأصل",
+            listOf("Equipment", "Functional Location", "Linear Asset", "Tool Asset", "Safety Asset", "Utility Asset", "Production Asset", "Mobile Asset", "Serialized Component"),
+            assetType
+        ) { assetType = it }
         LabeledField("المجموعة (Group)", group, { group = it })
+        LabeledField("الفئة (Category)", category, { category = it })
         LabeledField("الموقع النصّي (Location)", location, { location = it })
         if (locations.isNotEmpty()) {
             LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
@@ -404,17 +422,26 @@ internal fun AssetFormSheet(
         LabeledField("الموديل (Model)", model, { model = it })
         OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
+        Text("التنظيم والمسؤولية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        LabeledField("المسؤول", responsiblePerson, { responsiblePerson = it })
+        LabeledField("الإدارة المالكة", department, { department = it })
+        LabeledField("مركز التكلفة", costCenter, { costCenter = it })
+        LabeledField("مركز العمل", workCenter, { workCenter = it })
         Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
         LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
+        LabeledField("نوع البناء (Construction Type)", constructionType, { constructionType = it })
         LabeledField("المورّد (Supplier)", supplier, { supplier = it })
         LabeledField("أمر الشراء (PO)", purchaseOrder, { purchaseOrder = it })
         LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
+        LabeledField("المرجع المالي للأصل", financialAssetRef, { financialAssetRef = it })
         DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
+        DateField("تاريخ التشغيل", commissioningDate) { commissioningDate = it }
         Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
         DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
         DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
+        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
         SaveButton(code.isNotBlank() && name.isNotBlank()) {
             val today = DateStrings.today()
             onSave(
@@ -440,7 +467,18 @@ internal fun AssetFormSheet(
                     supplier = supplier.trim(),
                     purchaseOrder = purchaseOrder.trim(),
                     purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
-                    acquiredAt = acquiredAt.trim()
+                    acquiredAt = acquiredAt.trim(),
+                    description = description.trim().ifBlank { null },
+                    assetType = assetType.ifBlank { null },
+                    category = category.trim().ifBlank { null },
+                    costCenter = costCenter.trim().ifBlank { null },
+                    workCenter = workCenter.trim().ifBlank { null },
+                    department = department.trim().ifBlank { null },
+                    responsiblePerson = responsiblePerson.trim().ifBlank { null },
+                    commissioningDate = commissioningDate.trim().ifBlank { null },
+                    constructionType = constructionType.trim().ifBlank { null },
+                    financialAssetRef = financialAssetRef.trim().ifBlank { null },
+                    notes = notes.trim().ifBlank { null }
                 )
             )
         }
