@@ -1,11 +1,12 @@
-name: App3 Assets Stage 3
+name: App3 Assets Stage 4
 
 on:
   push:
     branches: ["App3"]
     paths:
       - ".github/workflows/app3-assets-stage3.yml"
-      - "scripts/app3_assets_stage3.py"
+      - "scripts/app3_assets_stage4_data.py"
+      - "scripts/app3_assets_stage4_ui.py"
   workflow_dispatch:
 
 permissions:
@@ -39,8 +40,11 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Implement linear asset management
-        run: python3 scripts/app3_assets_stage3.py
+      - name: Implement component-list data model
+        run: python3 scripts/app3_assets_stage4_data.py
+
+      - name: Implement component-list user interface
+        run: python3 scripts/app3_assets_stage4_ui.py
 
       - name: Build App3 debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
@@ -58,12 +62,12 @@ jobs:
             exit 1
           fi
 
-          git commit -m "feat(assets): add linear asset management"
+          git commit -m "feat(assets): add structured maintenance component lists"
           git push origin HEAD:App3
 
       - name: Upload App3 APK
         uses: actions/upload-artifact@v4
         with:
-          name: App3-assets-stage3-debug-apk
+          name: App3-assets-stage4-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
