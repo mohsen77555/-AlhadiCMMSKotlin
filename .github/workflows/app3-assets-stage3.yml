@@ -1,15 +1,12 @@
-name: App3 Assets Stage 4
+name: App3 Assets Stage 5
 
 on:
   push:
     branches: ["App3"]
     paths:
       - ".github/workflows/app3-assets-stage3.yml"
-      - "scripts/app3_assets_stage4_data.py"
-      - "scripts/app3_assets_stage4_ui.py"
-      - "scripts/app3_assets_stage4_ui_fix.py"
-      - "scripts/app3_assets_stage4_ui_fix2.py"
-      - "scripts/app3_assets_stage4_ui_fix3.py"
+      - "scripts/app3_assets_stage5_data.py"
+      - "scripts/app3_assets_stage5_ui.py"
   workflow_dispatch:
 
 permissions:
@@ -43,86 +40,71 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Apply, verify and publish stage 4
+      - name: Apply, verify and publish stage 5
         shell: bash
         run: |
           set +e
-          python3 scripts/app3_assets_stage4_data.py > stage4-data.log 2>&1
+          python3 scripts/app3_assets_stage5_data.py > stage5-data.log 2>&1
           data_status=$?
 
           ui_status=99
           build_status=99
           if [ "$data_status" -eq 0 ]; then
-            python3 scripts/app3_assets_stage4_ui_fix.py > stage4-fix.log 2>&1
-            fix_status=$?
-            if [ "$fix_status" -eq 0 ]; then
-              python3 scripts/app3_assets_stage4_ui_fix2.py >> stage4-fix.log 2>&1
-              fix_status=$?
-            fi
-            if [ "$fix_status" -eq 0 ]; then
-              python3 scripts/app3_assets_stage4_ui_fix3.py >> stage4-fix.log 2>&1
-              fix_status=$?
-            fi
-            if [ "$fix_status" -eq 0 ]; then
-              python3 scripts/app3_assets_stage4_ui.py > stage4-ui.log 2>&1
-              ui_status=$?
-            else
-              cat stage4-fix.log > stage4-ui.log
-              ui_status=$fix_status
-            fi
+            python3 scripts/app3_assets_stage5_ui.py > stage5-ui.log 2>&1
+            ui_status=$?
           else
-            echo "UI patch was not started because the data patch failed." > stage4-ui.log
+            echo "UI patch was not started because the data patch failed." > stage5-ui.log
           fi
 
           if [ "$data_status" -eq 0 ] && [ "$ui_status" -eq 0 ]; then
-            gradle assembleDebug --no-daemon --stacktrace > stage4-build.log 2>&1
+            gradle assembleDebug --no-daemon --stacktrace > stage5-build.log 2>&1
             build_status=$?
           else
-            echo "Build was not started because a patch step failed." > stage4-build.log
+            echo "Build was not started because a patch step failed." > stage5-build.log
           fi
 
-          cat stage4-data.log
-          cat stage4-ui.log
-          tail -n 200 stage4-build.log
+          cat stage5-data.log
+          cat stage5-ui.log
+          tail -n 220 stage5-build.log
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           if [ "$data_status" -ne 0 ] || [ "$ui_status" -ne 0 ] || [ "$build_status" -ne 0 ]; then
             {
-              echo "Stage 4 diagnostics"
+              echo "Stage 5 diagnostics"
               echo "data_status=$data_status"
               echo "ui_status=$ui_status"
               echo "build_status=$build_status"
               echo
               echo "--- data patch ---"
-              tail -n 120 stage4-data.log
+              tail -n 160 stage5-data.log
               echo
               echo "--- UI patch ---"
-              tail -n 120 stage4-ui.log
+              tail -n 160 stage5-ui.log
               echo
               echo "--- build ---"
-              tail -n 220 stage4-build.log
-            } > stage4-status.txt
-            git add stage4-status.txt
-            git commit -m "chore(app3): record stage 4 diagnostics [skip ci]" || true
+              tail -n 260 stage5-build.log
+            } > stage5-status.txt
+            git add stage5-status.txt
+            git commit -m "chore(app3): record stage 5 diagnostics [skip ci]" || true
             git push origin HEAD:App3
             exit 1
           fi
 
-          rm -f stage4-data.log stage4-fix.log stage4-ui.log stage4-build.log
-          git rm -f stage4-status.txt 2>/dev/null || true
+          rm -f stage5-data.log stage5-ui.log stage5-build.log
+          git rm -f stage5-status.txt 2>/dev/null || true
           git add app/src/main app/schemas
           if git diff --cached --quiet; then
             echo "No application changes to commit"
             exit 1
           fi
-          git commit -m "feat(assets): add structured maintenance component lists"
+          git commit -m "feat(assets): add serial number management"
           git push origin HEAD:App3
 
       - name: Upload App3 APK
         uses: actions/upload-artifact@v4
         with:
-          name: App3-assets-stage4-debug-apk
+          name: App3-assets-stage5-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
