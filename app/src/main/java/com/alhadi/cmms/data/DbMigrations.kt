@@ -70,10 +70,26 @@ object DbMigrations {
         }
     }
 
+    /** v24 -> v25: adds the `suppliers` table. */
+    val MIGRATION_24_25 = object : Migration(24, 25) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `suppliers` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`contactPerson` TEXT NOT NULL, " +
+                    "`phone` TEXT NOT NULL, " +
+                    "`email` TEXT NOT NULL, " +
+                    "`address` TEXT NOT NULL, " +
+                    "`notes` TEXT NOT NULL)"
+            )
+        }
+    }
+
     /**
      * All migrations, in order. Append new `Migration` objects here as the schema evolves.
      */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24)
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

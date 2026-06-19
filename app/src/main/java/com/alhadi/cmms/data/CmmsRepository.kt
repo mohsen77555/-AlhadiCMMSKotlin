@@ -17,6 +17,7 @@ import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.TrashEntity
@@ -56,6 +57,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val permitDao = database.workPermitDao()
     private val trashDao = database.trashDao()
     private val purchaseOrderDao = database.purchaseOrderDao()
+    private val supplierDao = database.supplierDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -83,6 +85,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val workPermits: Flow<List<WorkPermitEntity>> = permitDao.observePermits()
     val trash: Flow<List<TrashEntity>> = trashDao.observeTrash()
     val purchaseOrders: Flow<List<PurchaseOrderEntity>> = purchaseOrderDao.observePurchaseOrders()
+    val suppliers: Flow<List<SupplierEntity>> = supplierDao.observeSuppliers()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -154,6 +157,7 @@ class CmmsRepository(private val database: AppDatabase) {
                 "Notification" -> notificationDao.insert(backupJson.decodeFromString(MaintenanceNotificationEntity.serializer(), item.payload))
                 "TaskList" -> taskListDao.insertTaskList(backupJson.decodeFromString(TaskListEntity.serializer(), item.payload))
                 "Purchase" -> purchaseOrderDao.insert(backupJson.decodeFromString(PurchaseOrderEntity.serializer(), item.payload))
+                "Supplier" -> supplierDao.insert(backupJson.decodeFromString(SupplierEntity.serializer(), item.payload))
             }
             trashDao.deleteById(item.id)
             recordAudit("Restore", item.entityType, "استرجاع: ${item.label}", actor)
@@ -208,7 +212,8 @@ class CmmsRepository(private val database: AppDatabase) {
             taskLists = taskLists.first(),
             taskListOperations = taskListOperations.first(),
             permits = workPermits.first(),
-            purchaseOrders = purchaseOrderDao.dumpAll()
+            purchaseOrders = purchaseOrderDao.dumpAll(),
+            suppliers = supplierDao.dumpAll()
         )
         return backupJson.encodeToString(BackupBundle.serializer(), bundle)
     }
@@ -221,6 +226,7 @@ class CmmsRepository(private val database: AppDatabase) {
         val bundle = backupJson.decodeFromString(BackupBundle.serializer(), content)
         database.withTransaction {
             // Clear everything first.
+            supplierDao.deleteAll()
             purchaseOrderDao.deleteAll()
             auditLogDao.deleteAll()
             permitDao.deleteAll()
@@ -270,6 +276,7 @@ class CmmsRepository(private val database: AppDatabase) {
             taskListDao.insertOperations(bundle.taskListOperations)
             permitDao.insertAll(bundle.permits)
             purchaseOrderDao.insertAll(bundle.purchaseOrders)
+            supplierDao.insertAll(bundle.suppliers)
 
             recordAudit("Import", "Backup", "تم استعادة نسخة احتياطية (${bundle.totalRecords} سجل)", "System")
         }
@@ -920,6 +927,22 @@ class CmmsRepository(private val database: AppDatabase) {
             ),
             actor
         )
+    }
+
+    // ---------------------------------------------------------------------
+    // CRUD — Suppliers
+    // ---------------------------------------------------------------------
+
+    suspend fun saveSupplier(supplier: SupplierEntity, actor: String = "System") {
+        val isNew = supplier.id == 0L
+        supplierDao.insert(supplier)
+        recordAudit(if (isNew) "Create" else "Update", "Supplier", "${if (isNew) "إضافة" else "تعديل"} مورّد: ${supplier.name}", actor)
+    }
+
+    suspend fun deleteSupplier(supplier: SupplierEntity, actor: String = "System") {
+        moveToTrash("Supplier", supplier.id, supplier.name, backupJson.encodeToString(SupplierEntity.serializer(), supplier), actor)
+        supplierDao.deleteById(supplier.id)
+        recordAudit("Delete", "Supplier", "حذف مورّد: ${supplier.name}", actor)
     }
 
     // ---------------------------------------------------------------------

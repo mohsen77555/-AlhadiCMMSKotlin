@@ -77,6 +77,7 @@ import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -1021,13 +1022,16 @@ internal fun PurchaseOrderFormSheet(
     initial: PurchaseOrderEntity?,
     parts: List<SparePartEntity>,
     workOrders: List<WorkOrderEntity>,
+    suppliers: List<SupplierEntity>,
     onDismiss: () -> Unit,
     onSave: (PurchaseOrderEntity) -> Unit
 ) {
     val noPart = "— بدون ربط بقطعة —"
     val noWo = "— بدون أمر عمل —"
+    val noSupplier = "— بدون مورّد —"
     val partOptions = remember(parts) { listOf(noPart) + parts.map { "${it.partNumber} — ${it.name}" } }
     val woOptions = remember(workOrders) { listOf(noWo) + workOrders.map { "#${it.id} ${it.title}" } }
+    val supplierOptions = remember(suppliers) { listOf(noSupplier) + suppliers.map { it.name } }
 
     var partLabel by remember {
         mutableStateOf(initial?.partId?.let { pid -> parts.firstOrNull { it.id == pid }?.let { "${it.partNumber} — ${it.name}" } } ?: noPart)
@@ -1036,6 +1040,7 @@ internal fun PurchaseOrderFormSheet(
     var quantity by remember { mutableStateOf((initial?.quantity ?: 1).toString()) }
     var unitPrice by remember { mutableStateOf((initial?.unitPrice ?: 0.0).toString()) }
     var supplier by remember { mutableStateOf(initial?.supplier ?: "") }
+    var supplierLabel by remember { mutableStateOf(if (!initial?.supplier.isNullOrBlank() && suppliers.any { it.name == initial?.supplier }) initial!!.supplier else noSupplier) }
     var neededBy by remember { mutableStateOf(initial?.neededBy ?: DateStrings.daysFromToday(7)) }
     var woLabel by remember {
         mutableStateOf(initial?.workOrderId?.let { id -> "#$id " + (workOrders.firstOrNull { it.id == id }?.title ?: "") } ?: noWo)
@@ -1052,6 +1057,12 @@ internal fun PurchaseOrderFormSheet(
         LabeledField("اسم الصنف", itemName, { itemName = it })
         LabeledField("الكمية", quantity, { quantity = it }, numeric = true)
         LabeledField("سعر الوحدة", unitPrice, { unitPrice = it }, numeric = true)
+        if (supplierOptions.size > 1) {
+            OptionDropdown("اختر مورّداً", supplierOptions, supplierLabel) { sel ->
+                supplierLabel = sel
+                supplier = if (sel == noSupplier) "" else sel
+            }
+        }
         LabeledField("المورّد", supplier, { supplier = it })
         DateField("مطلوب بحلول", neededBy) { neededBy = it }
         OptionDropdown("مرتبط بأمر عمل (اختياري)", woOptions, woLabel) { woLabel = it }
@@ -1077,6 +1088,46 @@ internal fun PurchaseOrderFormSheet(
                     createdAt = initial?.createdAt ?: "",
                     neededBy = neededBy,
                     receivedAt = initial?.receivedAt ?: "",
+                    notes = notes.trim()
+                )
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Supplier form
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun SupplierFormSheet(
+    initial: SupplierEntity?,
+    onDismiss: () -> Unit,
+    onSave: (SupplierEntity) -> Unit
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var contactPerson by remember { mutableStateOf(initial?.contactPerson ?: "") }
+    var phone by remember { mutableStateOf(initial?.phone ?: "") }
+    var email by remember { mutableStateOf(initial?.email ?: "") }
+    var address by remember { mutableStateOf(initial?.address ?: "") }
+    var notes by remember { mutableStateOf(initial?.notes ?: "") }
+
+    FormSheet(if (initial == null) "مورّد جديد" else "تعديل المورّد", onDismiss) {
+        LabeledField("اسم المورّد", name, { name = it })
+        LabeledField("مسؤول التواصل", contactPerson, { contactPerson = it })
+        LabeledField("الهاتف", phone, { phone = it })
+        LabeledField("البريد الإلكتروني", email, { email = it })
+        LabeledField("العنوان", address, { address = it })
+        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
+        SaveButton(name.isNotBlank()) {
+            onSave(
+                SupplierEntity(
+                    id = initial?.id ?: 0,
+                    name = name.trim(),
+                    contactPerson = contactPerson.trim(),
+                    phone = phone.trim(),
+                    email = email.trim(),
+                    address = address.trim(),
                     notes = notes.trim()
                 )
             )

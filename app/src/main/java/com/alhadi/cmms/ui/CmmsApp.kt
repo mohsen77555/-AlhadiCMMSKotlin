@@ -73,6 +73,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingDown
@@ -149,6 +150,7 @@ import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.TrashEntity
@@ -193,7 +195,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Procurement, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
+private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures, Trash }
 
 private fun roleKey(user: UserEntity?): String = user?.role?.lowercase(Locale.getDefault()) ?: ""
 
@@ -210,7 +212,7 @@ private fun allowedMoreRoute(user: UserEntity?, route: MoreRoute): Boolean = whe
     "admin" -> true
     "supervisor" -> route != MoreRoute.Admin
     "technician" -> route in setOf(MoreRoute.Notifications, MoreRoute.Meters, MoreRoute.TaskLists)
-    "storekeeper" -> route in setOf(MoreRoute.Inventory, MoreRoute.Procurement, MoreRoute.Notifications)
+    "storekeeper" -> route in setOf(MoreRoute.Inventory, MoreRoute.Procurement, MoreRoute.Suppliers, MoreRoute.Notifications)
     else -> false
 }
 
@@ -234,6 +236,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val auditLog by viewModel.auditLog.collectAsStateWithLifecycle()
     val trash by viewModel.trash.collectAsStateWithLifecycle()
     val purchaseOrders by viewModel.purchaseOrders.collectAsStateWithLifecycle()
+    val suppliers by viewModel.suppliers.collectAsStateWithLifecycle()
     val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
@@ -353,6 +356,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         parts = spareParts,
                         pmItems = preventiveMaintenance,
                         notifications = notifications,
+                        purchaseOrders = purchaseOrders,
                         onReports = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Reports },
                         onGovernance = { selectedTab = BottomTab.More; moreRoute = MoreRoute.Audit },
                         onOpenTab = { selectedTab = it; if (it != BottomTab.More) moreRoute = null },
@@ -371,6 +375,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         parts = spareParts,
                         transactions = transactions,
                         bom = assetBom,
+                        purchaseOrders = purchaseOrders,
                         canManage = canManage,
                         defaultAssignee = actorName,
                         onIssueMaterial = viewModel::issuePartToWorkOrder,
@@ -467,6 +472,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             innerPadding = innerPadding,
                             parts = spareParts,
                             transactions = transactions,
+                            purchaseOrders = purchaseOrders,
                             canReceive = canManageStore,
                             canManage = canManageStore,
                             onIssue = viewModel::issuePart,
@@ -489,10 +495,18 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             orders = purchaseOrders,
                             parts = spareParts,
                             workOrders = workOrders,
+                            suppliers = suppliers,
                             canManage = canManageStore,
                             onSave = viewModel::savePurchaseOrder,
                             onSetStatus = viewModel::setPurchaseOrderStatus,
                             onDelete = viewModel::deletePurchaseOrder
+                        )
+                        MoreRoute.Suppliers -> SuppliersScreen(
+                            innerPadding = innerPadding,
+                            suppliers = suppliers,
+                            canManage = canManageStore,
+                            onSave = viewModel::saveSupplier,
+                            onDelete = viewModel::deleteSupplier
                         )
                         MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
                         MoreRoute.Trash -> TrashScreen(
@@ -595,6 +609,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Notifications -> ScreenMeta("البلاغات", "بلاغات الصيانة وتحويلها لأوامر", Icons.Filled.NotificationsActive, AccentRed)
         MoreRoute.Inventory -> ScreenMeta("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple)
         MoreRoute.Procurement -> ScreenMeta("المشتريات", "طلبات الشراء واستلامها", Icons.Filled.ShoppingCart, AccentGreen)
+        MoreRoute.Suppliers -> ScreenMeta("الموردون", "إدارة الموردين", Icons.Filled.Store, AccentTeal)
         MoreRoute.Reports -> ScreenMeta("التقارير", "مؤشرات وتصدير وتحليلات", Icons.Filled.Analytics, AccentBlue)
         MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
         MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
@@ -863,6 +878,7 @@ private fun DashboardScreen(
     parts: List<SparePartEntity>,
     pmItems: List<PreventiveMaintenanceEntity>,
     notifications: List<MaintenanceNotificationEntity>,
+    purchaseOrders: List<PurchaseOrderEntity>,
     onReports: () -> Unit,
     onGovernance: () -> Unit,
     onOpenTab: (BottomTab) -> Unit,
@@ -969,9 +985,11 @@ private fun DashboardScreen(
         val openNotifications = notifications.filter {
             (it.status == "New" || it.status == "Screened") && (it.priority == "Critical" || it.priority == "High")
         }.take(4)
+        val pendingPurchases = purchaseOrders.filter { it.status == "Requested" || it.status == "Approved" || it.status == "Ordered" }.take(4)
 
         if (warningAssets.isEmpty() && lowStockParts.isEmpty() && duePm.isEmpty() &&
-            pendingApprovals.isEmpty() && expiringWarranty.isEmpty() && openNotifications.isEmpty()
+            pendingApprovals.isEmpty() && expiringWarranty.isEmpty() && openNotifications.isEmpty() &&
+            pendingPurchases.isEmpty()
         ) {
             item { CalmCard() }
         } else {
@@ -992,6 +1010,9 @@ private fun DashboardScreen(
             }
             items(expiringWarranty.take(4), key = { "w-${it.id}" }) { asset ->
                 AlertRow(Icons.Filled.Verified, AccentTeal, "${asset.code} • ${asset.name}", "ينتهي الضمان بتاريخ ${asset.warrantyEnd}", onClick = { onOpenTab(BottomTab.Assets) })
+            }
+            items(pendingPurchases, key = { "po-${it.id}" }) { po ->
+                AlertRow(Icons.Filled.ShoppingCart, AccentGreen, "${po.number} • ${po.itemName}", "طلب شراء ${purchaseStatusLabel(po.status)}", onClick = { onOpenMore(MoreRoute.Procurement) })
             }
         }
     }
@@ -1110,6 +1131,7 @@ private val ALL_MORE_MODULES = listOf(
     MoreModule(MoreRoute.Notifications, "البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed),
     MoreModule(MoreRoute.Inventory, "المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple),
     MoreModule(MoreRoute.Procurement, "المشتريات", "طلبات الشراء والاستلام", Icons.Filled.ShoppingCart, AccentGreen),
+    MoreModule(MoreRoute.Suppliers, "الموردون", "إدارة الموردين", Icons.Filled.Store, AccentTeal),
     MoreModule(MoreRoute.Reports, "التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue),
     MoreModule(MoreRoute.PreventiveMaintenance, "الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal),
     MoreModule(MoreRoute.TaskLists, "قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue),
@@ -2182,6 +2204,7 @@ private fun WorkOrdersScreen(
     parts: List<SparePartEntity>,
     transactions: List<InventoryTransactionEntity>,
     bom: List<AssetBomItemEntity>,
+    purchaseOrders: List<PurchaseOrderEntity>,
     canManage: Boolean,
     defaultAssignee: String,
     onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
@@ -2304,6 +2327,7 @@ private fun WorkOrdersScreen(
                     photos = photos.filter { it.orderId == workOrder.id },
                     permits = permits.filter { it.orderId == workOrder.id },
                     materials = transactions.filter { it.workOrderId == workOrder.id },
+                    linkedPurchases = purchaseOrders.filter { it.workOrderId == workOrder.id },
                     catalog = parts,
                     bomPartIds = bom.filter { it.assetId == workOrder.assetId }.map { it.partId }.toSet(),
                     partMap = partMap,
@@ -2356,6 +2380,7 @@ private fun WorkOrderCard(
     photos: List<WorkOrderPhotoEntity>,
     permits: List<WorkPermitEntity>,
     materials: List<InventoryTransactionEntity>,
+    linkedPurchases: List<PurchaseOrderEntity>,
     catalog: List<SparePartEntity>,
     bomPartIds: Set<Long>,
     partMap: Map<Long, SparePartEntity>,
@@ -2518,6 +2543,25 @@ private fun WorkOrderCard(
                         Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("صرف قطعة للأمر")
+                    }
+                }
+            }
+
+            if (linkedPurchases.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentGreen)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("طلبات الشراء المرتبطة (${linkedPurchases.size})", fontWeight = FontWeight.Medium)
+                }
+                linkedPurchases.forEach { po ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("×${po.quantity}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = AccentGreen)
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(po.number, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            Text(po.itemName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusBadge(purchaseStatusLabel(po.status), purchaseTone(po.status))
                     }
                 }
             }
@@ -3110,6 +3154,7 @@ private fun InventoryScreen(
     innerPadding: PaddingValues,
     parts: List<SparePartEntity>,
     transactions: List<InventoryTransactionEntity>,
+    purchaseOrders: List<PurchaseOrderEntity>,
     canReceive: Boolean,
     canManage: Boolean,
     onIssue: (SparePartEntity, Int) -> Unit,
@@ -3120,6 +3165,13 @@ private fun InventoryScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var lowStockOnly by rememberSaveable { mutableStateOf(false) }
+    // Quantity already requested/approved/ordered but not yet received, per part.
+    val onOrderByPart = remember(purchaseOrders) {
+        purchaseOrders
+            .filter { it.partId != null && (it.status == "Requested" || it.status == "Approved" || it.status == "Ordered") }
+            .groupBy { it.partId!! }
+            .mapValues { (_, list) -> list.sumOf { it.quantity } }
+    }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<SparePartEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<SparePartEntity?>(null) }
@@ -3190,6 +3242,7 @@ private fun InventoryScreen(
                 items(groupParts, key = { it.id }) { part ->
                     SparePartCard(
                         part = part,
+                        onOrderQty = onOrderByPart[part.id] ?: 0,
                         canReceive = canReceive,
                         canManage = canManage,
                         onIssue = onIssue,
@@ -3229,6 +3282,7 @@ private fun InventoryScreen(
 @Composable
 private fun SparePartCard(
     part: SparePartEntity,
+    onOrderQty: Int,
     canReceive: Boolean,
     canManage: Boolean,
     onIssue: (SparePartEntity, Int) -> Unit,
@@ -3258,6 +3312,12 @@ private fun SparePartCard(
             InfoRow("الموقع", part.location)
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
             InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))
+            if (onOrderQty > 0) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Filled.ShoppingCart, contentDescription = null, modifier = Modifier.size(14.dp), tint = AccentGreen)
+                    Text("قيد الشراء: $onOrderQty ${part.unit}", style = MaterialTheme.typography.labelMedium, color = AccentGreen, fontWeight = FontWeight.Bold)
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = { moveMode = "issue" }, enabled = part.onHandQty > 0, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -3549,11 +3609,72 @@ private fun ReportCard(title: String, lines: List<String>) {
 // ---------------------------------------------------------------------------
 
 @Composable
+private fun SuppliersScreen(
+    innerPadding: PaddingValues,
+    suppliers: List<SupplierEntity>,
+    canManage: Boolean,
+    onSave: (SupplierEntity) -> Unit,
+    onDelete: (SupplierEntity) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<SupplierEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<SupplierEntity?>(null) }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionHeader("الموردون (${suppliers.size})")
+            Text("سجّل الموردين لاختيارهم في طلبات الشراء.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (canManage) {
+            item { AddButton("مورّد جديد") { editing = null; showForm = true } }
+        }
+        if (suppliers.isEmpty()) {
+            item { EmptyState("لا يوجد موردون بعد", Icons.Filled.Store) }
+        }
+        items(suppliers, key = { it.id }) { supplier ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconBubble(Icons.Filled.Store, AccentTeal, AccentTeal.copy(alpha = 0.14f), 38)
+                        Text(supplier.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
+                    if (supplier.contactPerson.isNotBlank()) InfoRow("مسؤول التواصل", supplier.contactPerson)
+                    if (supplier.phone.isNotBlank()) InfoRow("الهاتف", supplier.phone)
+                    if (supplier.email.isNotBlank()) InfoRow("البريد", supplier.email)
+                    if (supplier.address.isNotBlank()) InfoRow("العنوان", supplier.address)
+                    if (supplier.notes.isNotBlank()) Text(supplier.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (canManage) EditDeleteRow({ editing = supplier; showForm = true }, { deleteTarget = supplier })
+                }
+            }
+        }
+    }
+
+    if (showForm) {
+        SupplierFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف المورّد",
+            text = "هل تريد حذف ${target.name}؟ (يمكن استرجاعه من سلة المحذوفات)",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
 private fun ProcurementScreen(
     innerPadding: PaddingValues,
     orders: List<PurchaseOrderEntity>,
     parts: List<SparePartEntity>,
     workOrders: List<WorkOrderEntity>,
+    suppliers: List<SupplierEntity>,
     canManage: Boolean,
     onSave: (PurchaseOrderEntity) -> Unit,
     onSetStatus: (PurchaseOrderEntity, String) -> Unit,
@@ -3613,6 +3734,7 @@ private fun ProcurementScreen(
             initial = editing,
             parts = parts,
             workOrders = workOrders,
+            suppliers = suppliers,
             onDismiss = { showForm = false },
             onSave = { onSave(it); showForm = false }
         )

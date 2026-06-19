@@ -22,6 +22,7 @@ import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.TrashEntity
@@ -118,6 +119,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val purchaseOrders: StateFlow<List<PurchaseOrderEntity>> = repository.purchaseOrders
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val suppliers: StateFlow<List<SupplierEntity>> = repository.suppliers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val measuringPoints: StateFlow<List<MeasuringPointEntity>> = repository.measuringPoints
@@ -502,6 +506,8 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun setPurchaseOrderStatus(order: PurchaseOrderEntity, status: String) = launchAction("تم تحديث طلب الشراء") { repository.setPurchaseOrderStatus(order, status, actor()) }
     fun deletePurchaseOrder(order: PurchaseOrderEntity) = launchAction("تم حذف طلب الشراء") { repository.deletePurchaseOrder(order, actor()) }
     fun createReorderForPart(part: SparePartEntity) = launchAction("تم إنشاء طلب شراء للمخزون") { repository.createReorderForPart(part, actor()) }
+    fun saveSupplier(supplier: SupplierEntity) = launchAction("تم حفظ المورّد") { repository.saveSupplier(supplier, actor()) }
+    fun deleteSupplier(supplier: SupplierEntity) = launchAction("تم حذف المورّد") { repository.deleteSupplier(supplier, actor()) }
 
     fun restoreTrash(item: TrashEntity) = launchAction("تم استرجاع العنصر") { repository.restoreTrash(item, actor()) }
     fun purgeTrash(item: TrashEntity) = launchAction("تم الحذف نهائياً") { repository.purgeTrash(item, actor()) }

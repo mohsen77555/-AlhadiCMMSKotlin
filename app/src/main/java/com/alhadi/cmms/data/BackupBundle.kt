@@ -16,6 +16,7 @@ import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -60,7 +61,8 @@ data class BackupBundle(
     val taskLists: List<TaskListEntity> = emptyList(),
     val taskListOperations: List<TaskListOperationEntity> = emptyList(),
     val permits: List<WorkPermitEntity> = emptyList(),
-    val purchaseOrders: List<PurchaseOrderEntity> = emptyList()
+    val purchaseOrders: List<PurchaseOrderEntity> = emptyList(),
+    val suppliers: List<SupplierEntity> = emptyList()
 ) {
     /** Total number of records across all tables — handy for a restore summary. */
     val totalRecords: Int
@@ -69,7 +71,7 @@ data class BackupBundle(
             measurementReadings.size + functionalLocations.size + capa.size + assetDocuments.size +
             assetCharacteristics.size + assetBom.size + assetMovements.size + pmChecklist.size +
             notifications.size + operations.size + confirmations.size + photos.size +
-            taskLists.size + taskListOperations.size + permits.size + purchaseOrders.size
+            taskLists.size + taskListOperations.size + permits.size + purchaseOrders.size + suppliers.size
 
     companion object {
         const val CURRENT_FORMAT_VERSION = 1
