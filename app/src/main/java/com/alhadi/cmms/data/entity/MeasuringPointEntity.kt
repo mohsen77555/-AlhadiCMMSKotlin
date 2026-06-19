@@ -1,18 +1,14 @@
 package com.alhadi.cmms.data.entity
 
-import kotlinx.serialization.Serializable
-
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
-/**
- * A measuring point on an asset (running hours, temperature, vibration, pressure...).
- * Either a cumulative counter or a plain reading, with an optional upper alarm limit.
- */
 @Entity(
     tableName = "measuring_points",
-    indices = [Index(value = ["assetId"])]
+    indices = [Index(value = ["assetId"]), Index(value = ["pointCode"], unique = true)]
 )
 @Serializable
 data class MeasuringPointEntity(
@@ -24,5 +20,21 @@ data class MeasuringPointEntity(
     val isCounter: Boolean,
     val upperLimit: Double?,
     val lastReading: Double,
-    val lastReadingAt: String
+    val lastReadingAt: String,
+    @ColumnInfo(defaultValue = "''")
+    val pointCode: String = "",
+    @ColumnInfo(defaultValue = "'Measurement'")
+    val measurementType: String = "Measurement",
+    val lowerLimit: Double? = null,
+    val lowerWarningLimit: Double? = null,
+    val upperWarningLimit: Double? = null,
+    @ColumnInfo(defaultValue = "'Active'")
+    val status: String = "Active",
+    val functionalLocationId: Long? = null,
+    @ColumnInfo(defaultValue = "'Manual'")
+    val sourceType: String = "Manual",
+    @ColumnInfo(defaultValue = "''")
+    val meterSerial: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val createdAt: String = ""
 )
