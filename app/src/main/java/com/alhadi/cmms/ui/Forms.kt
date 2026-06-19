@@ -131,8 +131,10 @@ internal fun orgAncestorName(units: List<OrgUnitEntity>, start: OrgUnitEntity?, 
 internal fun roleLabelAr(role: String): String = when (role.lowercase(Locale.getDefault())) {
     "admin" -> "مدير"
     "supervisor" -> "مشرف"
+    "planner" -> "مخطط"
     "technician" -> "فني"
     "storekeeper" -> "أمين مخزن"
+    "viewer" -> "مطّلع"
     else -> role
 }
 
@@ -1619,7 +1621,7 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
     FormSheet(if (initial == null) "إضافة مستخدم" else "تعديل المستخدم", onDismiss) {
         LabeledField("الاسم", name, { name = it })
         LabeledField("اسم المستخدم", username, { username = it })
-        OptionDropdown("الدور", listOf("Admin", "Supervisor", "Technician", "Storekeeper"), role, display = { roleLabelAr(it) }) { role = it }
+        OptionDropdown("الدور", listOf("Admin", "Supervisor", "Planner", "Technician", "Storekeeper", "Viewer"), role, display = { roleLabelAr(it) }) { role = it }
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },

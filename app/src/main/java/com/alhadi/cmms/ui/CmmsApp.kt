@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -203,24 +204,28 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Costs, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, OrgUnits, OrgReports, Capa, Failures, Trash }
+private enum class MoreRoute { Notifications, Inventory, Procurement, Suppliers, Costs, Reports, Audit, Admin, Roles, PreventiveMaintenance, TaskLists, Meters, Locations, OrgUnits, OrgReports, Capa, Failures, Trash }
 
 private fun roleKey(user: UserEntity?): String = user?.role?.lowercase(Locale.getDefault()) ?: ""
 
 /** Bottom tabs each role may see. "More" is always present (it hosts logout). */
 private fun allowedTabsFor(user: UserEntity?): Set<BottomTab> = when (roleKey(user)) {
     "admin", "supervisor" -> BottomTab.entries.toSet()
+    "planner" -> setOf(BottomTab.Home, BottomTab.WorkOrders, BottomTab.Supervision, BottomTab.Assets, BottomTab.More)
     "technician" -> setOf(BottomTab.Home, BottomTab.WorkOrders, BottomTab.Supervision, BottomTab.Assets, BottomTab.More)
     "storekeeper" -> setOf(BottomTab.Home, BottomTab.Assets, BottomTab.More)
+    "viewer" -> setOf(BottomTab.Home, BottomTab.Assets, BottomTab.More)
     else -> setOf(BottomTab.Home, BottomTab.More)
 }
 
-/** Whether a role may open a given "More" module. */
+/** Whether a role may open a given "More" module. ([MoreRoute.Roles] is admin-only.) */
 private fun allowedMoreRoute(user: UserEntity?, route: MoreRoute): Boolean = when (roleKey(user)) {
     "admin" -> true
-    "supervisor" -> route != MoreRoute.Admin
+    "supervisor" -> route != MoreRoute.Admin && route != MoreRoute.Roles
+    "planner" -> route in setOf(MoreRoute.PreventiveMaintenance, MoreRoute.TaskLists, MoreRoute.Notifications, MoreRoute.Meters, MoreRoute.Reports, MoreRoute.Costs, MoreRoute.OrgReports, MoreRoute.Capa, MoreRoute.Failures, MoreRoute.Locations, MoreRoute.OrgUnits)
     "technician" -> route in setOf(MoreRoute.Notifications, MoreRoute.Meters, MoreRoute.TaskLists)
     "storekeeper" -> route in setOf(MoreRoute.Inventory, MoreRoute.Procurement, MoreRoute.Suppliers, MoreRoute.Notifications)
+    "viewer" -> route in setOf(MoreRoute.Reports, MoreRoute.Costs, MoreRoute.OrgReports)
     else -> false
 }
 
@@ -570,6 +575,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             workOrders = workOrders,
                             orgUnits = orgUnits
                         )
+                        MoreRoute.Roles -> RolesScreen(innerPadding = innerPadding, users = users)
                         MoreRoute.Capa -> CapaScreen(
                             innerPadding = innerPadding,
                             items = capaActions,
@@ -648,6 +654,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.Reports -> ScreenMeta("التقارير", "مؤشرات وتصدير وتحليلات", Icons.Filled.Analytics, AccentBlue)
         MoreRoute.Audit -> ScreenMeta("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentRed)
         MoreRoute.Admin -> ScreenMeta("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
+        MoreRoute.Roles -> ScreenMeta("الأدوار والصلاحيات", "مصفوفة RBAC لكل دور", Icons.Filled.AdminPanelSettings, AccentTeal)
         MoreRoute.PreventiveMaintenance -> ScreenMeta("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal)
         MoreRoute.TaskLists -> ScreenMeta("قوالب العمل", "قوالب العمليات للخطط الوقائية", Icons.AutoMirrored.Filled.List, AccentBlue)
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
@@ -1181,7 +1188,8 @@ private val ALL_MORE_MODULES = listOf(
     MoreModule(MoreRoute.Failures, "تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed),
     MoreModule(MoreRoute.Audit, "سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy),
     MoreModule(MoreRoute.Trash, "سلة المحذوفات", "استرجاع أو حذف نهائي", Icons.Filled.Delete, AccentBrown),
-    MoreModule(MoreRoute.Admin, "الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange)
+    MoreModule(MoreRoute.Admin, "الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange),
+    MoreModule(MoreRoute.Roles, "الأدوار والصلاحيات", "مصفوفة RBAC", Icons.Filled.AdminPanelSettings, AccentTeal)
 )
 
 @Composable
@@ -4849,6 +4857,72 @@ private fun OrgUnitCard(
                 StatusBadge("فرعية: $childCount", statusTone("neutral"))
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+private val RBAC_ROLES = listOf("Admin", "Supervisor", "Planner", "Technician", "Storekeeper", "Viewer")
+
+private data class RbacCapability(val label: String, val roles: Set<String>)
+
+/** Capability matrix reflecting the actual enforcement gates (governance RBAC). */
+private val RBAC_MATRIX = listOf(
+    RbacCapability("الإدارة العامة (أصول/أوامر/وقائية/مواقع)", setOf("Admin", "Supervisor", "Planner")),
+    RbacCapability("المخزون والمشتريات", setOf("Admin", "Supervisor", "Planner", "Storekeeper")),
+    RbacCapability("التقارير والتكاليف", setOf("Admin", "Supervisor", "Planner", "Viewer")),
+    RbacCapability("البلاغات", setOf("Admin", "Supervisor", "Planner", "Technician", "Storekeeper")),
+    RbacCapability("القياسات والعدّادات", setOf("Admin", "Supervisor", "Planner", "Technician")),
+    RbacCapability("إدارة المستخدمين والنظام", setOf("Admin"))
+)
+
+@Composable
+private fun RolesScreen(innerPadding: PaddingValues, users: List<UserEntity>) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SectionHeader("مصفوفة الأدوار والصلاحيات")
+            Text("ما يستطيع كل دور فعله في النظام (RBAC).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(12.dp).horizontalScroll(rememberScrollState())) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("الصلاحية", modifier = Modifier.width(190.dp), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                        RBAC_ROLES.forEach { r ->
+                            Text(roleLabelAr(r), modifier = Modifier.width(64.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                    RBAC_MATRIX.forEach { cap ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(cap.label, modifier = Modifier.width(190.dp), style = MaterialTheme.typography.bodySmall)
+                            RBAC_ROLES.forEach { r ->
+                                val ok = r in cap.roles
+                                Text(
+                                    if (ok) "✓" else "—",
+                                    modifier = Modifier.width(64.dp),
+                                    textAlign = TextAlign.Center,
+                                    color = if (ok) AccentGreen else MaterialTheme.colorScheme.outline,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        item { SectionHeader("المستخدمون حسب الدور") }
+        items(RBAC_ROLES, key = { it }) { r ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    StatusBadge(roleLabelAr(r), statusTone("info"))
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text("${users.count { it.role.equals(r, ignoreCase = true) }} مستخدم", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
 }

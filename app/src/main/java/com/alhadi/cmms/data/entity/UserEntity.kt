@@ -26,9 +26,12 @@ data class UserEntity(
     val isSupervisor: Boolean
         get() = role.equals("Supervisor", ignoreCase = true)
 
-    /** Admins and supervisors may create work orders and manage inventory / PM. */
+    val isPlanner: Boolean
+        get() = role.equals("Planner", ignoreCase = true)
+
+    /** Admins, supervisors and planners may create work orders and manage assets / PM. */
     val canManage: Boolean
-        get() = isAdmin || isSupervisor
+        get() = isAdmin || isSupervisor || isPlanner
 
     val initials: String
         get() = name.trim()
