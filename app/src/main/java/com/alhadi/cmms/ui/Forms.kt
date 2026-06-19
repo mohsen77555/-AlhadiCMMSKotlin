@@ -408,6 +408,12 @@ internal fun AssetFormSheet(
     var constructionType by remember { mutableStateOf(initial?.constructionType ?: "") }
     var financialAssetRef by remember { mutableStateOf(initial?.financialAssetRef ?: "") }
     var notes by remember { mutableStateOf(initial?.notes ?: "") }
+    var company by remember { mutableStateOf(initial?.company ?: "") }
+    var site by remember { mutableStateOf(initial?.site ?: "") }
+    var plant by remember { mutableStateOf(initial?.plant ?: "") }
+    var maintenancePlant by remember { mutableStateOf(initial?.maintenancePlant ?: "") }
+    var planningPlant by remember { mutableStateOf(initial?.planningPlant ?: "") }
+    var plannerGroup by remember { mutableStateOf(initial?.plannerGroup ?: "") }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         LabeledField("الكود (Code)", code, { code = it })
@@ -441,6 +447,13 @@ internal fun AssetFormSheet(
         LabeledField("الإدارة المالكة", department, { department = it })
         LabeledField("مركز التكلفة", costCenter, { costCenter = it })
         LabeledField("مركز العمل", workCenter, { workCenter = it })
+        LabeledField("مجموعة المخطط (Planner Group)", plannerGroup, { plannerGroup = it })
+        Text("هيكل المؤسسة (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        LabeledField("الشركة (Company)", company, { company = it })
+        LabeledField("الموقع/الفرع (Site)", site, { site = it })
+        LabeledField("المصنع (Plant)", plant, { plant = it })
+        LabeledField("مصنع الصيانة (Maintenance Plant)", maintenancePlant, { maintenancePlant = it })
+        LabeledField("مصنع التخطيط (Planning Plant)", planningPlant, { planningPlant = it })
         Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
         LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
@@ -492,7 +505,13 @@ internal fun AssetFormSheet(
                     commissioningDate = commissioningDate.trim().ifBlank { null },
                     constructionType = constructionType.trim().ifBlank { null },
                     financialAssetRef = financialAssetRef.trim().ifBlank { null },
-                    notes = notes.trim().ifBlank { null }
+                    notes = notes.trim().ifBlank { null },
+                    company = company.trim().ifBlank { null },
+                    site = site.trim().ifBlank { null },
+                    plant = plant.trim().ifBlank { null },
+                    maintenancePlant = maintenancePlant.trim().ifBlank { null },
+                    planningPlant = planningPlant.trim().ifBlank { null },
+                    plannerGroup = plannerGroup.trim().ifBlank { null }
                 )
             )
         }

@@ -84,7 +84,7 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         PurchaseOrderEntity::class,
         SupplierEntity::class
     ],
-    version = 26,
+    version = 27,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -46,7 +46,14 @@ data class AssetEntity(
     val commissioningDate: String? = null,
     val constructionType: String? = null,
     val financialAssetRef: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    // Governance §5 enterprise organization hierarchy (nullable for safe schema migration).
+    val company: String? = null,
+    val site: String? = null,
+    val plant: String? = null,
+    val maintenancePlant: String? = null,
+    val planningPlant: String? = null,
+    val plannerGroup: String? = null
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

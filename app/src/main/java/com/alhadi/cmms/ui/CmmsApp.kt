@@ -1566,6 +1566,12 @@ private fun AssetDetailScreen(
                     asset.department?.takeIf { it.isNotBlank() }?.let { InfoRow("الإدارة المالكة", it) }
                     asset.costCenter?.takeIf { it.isNotBlank() }?.let { InfoRow("مركز التكلفة", it) }
                     asset.workCenter?.takeIf { it.isNotBlank() }?.let { InfoRow("مركز العمل", it) }
+                    asset.plannerGroup?.takeIf { it.isNotBlank() }?.let { InfoRow("مجموعة المخطط", it) }
+                    asset.company?.takeIf { it.isNotBlank() }?.let { InfoRow("الشركة", it) }
+                    asset.site?.takeIf { it.isNotBlank() }?.let { InfoRow("الموقع/الفرع", it) }
+                    asset.plant?.takeIf { it.isNotBlank() }?.let { InfoRow("المصنع", it) }
+                    asset.maintenancePlant?.takeIf { it.isNotBlank() }?.let { InfoRow("مصنع الصيانة", it) }
+                    asset.planningPlant?.takeIf { it.isNotBlank() }?.let { InfoRow("مصنع التخطيط", it) }
                     InfoRow("تاريخ التركيب", asset.installedAt)
                     asset.commissioningDate?.takeIf { it.isNotBlank() }?.let { InfoRow("تاريخ التشغيل", it) }
                     asset.financialAssetRef?.takeIf { it.isNotBlank() }?.let { InfoRow("المرجع المالي", it) }
