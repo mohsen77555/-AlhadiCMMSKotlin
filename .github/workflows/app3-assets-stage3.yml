@@ -7,6 +7,7 @@ on:
       - ".github/workflows/app3-assets-stage3.yml"
       - "scripts/app3_assets_stage4_data.py"
       - "scripts/app3_assets_stage4_ui.py"
+      - "scripts/app3_assets_stage4_ui_fix.py"
   workflow_dispatch:
 
 permissions:
@@ -50,8 +51,15 @@ jobs:
           ui_status=99
           build_status=99
           if [ "$data_status" -eq 0 ]; then
-            python3 scripts/app3_assets_stage4_ui.py > stage4-ui.log 2>&1
-            ui_status=$?
+            python3 scripts/app3_assets_stage4_ui_fix.py > stage4-fix.log 2>&1
+            fix_status=$?
+            if [ "$fix_status" -eq 0 ]; then
+              python3 scripts/app3_assets_stage4_ui.py > stage4-ui.log 2>&1
+              ui_status=$?
+            else
+              cat stage4-fix.log > stage4-ui.log
+              ui_status=$fix_status
+            fi
           else
             echo "UI patch was not started because the data patch failed." > stage4-ui.log
           fi
@@ -92,7 +100,8 @@ jobs:
             exit 1
           fi
 
-          rm -f stage4-status.txt stage4-data.log stage4-ui.log stage4-build.log
+          rm -f stage4-data.log stage4-fix.log stage4-ui.log stage4-build.log
+          git rm -f stage4-status.txt 2>/dev/null || true
           git add app/src/main app/schemas
           if git diff --cached --quiet; then
             echo "No application changes to commit"
