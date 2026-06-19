@@ -164,7 +164,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "alhadi_cmms.db"
                 )
-                    .addMigrations(*DbMigrations.ALL)
+                    .addMigrations(*DbMigrations.ALL, DbMigration28.MIGRATION_27_28)
                     .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .build()
                 INSTANCE = instance
