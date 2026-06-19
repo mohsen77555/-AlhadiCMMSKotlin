@@ -1,18 +1,17 @@
 package com.alhadi.cmms.data.entity
 
-import kotlinx.serialization.Serializable
-
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
- * A flexible technical characteristic (key/value) describing an asset —
- * e.g. Flow=120 m3/h, Power=37 kW, Voltage=400 V.
+ * A governed technical characteristic describing an asset.
  */
 @Entity(
     tableName = "asset_characteristics",
-    indices = [Index(value = ["assetId"])]
+    indices = [Index(value = ["assetId"]), Index(value = ["characteristicCode"])]
 )
 @Serializable
 data class AssetCharacteristicEntity(
@@ -21,5 +20,21 @@ data class AssetCharacteristicEntity(
     val assetId: Long,
     val name: String,
     val value: String,
-    val unit: String
+    val unit: String,
+    @ColumnInfo(defaultValue = "''")
+    val characteristicCode: String = "",
+    @ColumnInfo(defaultValue = "'Text'")
+    val dataType: String = "Text",
+    @ColumnInfo(defaultValue = "0")
+    val isRequired: Boolean = false,
+    @ColumnInfo(defaultValue = "''")
+    val allowedValues: String = "",
+    @ColumnInfo(defaultValue = "'Manual'")
+    val source: String = "Manual",
+    @ColumnInfo(defaultValue = "0")
+    val isInherited: Boolean = false,
+    @ColumnInfo(defaultValue = "''")
+    val changedAt: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val changedBy: String = ""
 )
