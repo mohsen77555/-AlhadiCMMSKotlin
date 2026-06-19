@@ -103,4 +103,15 @@ replace_once(
     "bootstrap transaction",
 )
 
-print("Backend stage 1 compilation and bootstrap fixes applied.")
+# PostgreSQL cannot infer the SQL type of java.time.Instant through setObject.
+replace_once(
+    "backend/src/main/kotlin/com/alhadi/cmms/backend/auth/AuthRepository.kt",
+    '''                statement.setObject(4, expiresAt)''',
+    '''                statement.setObject(
+                    4,
+                    java.time.OffsetDateTime.ofInstant(expiresAt, java.time.ZoneOffset.UTC)
+                )''',
+    "refresh token expiry binding",
+)
+
+print("Backend stage 1 compilation, bootstrap and timestamp fixes applied.")
