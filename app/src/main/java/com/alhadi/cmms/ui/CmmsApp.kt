@@ -378,6 +378,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         characteristics = assetCharacteristics,
                         bomItems = assetBom,
                         movements = assetMovements,
+                        measuringPoints = measuringPoints,
+                        notifications = notifications,
+                        auditLog = auditLog,
                         spareParts = spareParts,
                         canManage = canManage,
                         defaultAssignee = actorName,
@@ -1173,6 +1176,9 @@ private fun AssetsScreen(
     characteristics: List<AssetCharacteristicEntity>,
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
+    measuringPoints: List<MeasuringPointEntity>,
+    notifications: List<MaintenanceNotificationEntity>,
+    auditLog: List<AuditLogEntity>,
     spareParts: List<SparePartEntity>,
     canManage: Boolean,
     defaultAssignee: String,
@@ -1194,6 +1200,8 @@ private fun AssetsScreen(
     var editing by remember { mutableStateOf<AssetEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<AssetEntity?>(null) }
     var detailId by remember { mutableStateOf<Long?>(null) }
+    var statusFilter by rememberSaveable { mutableStateOf("All") }
+    var criticalityFilter by rememberSaveable { mutableStateOf("All") }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val raw = result.contents
@@ -1227,6 +1235,9 @@ private fun AssetsScreen(
             characteristics = characteristics.filter { it.assetId == detailAsset.id },
             bomItems = bomItems.filter { it.assetId == detailAsset.id },
             movements = movements.filter { it.assetId == detailAsset.id },
+            measuringPoints = measuringPoints.filter { it.assetId == detailAsset.id },
+            notifications = notifications.filter { it.assetId == detailAsset.id },
+            auditLog = auditLog.filter { it.entityType == "Asset" && (it.details.contains(detailAsset.code) || it.details.contains(detailAsset.name)) },
             spareParts = spareParts,
             locations = locations,
             canManage = canManage,
@@ -1248,16 +1259,42 @@ private fun AssetsScreen(
         return
     }
 
-    val filtered = remember(query, assets) {
-        if (query.isBlank()) assets else assets.filter { asset ->
+    val statusOptions = remember(assets) {
+        listOf("All") + assets.map { it.status }.filter { it.isNotBlank() }.distinct().sorted()
+    }
+    val criticalityOptions = remember(assets) {
+        listOf("All") + assets.map { it.criticality }.filter { it.isNotBlank() }.distinct().sorted()
+    }
+    val filtered = remember(query, statusFilter, criticalityFilter, assets) {
+        assets.filter { asset ->
             val q = query.lowercase(Locale.getDefault())
-            asset.code.lowercase(Locale.getDefault()).contains(q) ||
+            val matchesQuery = query.isBlank() ||
+                asset.code.lowercase(Locale.getDefault()).contains(q) ||
                 asset.name.lowercase(Locale.getDefault()).contains(q) ||
                 asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
                 asset.location.lowercase(Locale.getDefault()).contains(q) ||
                 asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
-                asset.assetTag.lowercase(Locale.getDefault()).contains(q)
-        }
+                asset.assetTag.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetType.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetCategory.lowercase(Locale.getDefault()).contains(q) ||
+                asset.equipmentCategory.lowercase(Locale.getDefault()).contains(q) ||
+                asset.objectType.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetClass.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetSubclass.lowercase(Locale.getDefault()).contains(q) ||
+                asset.alternativeLabel.lowercase(Locale.getDefault()).contains(q) ||
+                asset.externalAssetCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.legacyAssetCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.barcode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.qrCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.model.lowercase(Locale.getDefault()).contains(q) ||
+                asset.responsiblePersonId.lowercase(Locale.getDefault()).contains(q) ||
+                asset.workCenterId.lowercase(Locale.getDefault()).contains(q) ||
+                asset.costCenterId.lowercase(Locale.getDefault()).contains(q) ||
+                asset.financialAssetRef.lowercase(Locale.getDefault()).contains(q)
+            val matchesStatus = statusFilter == "All" || asset.status == statusFilter
+            val matchesCriticality = criticalityFilter == "All" || asset.criticality == criticalityFilter
+            matchesQuery && matchesStatus && matchesCriticality
+        }.sortedWith(compareBy<AssetEntity> { it.groupName }.thenBy { it.code })
     }
     val grouped = filtered.groupBy { it.groupName }
 
@@ -1271,9 +1308,9 @@ private fun AssetsScreen(
         ) {
             if (query.isBlank() && assets.isNotEmpty()) {
                 item {
-                    val running = assets.count { it.status == "Running" }
-                    val stopped = assets.count { it.status == "Stopped" || it.status == "Retired" }
-                    val warning = assets.count { it.status == "Warning" || it.status == "Under Maintenance" }
+                    val running = assets.count { it.status == "Running" || it.status == "Active" }
+                    val stopped = assets.count { it.status in listOf("Stopped", "Retired", "Disposed", "Inactive", "Out of Service", "Breakdown") }
+                    val warning = assets.count { it.status in listOf("Warning", "Under Maintenance", "Standby", "In Storage", "Sent to Vendor", "Refurbishment") }
                     val other = assets.size - running - stopped - warning
                     val seg = listOf(
                         ChartSegment("تعمل", running, AccentGreen),
@@ -1292,10 +1329,45 @@ private fun AssetsScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.weight(1f)) {
-                        SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill")
+                        SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill أو الموقع")
                     }
                     FilledTonalIconButton(onClick = { launchScan() }) {
                         Icon(Icons.Filled.QrCodeScanner, contentDescription = "مسح رمز الأصل")
+                    }
+                }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssetFilterChips(
+                        title = "الحالة",
+                        options = statusOptions,
+                        selected = statusFilter,
+                        allLabel = "الكل",
+                        onSelect = { statusFilter = it }
+                    )
+                    AssetFilterChips(
+                        title = "الأهمية",
+                        options = criticalityOptions,
+                        selected = criticalityFilter,
+                        allLabel = "كل الأهميات",
+                        onSelect = { criticalityFilter = it }
+                    )
+                }
+            }
+            if (query.isNotBlank() || statusFilter != "All" || criticalityFilter != "All") {
+                item {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "النتائج: ${filtered.size} من ${assets.size}",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = {
+                            query = ""
+                            statusFilter = "All"
+                            criticalityFilter = "All"
+                        }) { Text("مسح الفلاتر") }
                     }
                 }
             }
@@ -1363,8 +1435,139 @@ private fun AssetCard(
                 StatusBadge(asset.criticality, priorityTone(asset.criticality))
                 AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
             }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (asset.lastInspectionAt.isNotBlank()) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("آخر فحص: ${asset.lastInspectionAt}", maxLines = 1) },
+                        leadingIcon = { Icon(Icons.Filled.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+                if (asset.warrantyEnd.isNotBlank()) {
+                    val warrantyTone = statusTone(if (asset.isUnderWarranty(DateStrings.today())) "running" else "stopped")
+                    StatusBadge("الضمان: ${asset.warrantyEnd}", warrantyTone)
+                }
+            }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
+    }
+}
+
+@Composable
+private fun AssetFilterChips(
+    title: String,
+    options: List<String>,
+    selected: String,
+    allLabel: String,
+    onSelect: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        options.forEach { option ->
+            FilterChip(
+                selected = selected == option,
+                onClick = { onSelect(option) },
+                label = { Text(if (option == "All") allLabel else option, maxLines = 1) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AssetGovernanceCard(
+    asset: AssetEntity,
+    workOrders: List<WorkOrderEntity>,
+    pmItems: List<PreventiveMaintenanceEntity>,
+    documents: List<AssetDocumentEntity>,
+    characteristics: List<AssetCharacteristicEntity>,
+    bomItems: List<AssetBomItemEntity>,
+    movements: List<AssetMovementEntity>,
+    measuringPoints: List<MeasuringPointEntity>,
+    notifications: List<MaintenanceNotificationEntity>,
+    auditLog: List<AuditLogEntity>,
+    hasLocation: Boolean
+) {
+    val critical = asset.criticality.equals("Critical", ignoreCase = true) || asset.criticality.equals("High", ignoreCase = true)
+    val checks = listOf(
+        "تعريف فريد" to asset.code.isNotBlank(),
+        "نوع وفئة" to (asset.assetType.isNotBlank() && asset.assetCategory.isNotBlank()),
+        "تصنيف وهوية" to (asset.objectType.isNotBlank() || asset.assetClass.isNotBlank() || asset.assetSubclass.isNotBlank()),
+        "موقع واضح" to hasLocation,
+        "حالة تشغيلية" to asset.status.isNotBlank(),
+        "أهمية محددة" to asset.criticality.isNotBlank(),
+        "تنظيم ومسؤولية" to (asset.workCenterId.isNotBlank() || asset.responsiblePersonId.isNotBlank() || asset.departmentId.isNotBlank()),
+        "بيانات مصنّع/موديل" to (asset.manufacturer.isNotBlank() || asset.model.isNotBlank()),
+        "رقم تسلسلي/وسم" to (asset.serialNumber.isNotBlank() || asset.assetTag.isNotBlank()),
+        "شركاء" to asset.partners.isNotBlank(),
+        "خصائص فنية" to characteristics.isNotEmpty(),
+        "مستندات" to documents.isNotEmpty(),
+        "قياسات/عدادات" to measuringPoints.isNotEmpty(),
+        "خطة وقائية" to pmItems.isNotEmpty(),
+        "قائمة مكونات BOM" to bomItems.isNotEmpty(),
+        "سلامة وامتثال" to (!asset.safetyCritical || asset.safetyInstructions.isNotBlank() || asset.requiredPermits.isNotBlank()),
+        "ربط مالي" to (asset.financialAssetRef.isNotBlank() || asset.costCenterId.isNotBlank() || asset.purchaseCost > 0.0),
+        "بيانات خطية" to (asset.assetType != "Linear Asset" || asset.linearLength > 0.0 || (asset.linearStartPoint.isNotBlank() && asset.linearEndPoint.isNotBlank())),
+        "تاريخ/تتبع" to (movements.isNotEmpty() || workOrders.isNotEmpty() || notifications.isNotEmpty() || auditLog.isNotEmpty())
+    )
+    val passed = checks.count { it.second }
+    val missingCritical = critical && (documents.isEmpty() || pmItems.isEmpty() || characteristics.isEmpty())
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("حوكمة الأصل")
+                Spacer(modifier = Modifier.weight(1f))
+                StatusBadge("$passed/${checks.size}", statusTone(if (missingCritical) "warning" else "running"))
+            }
+            Text(
+                "تغطي هذه البطاقة القاعدة الذهبية للأصل: الموقع، الحالة، الأهمية، التصنيف، المستندات، القياسات، BOM، البلاغات، الأوامر، الخطط، التكلفة، التاريخ، والتدقيق.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (missingCritical) {
+                Text(
+                    "تنبيه حوكمة: الأصل عالي/حرج ويحتاج خصائص فنية ومستندات وخطة وقائية مكتملة أو مبررًا موثقًا.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AccentOrange,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            checks.chunked(2).forEach { row ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { (label, ok) ->
+                        GovernancePill(label = label, ok = ok, modifier = Modifier.weight(1f))
+                    }
+                    if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GovernancePill(label: String, ok: Boolean, modifier: Modifier = Modifier) {
+    val tone = if (ok) statusTone("running") else statusTone("warning")
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(tone.container)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            if (ok) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+            contentDescription = null,
+            tint = tone.content,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(label, color = tone.content, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1379,6 +1582,9 @@ private fun AssetDetailScreen(
     characteristics: List<AssetCharacteristicEntity>,
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
+    measuringPoints: List<MeasuringPointEntity>,
+    notifications: List<MaintenanceNotificationEntity>,
+    auditLog: List<AuditLogEntity>,
     spareParts: List<SparePartEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
@@ -1416,8 +1622,8 @@ private fun AssetDetailScreen(
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
     var showMoveForm by remember { mutableStateOf(false) }
-    val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
-    val retired = asset.status.equals("Retired", ignoreCase = true)
+    val lifecycle = listOf("Draft", "Active", "Running", "Standby", "Under Maintenance", "Breakdown", "Stopped", "Out of Service", "In Storage", "Sent to Vendor", "Refurbishment", "Retired", "Disposed", "Inactive")
+    val blocksNewWork = asset.status.equals("Retired", ignoreCase = true) || asset.status.equals("Disposed", ignoreCase = true)
 
     LazyColumn(
         modifier = Modifier
@@ -1447,16 +1653,56 @@ private fun AssetDetailScreen(
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     SectionHeader("المعلومات")
+                    InfoRow("نوع الأصل", asset.assetType)
+                    if (asset.assetCategory.isNotBlank()) InfoRow("فئة الأصل", asset.assetCategory)
+                    if (asset.equipmentCategory.isNotBlank()) InfoRow("فئة المعدة", asset.equipmentCategory)
+                    if (asset.objectType.isNotBlank()) InfoRow("نوع الكائن الفني", asset.objectType)
+                    if (asset.assetClass.isNotBlank()) InfoRow("تصنيف الأصل", asset.assetClass)
+                    if (asset.assetSubclass.isNotBlank()) InfoRow("التصنيف الفرعي", asset.assetSubclass)
+                    if (asset.alternativeLabel.isNotBlank()) InfoRow("تسمية بديلة", asset.alternativeLabel)
+                    if (asset.externalAssetCode.isNotBlank()) InfoRow("كود خارجي", asset.externalAssetCode)
+                    if (asset.legacyAssetCode.isNotBlank()) InfoRow("كود قديم", asset.legacyAssetCode)
+                    if (asset.barcode.isNotBlank()) InfoRow("Barcode", asset.barcode)
+                    if (asset.qrCode.isNotBlank()) InfoRow("QR Code", asset.qrCode)
+                    if (asset.description.isNotBlank()) InfoRow("الوصف", asset.description)
+                    if (asset.longDescription.isNotBlank()) InfoRow("الوصف التفصيلي", asset.longDescription)
                     InfoRow("المجموعة", asset.groupName)
                     InfoRow("الموقع", asset.location)
                     InfoRow("الموقع الفني", locationLabel)
                     InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
                     InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                    if (asset.constructionType.isNotBlank()) InfoRow("نوع البناء", asset.constructionType)
                     if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
                     if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
                     InfoRow("الأهمية", asset.criticality)
                     InfoRow("تاريخ التركيب", asset.installedAt)
+                    if (asset.commissioningAt.isNotBlank()) InfoRow("تاريخ التشغيل", asset.commissioningAt)
                     InfoRow("آخر فحص", asset.lastInspectionAt)
+                    if (asset.notes.isNotBlank()) InfoRow("ملاحظات", asset.notes)
+                }
+            }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SectionHeader("الموقع والتنظيم والمسؤولية")
+                    if (asset.companyId.isNotBlank()) InfoRow("الشركة", asset.companyId)
+                    if (asset.siteId.isNotBlank()) InfoRow("الموقع العام", asset.siteId)
+                    if (asset.plantId.isNotBlank()) InfoRow("المصنع / الموقع التشغيلي", asset.plantId)
+                    if (asset.maintenancePlantId.isNotBlank()) InfoRow("موقع الصيانة", asset.maintenancePlantId)
+                    if (asset.planningPlantId.isNotBlank()) InfoRow("موقع التخطيط", asset.planningPlantId)
+                    if (asset.workCenterId.isNotBlank()) InfoRow("مركز العمل", asset.workCenterId)
+                    if (asset.plannerGroupId.isNotBlank()) InfoRow("مجموعة التخطيط", asset.plannerGroupId)
+                    if (asset.costCenterId.isNotBlank()) InfoRow("مركز التكلفة", asset.costCenterId)
+                    if (asset.departmentId.isNotBlank()) InfoRow("الإدارة المالكة", asset.departmentId)
+                    if (asset.responsiblePersonId.isNotBlank()) InfoRow("المسؤول", asset.responsiblePersonId)
+                    if (asset.partners.isNotBlank()) InfoRow("الشركاء", asset.partners)
+                    if (
+                        listOf(asset.companyId, asset.siteId, asset.plantId, asset.maintenancePlantId, asset.planningPlantId, asset.workCenterId, asset.plannerGroupId, asset.costCenterId, asset.departmentId, asset.responsiblePersonId, asset.partners).all { it.isBlank() }
+                    ) {
+                        Text("لم يتم تسجيل بيانات تنظيمية أو مسؤوليات لهذا الأصل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -1481,8 +1727,25 @@ private fun AssetDetailScreen(
             }
         }
 
+        item {
+            AssetGovernanceCard(
+                asset = asset,
+                workOrders = workOrders,
+                pmItems = pmItems,
+                documents = documents,
+                characteristics = characteristics,
+                bomItems = bomItems,
+                movements = movements,
+                measuringPoints = measuringPoints,
+                notifications = notifications,
+                auditLog = auditLog,
+                hasLocation = asset.locationId != null || asset.location.isNotBlank()
+            )
+        }
+
         val hasFinancial = asset.supplier.isNotBlank() || asset.purchaseOrder.isNotBlank() ||
-            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank()
+            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank() || asset.financialAssetRef.isNotBlank() ||
+            asset.financialStatus.isNotBlank() || asset.bookValue > 0.0 || asset.capitalizationAt.isNotBlank()
         if (hasFinancial) {
             item {
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -1492,6 +1755,44 @@ private fun AssetDetailScreen(
                         if (asset.purchaseOrder.isNotBlank()) InfoRow("أمر الشراء", asset.purchaseOrder)
                         if (asset.purchaseCost > 0.0) InfoRow("تكلفة الشراء", money(asset.purchaseCost))
                         if (asset.acquiredAt.isNotBlank()) InfoRow("تاريخ الاقتناء", asset.acquiredAt)
+                        if (asset.financialAssetRef.isNotBlank()) InfoRow("مرجع الأصل المالي", asset.financialAssetRef)
+                        if (asset.financialStatus.isNotBlank()) InfoRow("الحالة المالية", asset.financialStatus)
+                        if (asset.bookValue > 0.0) InfoRow("القيمة الدفترية", money(asset.bookValue))
+                        if (asset.capitalizationAt.isNotBlank()) InfoRow("تاريخ الرسملة", asset.capitalizationAt)
+                    }
+                }
+            }
+        }
+
+        if (asset.safetyCritical || asset.riskLevel.isNotBlank() || asset.requiredPermits.isNotBlank() || asset.safetyInstructions.isNotBlank() || asset.ppeRequired.isNotBlank() || asset.complianceRequirements.isNotBlank()) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            SectionHeader("السلامة والامتثال")
+                            Spacer(modifier = Modifier.weight(1f))
+                            if (asset.safetyCritical) StatusBadge("حرج للسلامة", statusTone("critical"))
+                        }
+                        if (asset.riskLevel.isNotBlank()) InfoRow("مستوى الخطر", asset.riskLevel)
+                        if (asset.requiredPermits.isNotBlank()) InfoRow("التصاريح المطلوبة", asset.requiredPermits)
+                        if (asset.safetyInstructions.isNotBlank()) InfoRow("تعليمات السلامة", asset.safetyInstructions)
+                        if (asset.ppeRequired.isNotBlank()) InfoRow("معدات الوقاية", asset.ppeRequired)
+                        InfoRow("يتطلب عزل", if (asset.isolationRequired) "نعم" else "لا")
+                        if (asset.complianceRequirements.isNotBlank()) InfoRow("متطلبات الامتثال", asset.complianceRequirements)
+                    }
+                }
+            }
+        }
+
+        if (asset.assetType == "Linear Asset" || asset.linearStartPoint.isNotBlank() || asset.linearEndPoint.isNotBlank() || asset.linearLength > 0.0 || asset.linearRoute.isNotBlank()) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("بيانات الأصل الخطي")
+                        if (asset.linearStartPoint.isNotBlank()) InfoRow("نقطة البداية", asset.linearStartPoint)
+                        if (asset.linearEndPoint.isNotBlank()) InfoRow("نقطة النهاية", asset.linearEndPoint)
+                        if (asset.linearLength > 0.0) InfoRow("الطول", "${asset.linearLength} ${asset.linearUnit}".trim())
+                        if (asset.linearRoute.isNotBlank()) InfoRow("المسار", asset.linearRoute)
                     }
                 }
             }
@@ -1631,9 +1932,9 @@ private fun AssetDetailScreen(
                 }
             }
             item {
-                if (retired) {
+                if (blocksNewWork) {
                     Text(
-                        "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه.",
+                        "الأصل متقاعد/متخلص منه — لا يمكن إنشاء أوامر عمل جديدة عليه.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -1735,6 +2036,46 @@ private fun AssetDetailScreen(
             }
         }
 
+        item { SectionHeader("القياسات والعدادات (${measuringPoints.size})") }
+        if (measuringPoints.isEmpty()) {
+            item { EmptyState("لا توجد نقاط قياس أو عدادات لهذا الأصل", Icons.Filled.Speed) }
+        }
+        items(measuringPoints, key = { "mp-${it.id}" }) { point ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.Speed, AccentTeal, AccentTeal.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(point.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            if (point.isCounter) "عداد تراكمي" else "قراءة قياسية",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        LtrText("${point.lastReading} ${point.unit}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(point.lastReadingAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        item { SectionHeader("البلاغات المرتبطة (${notifications.size})") }
+        if (notifications.isEmpty()) {
+            item { EmptyState("لا توجد بلاغات مرتبطة بهذا الأصل", Icons.Filled.NotificationsActive) }
+        }
+        items(notifications, key = { "nt-${it.id}" }) { notification ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(notification.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        StatusBadge(notificationStatusLabel(notification.status), statusTone(notification.status))
+                    }
+                    Text(notification.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 SectionHeader("المستندات (${documents.size})")
@@ -1798,6 +2139,23 @@ private fun AssetDetailScreen(
                         if (route.isNotBlank()) LtrText(route, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (mv.notes.isNotBlank()) Text(mv.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${mv.performedBy} • ${mv.occurredAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        item { SectionHeader("التدقيق والتتبع (${auditLog.size})") }
+        if (auditLog.isEmpty()) {
+            item { EmptyState("لا توجد سجلات تدقيق مباشرة لهذا الأصل", Icons.Filled.History) }
+        }
+        items(auditLog.take(10), key = { "audit-${it.id}" }) { audit ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.History, AccentNavy, AccentNavy.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(audit.action, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(audit.details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text("${audit.performedBy} • ${audit.createdAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

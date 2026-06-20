@@ -440,6 +440,7 @@ class CmmsRepository(private val database: AppDatabase) {
         estimatedCost: Double,
         actor: String
     ) {
+        validateAssetCanReceiveWorkOrder(assetId)
         val now = DateStrings.today()
         workOrderDao.insertWorkOrder(
             WorkOrderEntity(
@@ -604,18 +605,116 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveAsset(asset: AssetEntity, actor: String = "System") {
         val isNew = asset.id == 0L
+        validateAssetForSave(asset, isNew)
         assetDao.insertAsset(asset)
         recordAudit(if (isNew) "Create" else "Update", "Asset", "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code}", actor)
     }
 
     suspend fun deleteAsset(asset: AssetEntity, actor: String = "System") {
+        val hasHistory = assetHasHistory(asset.id)
+        if (hasHistory) {
+            assetDao.insertAsset(asset.copy(status = "Retired", notes = asset.notes.ifBlank { "تم تقاعد الأصل بدل الحذف لوجود تاريخ مرتبط." }))
+            recordAudit("Retire", "Asset", "لم يتم حذف أصل له تاريخ؛ تم تقاعده بدل الحذف: ${asset.code}", actor)
+            return
+        }
         assetDao.deleteById(asset.id)
         recordAudit("Delete", "Asset", "حذف أصل: ${asset.code}", actor)
     }
 
     suspend fun changeAssetStatus(asset: AssetEntity, status: String, actor: String = "System") {
-        assetDao.insertAsset(asset.copy(status = status))
+        val updated = asset.copy(status = status)
+        validateAssetForSave(updated, isNew = false)
+        assetDao.insertAsset(updated)
         recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status", actor)
+    }
+
+    private suspend fun validateAssetForSave(asset: AssetEntity, isNew: Boolean) {
+        fun fail(rule: String, message: String): Nothing = throw IllegalArgumentException("$rule: $message")
+
+        if (asset.code.isBlank()) fail("AST-REG-001", "كود الأصل مطلوب وفريد.")
+        if (asset.name.isBlank()) fail("AST-REG-002", "اسم الأصل مطلوب.")
+        if (asset.assetType.isBlank()) fail("AST-REG-002", "نوع الأصل مطلوب.")
+        if (asset.assetCategory.isBlank()) fail("AST-ID-004", "فئة الأصل مطلوبة.")
+        if (asset.status.isBlank()) fail("STAT-001", "حالة الأصل مطلوبة.")
+        if (asset.criticality.isBlank()) fail("CRIT-001", "أهمية الأصل مطلوبة.")
+
+        val duplicateCode = assetDao.findByCode(asset.code)
+        if (duplicateCode != null && duplicateCode.id != asset.id) {
+            fail("AST-REG-001", "كود الأصل مستخدم بالفعل: ${asset.code}")
+        }
+
+        val allAssets = assets.first()
+        if (asset.serialNumber.isNotBlank() && allAssets.any { it.id != asset.id && it.serialNumber.equals(asset.serialNumber, ignoreCase = true) }) {
+            fail("SN-002", "الرقم التسلسلي مستخدم بالفعل: ${asset.serialNumber}")
+        }
+        if (asset.assetType in setOf("Serialized Component", "Refurbishable Component") && asset.serialNumber.isBlank()) {
+            fail("AST-ID-008", "الرقم التسلسلي إلزامي للأصل المتسلسل.")
+        }
+        if (asset.barcode.isNotBlank() && allAssets.any { it.id != asset.id && it.barcode.equals(asset.barcode, ignoreCase = true) }) {
+            fail("AST-ID-009", "Barcode مستخدم بالفعل: ${asset.barcode}")
+        }
+        if (asset.qrCode.isNotBlank() && allAssets.any { it.id != asset.id && it.qrCode.equals(asset.qrCode, ignoreCase = true) }) {
+            fail("AST-ID-009", "QR Code مستخدم بالفعل: ${asset.qrCode}")
+        }
+
+        val existing = if (asset.id == 0L) null else assetDao.getAssetById(asset.id)
+        if (existing != null && existing.code != asset.code && assetHasHistory(asset.id)) {
+            fail("AST-ID-006", "لا يمكن تغيير كود أصل له بلاغات أو أوامر أو قراءات أو حركات.")
+        }
+
+        if (asset.parentAssetId == asset.id && asset.id != 0L) {
+            fail("HIER-002", "لا يمكن أن يكون الأصل أبًا لنفسه.")
+        }
+        if (asset.parentAssetId != null && createsAssetCycle(asset, allAssets)) {
+            fail("HIER-002", "لا يسمح بوجود علاقة دائرية في هرمية الأصول.")
+        }
+
+        val activeStatuses = setOf("Active", "Running", "Under Maintenance", "Breakdown")
+        if (asset.status in activeStatuses && asset.locationId == null && asset.location.isBlank() && asset.notes.isBlank()) {
+            fail("AST-REG-003", "الأصل النشط يجب أن يرتبط بموقع أو يحتوي ملاحظة تبرر عدم التركيب.")
+        }
+
+        val critical = asset.criticality.equals("Critical", ignoreCase = true) || asset.criticality.equals("High", ignoreCase = true)
+        if (critical) {
+            if (asset.locationId == null && asset.location.isBlank()) fail("AST-REG-004", "الأصل الحرج يحتاج بيانات موقع.")
+            if (asset.workCenterId.isBlank() && asset.responsiblePersonId.isBlank()) fail("AST-REG-004", "الأصل الحرج يحتاج مسؤولًا أو مركز عمل.")
+            if (asset.manufacturer.isBlank() && asset.model.isBlank()) fail("TECH-001", "الأصل الحرج يحتاج بيانات مصنّع أو موديل.")
+            val hasPm = preventiveMaintenance.first().any { it.assetId == asset.id }
+            if (!isNew && !hasPm && asset.notes.isBlank()) fail("CRIT-002", "الأصل الحرج يحتاج خطة وقائية أو مبررًا في الملاحظات.")
+        }
+
+        if (asset.safetyCritical && asset.safetyInstructions.isBlank() && asset.requiredPermits.isBlank()) {
+            fail("SAFE-001", "الأصل الحرج للسلامة يحتاج تعليمات سلامة أو تصاريح مطلوبة.")
+        }
+        if (asset.assetType == "Linear Asset" && asset.linearLength <= 0.0 && (asset.linearStartPoint.isBlank() || asset.linearEndPoint.isBlank())) {
+            fail("LIN-001", "الأصل الخطي يحتاج طولًا أو نقطة بداية ونهاية.")
+        }
+        if (asset.status in setOf("Retired", "Disposed") && asset.notes.isBlank()) {
+            fail("STAT-003", "تغيير الحالة إلى Retired أو Disposed يحتاج سببًا في الملاحظات.")
+        }
+    }
+
+    private suspend fun assetHasHistory(assetId: Long): Boolean =
+        workOrders.first().any { it.assetId == assetId } ||
+            preventiveMaintenance.first().any { it.assetId == assetId } ||
+            assetDocuments.first().any { it.assetId == assetId } ||
+            assetCharacteristics.first().any { it.assetId == assetId } ||
+            assetBom.first().any { it.assetId == assetId } ||
+            assetMovements.first().any { it.assetId == assetId } ||
+            measuringPoints.first().any { it.assetId == assetId } ||
+            notifications.first().any { it.assetId == assetId }
+
+    private fun createsAssetCycle(asset: AssetEntity, allAssets: List<AssetEntity>): Boolean {
+        val byId = allAssets.associateBy { it.id }.toMutableMap()
+        byId[asset.id] = asset
+        val seen = mutableSetOf<Long>()
+        var current = asset.parentAssetId
+        while (current != null) {
+            if (!seen.add(current)) return true
+            if (current == asset.id && asset.id != 0L) return true
+            current = byId[current]?.parentAssetId
+        }
+        return false
     }
 
     // ---------------------------------------------------------------------
@@ -639,6 +738,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
         val isNew = workOrder.id == 0L
+        if (isNew) validateAssetCanReceiveWorkOrder(workOrder.assetId)
         // Keep an existing decision; otherwise (re)derive whether sign-off is needed.
         val toSave = if (workOrder.approvalStatus == "Approved" || workOrder.approvalStatus == "Rejected") {
             workOrder
@@ -647,6 +747,13 @@ class CmmsRepository(private val database: AppDatabase) {
         }
         workOrderDao.insertWorkOrder(toSave)
         recordAudit(if (isNew) "Create" else "Update", "WorkOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر عمل: ${workOrder.title}", actor)
+    }
+
+    private suspend fun validateAssetCanReceiveWorkOrder(assetId: Long) {
+        val asset = assetDao.getAssetById(assetId) ?: throw IllegalArgumentException("AST-REG-009: لا يمكن إنشاء أمر صيانة بدون أصل واضح.")
+        if (asset.status in setOf("Retired", "Disposed")) {
+            throw IllegalArgumentException("STAT-002: لا يمكن إنشاء أمر صيانة عادي على أصل ${asset.status}.")
+        }
     }
 
     suspend fun setWorkOrderApproval(workOrder: WorkOrderEntity, approved: Boolean, actor: String = "System") {
@@ -711,6 +818,8 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveMeasuringPoint(point: MeasuringPointEntity, actor: String = "System") {
         val isNew = point.id == 0L
+        if (point.name.isBlank()) throw IllegalArgumentException("MP-003: اسم نقطة القياس مطلوب.")
+        if (point.unit.isBlank()) throw IllegalArgumentException("MP-003: وحدة القياس مطلوبة.")
         measurementDao.insertPoint(point)
         recordAudit(if (isNew) "Create" else "Update", "Meter", "${if (isNew) "إضافة" else "تعديل"} نقطة قياس: ${point.name}", actor)
     }
@@ -753,13 +862,41 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
         val isNew = location.id == 0L
+        validateFunctionalLocation(location)
         locationDao.insert(location)
         recordAudit(if (isNew) "Create" else "Update", "Location", "${if (isNew) "إضافة" else "تعديل"} موقع فني: ${location.code}", actor)
     }
 
     suspend fun deleteFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
+        val hasChildren = functionalLocations.first().any { it.parentId == location.id }
+        val hasAssets = assets.first().any { it.locationId == location.id }
+        if (hasChildren || hasAssets) {
+            throw IllegalArgumentException("FLOC-006: لا يمكن حذف موقع فني له أصول أو مواقع فرعية.")
+        }
         locationDao.deleteById(location.id)
         recordAudit("Delete", "Location", "حذف موقع فني: ${location.code}", actor)
+    }
+
+    private suspend fun validateFunctionalLocation(location: FunctionalLocationEntity) {
+        if (location.code.isBlank()) throw IllegalArgumentException("FLOC-001: كود الموقع الفني مطلوب وفريد.")
+        if (location.name.isBlank()) throw IllegalArgumentException("FLOC-001: اسم الموقع الفني مطلوب.")
+        val all = functionalLocations.first()
+        if (all.any { it.id != location.id && it.code.equals(location.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("FLOC-001: كود الموقع الفني مستخدم بالفعل: ${location.code}")
+        }
+        if (location.parentId == location.id && location.id != 0L) {
+            throw IllegalArgumentException("FLOC-003: لا يمكن أن يكون الموقع أبًا لنفسه.")
+        }
+        val byId = all.associateBy { it.id }.toMutableMap()
+        byId[location.id] = location
+        val seen = mutableSetOf<Long>()
+        var current = location.parentId
+        while (current != null) {
+            if (!seen.add(current) || (current == location.id && location.id != 0L)) {
+                throw IllegalArgumentException("FLOC-003: لا يسمح بوجود حلقة في هرمية المواقع الفنية.")
+            }
+            current = byId[current]?.parentId
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -793,12 +930,18 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveAssetDocument(doc: AssetDocumentEntity, actor: String = "System") {
         val isNew = doc.id == 0L
+        if (doc.type.isBlank() || doc.title.isBlank()) throw IllegalArgumentException("DOC-002: كل مستند يحتاج نوعًا وعنوانًا.")
         val toSave = if (isNew) doc.copy(uploadedBy = actor, uploadedAt = DateStrings.now()) else doc
         documentDao.insert(toSave)
         recordAudit(if (isNew) "Create" else "Update", "Document", "${if (isNew) "إضافة" else "تعديل"} مستند: ${doc.title}", actor)
     }
 
     suspend fun deleteAssetDocument(doc: AssetDocumentEntity, actor: String = "System") {
+        val asset = assetDao.getAssetById(doc.assetId)
+        val sensitive = doc.type in setOf("Warranty", "Certificate", "Safety", "Safety Document", "Calibration")
+        if (sensitive && (asset?.criticality == "Critical" || asset?.safetyCritical == true)) {
+            throw IllegalArgumentException("DOC-003: حذف مستند حساس لأصل حرج/سلامة يحتاج صلاحية واعتمادًا؛ أضف إصدارًا جديدًا بدل الحذف.")
+        }
         documentDao.deleteById(doc.id)
         recordAudit("Delete", "Document", "حذف مستند: ${doc.title}", actor)
     }
@@ -809,6 +952,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveCharacteristic(item: AssetCharacteristicEntity, actor: String = "System") {
         val isNew = item.id == 0L
+        if (item.name.isBlank() || item.value.isBlank()) throw IllegalArgumentException("CLASS-002: الخاصية تحتاج اسمًا وقيمة.")
         characteristicDao.insert(item)
         recordAudit(if (isNew) "Create" else "Update", "Characteristic", "${if (isNew) "إضافة" else "تعديل"} خاصية: ${item.name}", actor)
     }
@@ -824,6 +968,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveBomItem(item: AssetBomItemEntity, actor: String = "System") {
         val isNew = item.id == 0L
+        if (item.quantity <= 0) throw IllegalArgumentException("BOM-003: كمية بند المكونات يجب أن تكون أكبر من صفر.")
         bomDao.insert(item)
         recordAudit(if (isNew) "Create" else "Update", "BOM", "${if (isNew) "إضافة" else "تعديل"} بند مكوّنات (قطعة #${item.partId})", actor)
     }
