@@ -30,12 +30,65 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *   }
  */
 object DbMigrations {
+    val MIGRATION_22_23 = object : Migration(22, 23) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN assetType TEXT NOT NULL DEFAULT 'Equipment'",
+                "ALTER TABLE assets ADD COLUMN assetCategory TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN objectType TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN companyId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN siteId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN plantId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN maintenancePlantId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN planningPlantId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN workCenterId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN plannerGroupId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN costCenterId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN departmentId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN responsiblePersonId TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN constructionType TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN commissioningAt TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN financialAssetRef TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN partners TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN safetyCritical INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE assets ADD COLUMN riskLevel TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN requiredPermits TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN safetyInstructions TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN ppeRequired TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN isolationRequired INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE assets ADD COLUMN complianceRequirements TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN financialStatus TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN bookValue REAL NOT NULL DEFAULT 0.0",
+                "ALTER TABLE assets ADD COLUMN capitalizationAt TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN linearStartPoint TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN linearEndPoint TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN linearLength REAL NOT NULL DEFAULT 0.0",
+                "ALTER TABLE assets ADD COLUMN linearUnit TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN linearRoute TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
 
-    /**
-     * All migrations, in order. Empty while the schema is stable at the current version.
-     * Append new `Migration` objects here as the schema evolves.
-     */
-    val ALL: Array<Migration> = arrayOf()
+    val MIGRATION_23_24 = object : Migration(23, 24) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN equipmentCategory TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN assetClass TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN assetSubclass TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN longDescription TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN alternativeLabel TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN externalAssetCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN legacyAssetCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN barcode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN qrCode TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    /** All migrations, in order. Append new `Migration` objects here as the schema evolves. */
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

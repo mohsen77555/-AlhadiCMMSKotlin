@@ -13,11 +13,11 @@ fun statusTone(status: String): StatusTone {
             StatusTone(StatusRunning, StatusRunningContainer)
         "technically completed" ->
             StatusTone(StatusInfo, StatusInfoContainer)
-        "warning", "in progress", "scheduled", "pending", "due" ->
+        "warning", "in progress", "scheduled", "pending", "due", "standby", "in storage", "sent to vendor", "refurbishment" ->
             StatusTone(StatusWarning, StatusWarningContainer)
-        "stopped", "overdue", "failed", "critical" ->
+        "stopped", "overdue", "failed", "critical", "breakdown", "out of service", "retired", "disposed", "inactive" ->
             StatusTone(StatusStopped, StatusStoppedContainer)
-        "open", "new" ->
+        "open", "new", "draft" ->
             StatusTone(StatusInfo, StatusInfoContainer)
         else ->
             StatusTone(StatusNeutral, StatusNeutralContainer)
