@@ -453,7 +453,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             assets = assets,
                             workOrders = workOrders,
                             parts = spareParts,
-                            pmItems = preventiveMaintenance
+                            pmItems = preventiveMaintenance,
+                            movements = assetMovements
                         )
                         MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
                         MoreRoute.Meters -> MetersScreen(
@@ -3717,7 +3718,8 @@ private fun ReportsScreen(
     assets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     parts: List<SparePartEntity>,
-    pmItems: List<PreventiveMaintenanceEntity>
+    pmItems: List<PreventiveMaintenanceEntity>,
+    movements: List<AssetMovementEntity>
 ) {
     val today = DateStrings.today()
     val soon = DateStrings.daysFromToday(30)
@@ -3754,6 +3756,20 @@ private fun ReportsScreen(
     val withManualOverrides = assets.filter { it.manualOverrideReason.isNotBlank() }
     val inStorageAssets = assets.filter { it.status == "In Storage" }
     val mobileAssets = assets.filter { it.assetType == "Mobile Asset" }
+    val transferHistory = movements
+        .filter {
+            it.eventType.equals("Transfer", ignoreCase = true) ||
+                it.oldPlant.isNotBlank() || it.newPlant.isNotBlank() ||
+                it.oldWorkCenter.isNotBlank() || it.newWorkCenter.isNotBlank() ||
+                it.oldCostCenter.isNotBlank() || it.newCostCenter.isNotBlank()
+        }
+        .sortedByDescending { it.occurredAt }
+    val transferHistoryLines = transferHistory.take(5).map { movement ->
+        val code = assetName[movement.assetId] ?: "#${movement.assetId}"
+        val from = movement.fromLocationName.ifBlank { movement.oldPlant.ifBlank { "غير محدد" } }
+        val to = movement.toLocationName.ifBlank { movement.newPlant.ifBlank { "غير محدد" } }
+        "$code: $from → $to (${movement.occurredAt})"
+    }
     val context = LocalContext.current
     val reportText = buildReportText(
         assets = stats.assets, openWo = stats.openWorkOrders, closed = closed,
@@ -3766,7 +3782,8 @@ private fun ReportsScreen(
         criticalWithoutWorkCenter = criticalWithoutWorkCenter.size,
         criticalWithoutPlannerGroup = criticalWithoutPlannerGroup.size,
         withoutCostCenter = withoutCostCenter.size, withManualOverrides = withManualOverrides.size,
-        inStorageAssets = inStorageAssets.size, mobileAssets = mobileAssets.size
+        inStorageAssets = inStorageAssets.size, mobileAssets = mobileAssets.size,
+        transferMovements = transferHistory.size
     )
 
     LazyColumn(
@@ -3899,6 +3916,12 @@ private fun ReportsScreen(
                 "Assets By Cost Center: ${assets.groupingBy { it.costCenterCode.ifBlank { it.costCenterId.ifBlank { "غير محدد" } } }.eachCount().entries.sortedByDescending { it.value }.take(5).joinToString { "${it.key}: ${it.value}" }.ifBlank { "لا يوجد" }}",
                 "In Storage Assets: ${inStorageAssets.size}",
                 "Mobile Assets Location Report: ${mobileAssets.count { it.currentPhysicalLocation.isNotBlank() || it.physicalLocation.isNotBlank() || it.location.isNotBlank() }} / ${mobileAssets.size} لديها موقع معروف"
+            ))
+        }
+        item {
+            ReportCard("Asset Transfer History", listOf(
+                "إجمالي حركات النقل: ${transferHistory.size}",
+                "آخر حركات النقل: ${transferHistoryLines.joinToString(separator = " | ").ifBlank { "لا يوجد" }}"
             ))
         }
     }
@@ -5058,7 +5081,8 @@ private fun buildReportText(
     lowStock: Int, underWarranty: Int, expiringSoon: Int,
     missingCompany: Int, missingPlant: Int, installedWithoutFunctionalLocation: Int,
     criticalWithoutWorkCenter: Int, criticalWithoutPlannerGroup: Int,
-    withoutCostCenter: Int, withManualOverrides: Int, inStorageAssets: Int, mobileAssets: Int
+    withoutCostCenter: Int, withManualOverrides: Int, inStorageAssets: Int, mobileAssets: Int,
+    transferMovements: Int
 ): String = buildString {
     appendLine("تقرير الصيانة — الهادي CMMS")
     appendLine("التاريخ: ${DateStrings.today()}")
@@ -5075,6 +5099,7 @@ private fun buildReportText(
     appendLine("الأصول الحرجة — بدون مركز عمل: $criticalWithoutWorkCenter | بدون مجموعة تخطيط: $criticalWithoutPlannerGroup")
     appendLine("التكلفة والوراثة — بدون مركز تكلفة: $withoutCostCenter | تجاوزات يدوية: $withManualOverrides")
     appendLine("المخزن والمتنقلة — في المخزن: $inStorageAssets | متنقلة: $mobileAssets")
+    appendLine("سجل نقل الأصول — حركات النقل: $transferMovements")
 }
 
 @Composable
