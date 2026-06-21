@@ -849,6 +849,9 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveCompany(item: CompanyEntity, actor: String = "System") {
         if (item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("ORG-COMP-001: كود واسم الشركة مطلوبان.")
+        if (companies.first().any { it.id != item.id && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("ORG-COMP-001: لا يسمح بتكرار كود الشركة: ${item.code}")
+        }
         companyDao.insert(item)
         recordAudit("Upsert", "Company", "حفظ شركة: ${item.code}", actor)
     }
@@ -865,6 +868,9 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveSite(item: SiteEntity, actor: String = "System") {
         if (item.companyId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("ORG-SITE-001: الموقع العام يحتاج شركة وكودًا واسمًا.")
+        if (sites.first().any { it.id != item.id && it.companyId == item.companyId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("ORG-SITE-002: لا يتكرر كود الموقع داخل نفس الشركة: ${item.code}")
+        }
         siteDao.insert(item)
         recordAudit("Upsert", "Site", "حفظ موقع عام: ${item.code}", actor)
     }
@@ -881,6 +887,9 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun savePlant(item: PlantEntity, actor: String = "System") {
         if (item.companyId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("ORG-PLANT-001: Plant يحتاج شركة وكودًا واسمًا.")
+        if (plants.first().any { it.id != item.id && it.companyId == item.companyId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("ORG-PLANT-003: لا يتكرر كود Plant داخل الشركة: ${item.code}")
+        }
         plantDao.insert(item)
         recordAudit("Upsert", "Plant", "حفظ Plant: ${item.code}", actor)
     }
@@ -897,6 +906,9 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveWorkCenter(item: WorkCenterEntity, actor: String = "System") {
         if (item.plantId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("WC-ORG-001: مركز العمل يحتاج Plant وكودًا واسمًا.")
+        if (workCenters.first().any { it.id != item.id && it.plantId == item.plantId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("WC-ORG-002: لا يتكرر كود مركز العمل داخل نفس Plant: ${item.code}")
+        }
         workCenterDao.insert(item)
         recordAudit("Upsert", "WorkCenter", "حفظ مركز عمل: ${item.code}", actor)
     }
@@ -913,6 +925,9 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun savePlannerGroup(item: PlannerGroupEntity, actor: String = "System") {
         if (item.planningPlantId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("PG-ORG-001: مجموعة التخطيط تحتاج Planning Plant وكودًا واسمًا.")
+        if (plannerGroups.first().any { it.id != item.id && it.planningPlantId == item.planningPlantId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("PG-ORG-002: لا يتكرر كود مجموعة التخطيط داخل نفس Planning Plant: ${item.code}")
+        }
         plannerGroupDao.insert(item)
         recordAudit("Upsert", "PlannerGroup", "حفظ مجموعة تخطيط: ${item.code}", actor)
     }
@@ -929,6 +944,9 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveDepartment(item: DepartmentEntity, actor: String = "System") {
         if (item.companyId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("DEPT-ORG-001: القسم يحتاج شركة وكودًا واسمًا.")
+        if (departments.first().any { it.id != item.id && it.companyId == item.companyId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("DEPT-ORG-002: لا يتكرر كود القسم داخل نفس الشركة: ${item.code}")
+        }
         departmentDao.insert(item)
         recordAudit("Upsert", "Department", "حفظ قسم: ${item.code}", actor)
     }
@@ -945,6 +963,9 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveCostCenter(item: CostCenterEntity, actor: String = "System") {
         if (item.companyId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("CC-ORG-001: مركز التكلفة يحتاج شركة وكودًا واسمًا.")
+        if (costCenters.first().any { it.id != item.id && it.companyId == item.companyId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("CC-ORG-002: لا يتكرر كود مركز التكلفة داخل نفس الشركة: ${item.code}")
+        }
         costCenterDao.insert(item)
         recordAudit("Upsert", "CostCenter", "حفظ مركز تكلفة: ${item.code}", actor)
     }
@@ -961,6 +982,9 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveStorageLocation(item: StorageLocationEntity, actor: String = "System") {
         if (item.plantId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("SL-ORG-001: موقع التخزين يحتاج Plant وكودًا واسمًا.")
+        if (storageLocations.first().any { it.id != item.id && it.plantId == item.plantId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("SL-ORG-002: لا يتكرر كود Storage Location داخل نفس Plant: ${item.code}")
+        }
         storageLocationDao.insert(item)
         recordAudit("Upsert", "StorageLocation", "حفظ موقع تخزين: ${item.code}", actor)
     }
