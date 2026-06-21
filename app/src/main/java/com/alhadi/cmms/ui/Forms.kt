@@ -58,14 +58,19 @@ import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.PlannerGroupEntity
+import com.alhadi.cmms.data.entity.PlantEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SiteEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.StorageLocationEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
+import com.alhadi.cmms.data.entity.WorkCenterEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
@@ -184,7 +189,7 @@ private fun parseDateMillis(date: String): Long? =
 private fun formatDateMillis(millis: Long): String = dateFormatterUtc().format(Date(millis))
 
 @Composable
-private fun OptionDropdown(
+internal fun OptionDropdown(
     label: String,
     options: List<String>,
     selected: String,
@@ -343,7 +348,15 @@ internal fun AssetFormSheet(
     onDismiss: () -> Unit,
     onSave: (AssetEntity) -> Unit,
     locations: List<FunctionalLocationEntity> = emptyList(),
-    allAssets: List<AssetEntity> = emptyList()
+    allAssets: List<AssetEntity> = emptyList(),
+    companies: List<CompanyEntity> = emptyList(),
+    sites: List<SiteEntity> = emptyList(),
+    plants: List<PlantEntity> = emptyList(),
+    workCenters: List<WorkCenterEntity> = emptyList(),
+    plannerGroups: List<PlannerGroupEntity> = emptyList(),
+    departments: List<DepartmentEntity> = emptyList(),
+    costCenters: List<CostCenterEntity> = emptyList(),
+    storageLocations: List<StorageLocationEntity> = emptyList()
 ) {
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
@@ -364,34 +377,437 @@ internal fun AssetFormSheet(
     var purchaseOrder by remember { mutableStateOf(initial?.purchaseOrder ?: "") }
     var purchaseCost by remember { mutableStateOf((initial?.purchaseCost ?: 0.0).toString()) }
     var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
+    var assetType by remember { mutableStateOf(initial?.assetType ?: "Equipment") }
+    var assetCategory by remember { mutableStateOf(initial?.assetCategory ?: "") }
+    var equipmentCategory by remember { mutableStateOf(initial?.equipmentCategory ?: "") }
+    var objectType by remember { mutableStateOf(initial?.objectType ?: "") }
+    var assetClass by remember { mutableStateOf(initial?.assetClass ?: "") }
+    var assetSubclass by remember { mutableStateOf(initial?.assetSubclass ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var longDescription by remember { mutableStateOf(initial?.longDescription ?: "") }
+    var alternativeLabel by remember { mutableStateOf(initial?.alternativeLabel ?: "") }
+    var externalAssetCode by remember { mutableStateOf(initial?.externalAssetCode ?: "") }
+    var legacyAssetCode by remember { mutableStateOf(initial?.legacyAssetCode ?: "") }
+    var barcode by remember { mutableStateOf(initial?.barcode ?: "") }
+    var qrCode by remember { mutableStateOf(initial?.qrCode ?: "") }
+    var companyId by remember { mutableStateOf(initial?.companyId ?: "") }
+    var companyCode by remember { mutableStateOf(initial?.companyCode ?: "") }
+    var companyName by remember { mutableStateOf(initial?.companyName ?: "") }
+    var siteId by remember { mutableStateOf(initial?.siteId ?: "") }
+    var siteCode by remember { mutableStateOf(initial?.siteCode ?: "") }
+    var siteName by remember { mutableStateOf(initial?.siteName ?: "") }
+    var plantId by remember { mutableStateOf(initial?.plantId ?: "") }
+    var plantCode by remember { mutableStateOf(initial?.plantCode ?: "") }
+    var plantName by remember { mutableStateOf(initial?.plantName ?: "") }
+    var maintenancePlantId by remember { mutableStateOf(initial?.maintenancePlantId ?: "") }
+    var maintenancePlantCode by remember { mutableStateOf(initial?.maintenancePlantCode ?: "") }
+    var maintenancePlantName by remember { mutableStateOf(initial?.maintenancePlantName ?: "") }
+    var planningPlantId by remember { mutableStateOf(initial?.planningPlantId ?: "") }
+    var planningPlantCode by remember { mutableStateOf(initial?.planningPlantCode ?: "") }
+    var planningPlantName by remember { mutableStateOf(initial?.planningPlantName ?: "") }
+    var workCenterId by remember { mutableStateOf(initial?.workCenterId ?: "") }
+    var workCenterCode by remember { mutableStateOf(initial?.workCenterCode ?: "") }
+    var workCenterName by remember { mutableStateOf(initial?.workCenterName ?: "") }
+    var plannerGroupId by remember { mutableStateOf(initial?.plannerGroupId ?: "") }
+    var plannerGroupCode by remember { mutableStateOf(initial?.plannerGroupCode ?: "") }
+    var plannerGroupName by remember { mutableStateOf(initial?.plannerGroupName ?: "") }
+    var costCenterId by remember { mutableStateOf(initial?.costCenterId ?: "") }
+    var costCenterCode by remember { mutableStateOf(initial?.costCenterCode ?: "") }
+    var costCenterName by remember { mutableStateOf(initial?.costCenterName ?: "") }
+    var departmentId by remember { mutableStateOf(initial?.departmentId ?: "") }
+    var departmentCode by remember { mutableStateOf(initial?.departmentCode ?: "") }
+    var departmentName by remember { mutableStateOf(initial?.departmentName ?: "") }
+    var physicalLocation by remember { mutableStateOf(initial?.physicalLocation ?: "") }
+    var building by remember { mutableStateOf(initial?.building ?: "") }
+    var floor by remember { mutableStateOf(initial?.floor ?: "") }
+    var room by remember { mutableStateOf(initial?.room ?: "") }
+    var area by remember { mutableStateOf(initial?.area ?: "") }
+    var line by remember { mutableStateOf(initial?.line ?: "") }
+    var position by remember { mutableStateOf(initial?.position ?: "") }
+    var storageLocationId by remember { mutableStateOf(initial?.storageLocationId ?: "") }
+    var storageLocationCode by remember { mutableStateOf(initial?.storageLocationCode ?: "") }
+    var storageLocationName by remember { mutableStateOf(initial?.storageLocationName ?: "") }
+    var functionalLocationId by remember { mutableStateOf(initial?.functionalLocationId ?: "") }
+    var functionalLocationCode by remember { mutableStateOf(initial?.functionalLocationCode ?: "") }
+    var functionalLocationName by remember { mutableStateOf(initial?.functionalLocationName ?: "") }
+    var functionalLocationPath by remember { mutableStateOf(initial?.functionalLocationPath ?: "") }
+    var functionalLocationLevel by remember { mutableStateOf(initial?.functionalLocationLevel ?: 0) }
+    var locationInheritanceSource by remember { mutableStateOf(initial?.locationInheritanceSource ?: "") }
+    var isLocationInherited by remember { mutableStateOf(initial?.isLocationInherited == true) }
+    var isWorkCenterInherited by remember { mutableStateOf(initial?.isWorkCenterInherited == true) }
+    var isPlannerGroupInherited by remember { mutableStateOf(initial?.isPlannerGroupInherited == true) }
+    var isCostCenterInherited by remember { mutableStateOf(initial?.isCostCenterInherited == true) }
+    var isMaintenancePlantInherited by remember { mutableStateOf(initial?.isMaintenancePlantInherited == true) }
+    var isPlanningPlantInherited by remember { mutableStateOf(initial?.isPlanningPlantInherited == true) }
+    var inheritedFromFunctionalLocationId by remember { mutableStateOf(initial?.inheritedFromFunctionalLocationId ?: "") }
+    var manualOverrideReason by remember { mutableStateOf(initial?.manualOverrideReason ?: "") }
+    var responsiblePersonId by remember { mutableStateOf(initial?.responsiblePersonId ?: "") }
+    var constructionType by remember { mutableStateOf(initial?.constructionType ?: "") }
+    var commissioningAt by remember { mutableStateOf(initial?.commissioningAt ?: "") }
+    var financialAssetRef by remember { mutableStateOf(initial?.financialAssetRef ?: "") }
+    var notes by remember { mutableStateOf(initial?.notes ?: "") }
+    var partners by remember { mutableStateOf(initial?.partners ?: "") }
+    var safetyCritical by remember { mutableStateOf(initial?.safetyCritical == true) }
+    var riskLevel by remember { mutableStateOf(initial?.riskLevel ?: "") }
+    var requiredPermits by remember { mutableStateOf(initial?.requiredPermits ?: "") }
+    var safetyInstructions by remember { mutableStateOf(initial?.safetyInstructions ?: "") }
+    var ppeRequired by remember { mutableStateOf(initial?.ppeRequired ?: "") }
+    var isolationRequired by remember { mutableStateOf(initial?.isolationRequired == true) }
+    var complianceRequirements by remember { mutableStateOf(initial?.complianceRequirements ?: "") }
+    var financialStatus by remember { mutableStateOf(initial?.financialStatus ?: "") }
+    var bookValue by remember { mutableStateOf((initial?.bookValue ?: 0.0).toString()) }
+    var capitalizationAt by remember { mutableStateOf(initial?.capitalizationAt ?: "") }
+    var linearStartPoint by remember { mutableStateOf(initial?.linearStartPoint ?: "") }
+    var linearEndPoint by remember { mutableStateOf(initial?.linearEndPoint ?: "") }
+    var linearLength by remember { mutableStateOf((initial?.linearLength ?: 0.0).toString()) }
+    var linearUnit by remember { mutableStateOf(initial?.linearUnit ?: "") }
+    var linearRoute by remember { mutableStateOf(initial?.linearRoute ?: "") }
+    var currentCustodian by remember { mutableStateOf(initial?.currentCustodian ?: "") }
+    var currentPhysicalLocation by remember { mutableStateOf(initial?.currentPhysicalLocation ?: "") }
+    var lastKnownLocation by remember { mutableStateOf(initial?.lastKnownLocation ?: "") }
+    var movementStatus by remember { mutableStateOf(initial?.movementStatus ?: "") }
+    var checkedOutTo by remember { mutableStateOf(initial?.checkedOutTo ?: "") }
+    var checkedOutAt by remember { mutableStateOf(initial?.checkedOutAt ?: "") }
+    var expectedReturnAt by remember { mutableStateOf(initial?.expectedReturnAt ?: "") }
+    val formSteps = listOf(
+        "Basic" to "الأساسيات",
+        "Org" to "التنظيم",
+        "Finance" to "المالية",
+        "Safety" to "السلامة",
+        "Technical" to "فني/متنقل"
+    )
+    var currentStep by remember { mutableStateOf(formSteps.first().first) }
+    fun isStep(key: String): Boolean = currentStep == key
+    fun currentStepIndex(): Int = formSteps.indexOfFirst { it.first == currentStep }.coerceAtLeast(0)
+    fun activeStatus(status: String): Boolean = !status.equals("Inactive", ignoreCase = true)
+    fun masterLabel(id: Long, code: String, name: String): String = listOf(id.toString(), code, name).filter { it.isNotBlank() }.joinToString(" • ")
+    fun selectedMasterLabel(id: String, code: String, name: String): String = if (id.isBlank()) "" else listOf(id, code, name).filter { it.isNotBlank() }.joinToString(" • ")
+    fun parseMasterId(label: String): Long? = label.substringBefore(" • ").toLongOrNull()
+
+    fun applyFunctionalLocationInheritance(locationEntity: FunctionalLocationEntity) {
+        locationId = locationEntity.id
+        location = locationEntity.name
+        functionalLocationId = locationEntity.id.toString()
+        functionalLocationCode = locationEntity.code
+        functionalLocationName = locationEntity.name
+        functionalLocationPath = locationEntity.path.ifBlank { locationEntity.code }
+        functionalLocationLevel = locationEntity.level
+        locationInheritanceSource = locationEntity.code
+        inheritedFromFunctionalLocationId = locationEntity.id.toString()
+        isLocationInherited = true
+
+        if (companyId.isBlank()) companyId = locationEntity.companyId
+        if (siteId.isBlank()) siteId = locationEntity.siteId
+        if (plantId.isBlank()) plantId = locationEntity.plantId
+        if (maintenancePlantId.isBlank() && locationEntity.maintenancePlantId.isNotBlank()) {
+            maintenancePlantId = locationEntity.maintenancePlantId
+            isMaintenancePlantInherited = true
+        }
+        if (planningPlantId.isBlank() && locationEntity.planningPlantId.isNotBlank()) {
+            planningPlantId = locationEntity.planningPlantId
+            isPlanningPlantInherited = true
+        }
+        if (workCenterId.isBlank() && locationEntity.workCenterId.isNotBlank()) {
+            workCenterId = locationEntity.workCenterId
+            isWorkCenterInherited = true
+        }
+        if (plannerGroupId.isBlank() && locationEntity.plannerGroupId.isNotBlank()) {
+            plannerGroupId = locationEntity.plannerGroupId
+            isPlannerGroupInherited = true
+        }
+        if (costCenterId.isBlank() && locationEntity.costCenterId.isNotBlank()) {
+            costCenterId = locationEntity.costCenterId
+            isCostCenterInherited = true
+        }
+        if (departmentId.isBlank()) departmentId = locationEntity.departmentId
+        if (physicalLocation.isBlank()) physicalLocation = locationEntity.physicalLocation
+        if (building.isBlank()) building = locationEntity.building
+        if (floor.isBlank()) floor = locationEntity.floor
+        if (room.isBlank()) room = locationEntity.room
+        if (area.isBlank()) area = locationEntity.area
+        if (line.isBlank()) line = locationEntity.line
+        if (position.isBlank()) position = locationEntity.position
+    }
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
-        LabeledField("الكود (Code)", code, { code = it })
+        Text("قسّمنا نموذج الأصل إلى خطوات لتسهيل إدخال البيانات المطلوبة ومراجعتها قبل الحفظ.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            formSteps.forEachIndexed { index, step ->
+                val selected = currentStep == step.first
+                val label = "${index + 1}. ${step.second}"
+                if (selected) {
+                    Button(onClick = { currentStep = step.first }, modifier = Modifier.weight(1f)) {
+                        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                } else {
+                    OutlinedButton(onClick = { currentStep = step.first }, modifier = Modifier.weight(1f)) {
+                        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+        Text("الخطوة ${currentStepIndex() + 1} من ${formSteps.size}: ${formSteps[currentStepIndex()].second}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+
+        if (isStep("Basic")) {
+            Text("الأساسيات والتصنيف", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            LabeledField("الكود (Code)", code, { code = it })
         LabeledField("الاسم (Name)", name, { name = it })
+        OptionDropdown("نوع الأصل", listOf("Equipment", "Functional Location", "Linear Asset", "Tool Asset", "Safety Asset", "Utility Asset", "Production Asset", "Mobile Asset", "Serialized Component", "Refurbishable Component"), assetType) { assetType = it }
+        LabeledField("فئة الأصل", assetCategory, { assetCategory = it })
+        LabeledField("فئة المعدة", equipmentCategory, { equipmentCategory = it })
+        LabeledField("نوع الكائن الفني", objectType, { objectType = it })
+        LabeledField("تصنيف الأصل", assetClass, { assetClass = it })
+        LabeledField("التصنيف الفرعي", assetSubclass, { assetSubclass = it })
+        LabeledField("الوصف", description, { description = it })
+        LabeledField("الوصف التفصيلي", longDescription, { longDescription = it })
+        LabeledField("تسمية بديلة", alternativeLabel, { alternativeLabel = it })
+        LabeledField("كود الأصل الخارجي", externalAssetCode, { externalAssetCode = it })
+        LabeledField("كود الأصل القديم", legacyAssetCode, { legacyAssetCode = it })
+        LabeledField("Barcode", barcode, { barcode = it })
+        LabeledField("QR Code", qrCode, { qrCode = it })
         LabeledField("المجموعة (Group)", group, { group = it })
         LabeledField("الموقع النصّي (Location)", location, { location = it })
         if (locations.isNotEmpty()) {
-            LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+            LocationDropdown("الموقع الفني", locations, locationId) { selectedId ->
+                locationId = selectedId
+                locations.firstOrNull { it.id == selectedId }?.let(::applyFunctionalLocationInheritance)
+            }
+            if (locationInheritanceSource.isNotBlank()) {
+                Text("تم توريث بيانات التنظيم من الموقع الفني: $locationInheritanceSource", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
         }
         if (allAssets.isNotEmpty()) {
             AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
         }
         LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
         LabeledField("الموديل (Model)", model, { model = it })
-        OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
-        OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
-        Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        LabeledField("نوع البناء / Construction Type", constructionType, { constructionType = it })
+            OptionDropdown("الحالة", listOf("Draft", "Active", "Running", "Standby", "Under Maintenance", "Breakdown", "Stopped", "Out of Service", "In Storage", "Sent to Vendor", "Refurbishment", "Retired", "Disposed", "Inactive"), status) { status = it }
+            OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
+        }
+
+        if (isStep("Org")) {
+            Text("التنظيم والمسؤولية", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            if (companies.isNotEmpty()) {
+                val options = listOf("") + companies.filter { activeStatus(it.status) }.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("الشركة", options, selectedMasterLabel(companyId, companyCode, companyName)) { selected ->
+                    parseMasterId(selected)?.let { id -> companies.firstOrNull { it.id == id } }?.let { company ->
+                        companyId = company.id.toString(); companyCode = company.code; companyName = company.name
+                    } ?: run { companyId = ""; companyCode = ""; companyName = "" }
+                }
+            } else {
+                LabeledField("الشركة", companyId, { companyId = it })
+                LabeledField("كود الشركة", companyCode, { companyCode = it })
+                LabeledField("اسم الشركة", companyName, { companyName = it })
+            }
+
+            val companyLong = companyId.toLongOrNull()
+            val siteOptionsSource = sites.filter { activeStatus(it.status) && (companyLong == null || it.companyId == companyLong) }
+            if (siteOptionsSource.isNotEmpty()) {
+                val options = listOf("") + siteOptionsSource.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("الموقع العام", options, selectedMasterLabel(siteId, siteCode, siteName)) { selected ->
+                    parseMasterId(selected)?.let { id -> sites.firstOrNull { it.id == id } }?.let { site ->
+                        siteId = site.id.toString(); siteCode = site.code; siteName = site.name
+                        companies.firstOrNull { it.id == site.companyId }?.let { company ->
+                            companyId = company.id.toString(); companyCode = company.code; companyName = company.name
+                        }
+                    } ?: run { siteId = ""; siteCode = ""; siteName = "" }
+                }
+            } else {
+                LabeledField("الموقع العام", siteId, { siteId = it })
+                LabeledField("كود الموقع العام", siteCode, { siteCode = it })
+                LabeledField("اسم الموقع العام", siteName, { siteName = it })
+            }
+
+            val siteLong = siteId.toLongOrNull()
+            val plantOptionsSource = plants.filter { activeStatus(it.status) && (companyLong == null || it.companyId == companyLong) && (siteLong == null || it.siteId == siteLong) }
+            if (plantOptionsSource.isNotEmpty()) {
+                val options = listOf("") + plantOptionsSource.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("المصنع / الموقع التشغيلي", options, selectedMasterLabel(plantId, plantCode, plantName)) { selected ->
+                    parseMasterId(selected)?.let { id -> plants.firstOrNull { it.id == id } }?.let { plant ->
+                        plantId = plant.id.toString(); plantCode = plant.code; plantName = plant.name
+                        if (maintenancePlantId.isBlank()) { maintenancePlantId = plant.id.toString(); maintenancePlantCode = plant.code; maintenancePlantName = plant.name }
+                        if (planningPlantId.isBlank()) { planningPlantId = plant.id.toString(); planningPlantCode = plant.code; planningPlantName = plant.name }
+                    } ?: run { plantId = ""; plantCode = ""; plantName = "" }
+                }
+            } else {
+                LabeledField("المصنع / الموقع التشغيلي", plantId, { plantId = it })
+                LabeledField("كود المصنع", plantCode, { plantCode = it })
+                LabeledField("اسم المصنع", plantName, { plantName = it })
+            }
+
+            val plantLong = plantId.toLongOrNull()
+            val planningPlantLong = planningPlantId.toLongOrNull() ?: plantLong
+            if (plantOptionsSource.isNotEmpty()) {
+                val options = listOf("") + plantOptionsSource.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("موقع الصيانة", options, selectedMasterLabel(maintenancePlantId, maintenancePlantCode, maintenancePlantName)) { selected ->
+                    parseMasterId(selected)?.let { id -> plants.firstOrNull { it.id == id } }?.let { plant ->
+                        maintenancePlantId = plant.id.toString(); maintenancePlantCode = plant.code; maintenancePlantName = plant.name
+                    } ?: run { maintenancePlantId = ""; maintenancePlantCode = ""; maintenancePlantName = "" }
+                }
+                OptionDropdown("موقع التخطيط", options, selectedMasterLabel(planningPlantId, planningPlantCode, planningPlantName)) { selected ->
+                    parseMasterId(selected)?.let { id -> plants.firstOrNull { it.id == id } }?.let { plant ->
+                        planningPlantId = plant.id.toString(); planningPlantCode = plant.code; planningPlantName = plant.name
+                    } ?: run { planningPlantId = ""; planningPlantCode = ""; planningPlantName = "" }
+                }
+            } else {
+                LabeledField("موقع الصيانة", maintenancePlantId, { maintenancePlantId = it })
+                LabeledField("موقع التخطيط", planningPlantId, { planningPlantId = it })
+            }
+
+            val workCenterOptionsSource = workCenters.filter { activeStatus(it.status) && (plantLong == null || it.plantId == plantLong) }
+            if (workCenterOptionsSource.isNotEmpty()) {
+                val options = listOf("") + workCenterOptionsSource.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("مركز العمل", options, selectedMasterLabel(workCenterId, workCenterCode, workCenterName)) { selected ->
+                    parseMasterId(selected)?.let { id -> workCenters.firstOrNull { it.id == id } }?.let { wc ->
+                        workCenterId = wc.id.toString(); workCenterCode = wc.code; workCenterName = wc.name
+                    } ?: run { workCenterId = ""; workCenterCode = ""; workCenterName = "" }
+                }
+            } else {
+                LabeledField("مركز العمل", workCenterId, { workCenterId = it })
+            }
+
+            val plannerOptionsSource = plannerGroups.filter { activeStatus(it.status) && (planningPlantLong == null || it.planningPlantId == planningPlantLong) }
+            if (plannerOptionsSource.isNotEmpty()) {
+                val options = listOf("") + plannerOptionsSource.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("مجموعة التخطيط", options, selectedMasterLabel(plannerGroupId, plannerGroupCode, plannerGroupName)) { selected ->
+                    parseMasterId(selected)?.let { id -> plannerGroups.firstOrNull { it.id == id } }?.let { group ->
+                        plannerGroupId = group.id.toString(); plannerGroupCode = group.code; plannerGroupName = group.name
+                    } ?: run { plannerGroupId = ""; plannerGroupCode = ""; plannerGroupName = "" }
+                }
+            } else {
+                LabeledField("مجموعة التخطيط", plannerGroupId, { plannerGroupId = it })
+            }
+
+            val departmentOptionsSource = departments.filter { activeStatus(it.status) && (companyLong == null || it.companyId == companyLong) && (siteLong == null || it.siteId == siteLong) }
+            if (departmentOptionsSource.isNotEmpty()) {
+                val options = listOf("") + departmentOptionsSource.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("الإدارة المالكة", options, selectedMasterLabel(departmentId, departmentCode, departmentName)) { selected ->
+                    parseMasterId(selected)?.let { id -> departments.firstOrNull { it.id == id } }?.let { dep ->
+                        departmentId = dep.id.toString(); departmentCode = dep.code; departmentName = dep.name
+                    } ?: run { departmentId = ""; departmentCode = ""; departmentName = "" }
+                }
+            } else {
+                LabeledField("الإدارة المالكة", departmentId, { departmentId = it })
+                LabeledField("كود القسم", departmentCode, { departmentCode = it })
+                LabeledField("اسم القسم", departmentName, { departmentName = it })
+            }
+
+            val departmentLong = departmentId.toLongOrNull()
+            val costCenterOptionsSource = costCenters.filter { activeStatus(it.status) && (companyLong == null || it.companyId == companyLong) && (departmentLong == null || it.departmentId == departmentLong) }
+            if (costCenterOptionsSource.isNotEmpty()) {
+                val options = listOf("") + costCenterOptionsSource.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("مركز التكلفة", options, selectedMasterLabel(costCenterId, costCenterCode, costCenterName)) { selected ->
+                    parseMasterId(selected)?.let { id -> costCenters.firstOrNull { it.id == id } }?.let { cc ->
+                        costCenterId = cc.id.toString(); costCenterCode = cc.code; costCenterName = cc.name
+                    } ?: run { costCenterId = ""; costCenterCode = ""; costCenterName = "" }
+                }
+            } else {
+                LabeledField("مركز التكلفة", costCenterId, { costCenterId = it })
+                LabeledField("كود مركز التكلفة", costCenterCode, { costCenterCode = it })
+                LabeledField("اسم مركز التكلفة", costCenterName, { costCenterName = it })
+            }
+            LabeledField("المسؤول", responsiblePersonId, { responsiblePersonId = it })
+            Text("المكان الفعلي", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        LabeledField("المكان الفعلي", physicalLocation, { physicalLocation = it })
+        LabeledField("المبنى", building, { building = it })
+        LabeledField("الدور", floor, { floor = it })
+        LabeledField("الغرفة", room, { room = it })
+        LabeledField("المنطقة", area, { area = it })
+        LabeledField("الخط", line, { line = it })
+        LabeledField("الموضع", position, { position = it })
+            val storageOptionsSource = storageLocations.filter { activeStatus(it.status) && (plantLong == null || it.plantId == plantLong) }
+            if (storageOptionsSource.isNotEmpty()) {
+                val options = listOf("") + storageOptionsSource.map { masterLabel(it.id, it.code, it.name) }
+                OptionDropdown("موقع التخزين", options, selectedMasterLabel(storageLocationId, storageLocationCode, storageLocationName)) { selected ->
+                    parseMasterId(selected)?.let { id -> storageLocations.firstOrNull { it.id == id } }?.let { storage ->
+                        storageLocationId = storage.id.toString(); storageLocationCode = storage.code; storageLocationName = storage.name
+                    } ?: run { storageLocationId = ""; storageLocationCode = ""; storageLocationName = "" }
+                }
+            } else {
+                LabeledField("موقع التخزين", storageLocationId, { storageLocationId = it })
+                LabeledField("كود موقع التخزين", storageLocationCode, { storageLocationCode = it })
+                LabeledField("اسم موقع التخزين", storageLocationName, { storageLocationName = it })
+            }
+        if (isWorkCenterInherited || isPlannerGroupInherited || isCostCenterInherited || isMaintenancePlantInherited || isPlanningPlantInherited) {
+            Text(
+                listOfNotNull(
+                    "الموقع".takeIf { isLocationInherited },
+                    "مركز العمل".takeIf { isWorkCenterInherited },
+                    "مجموعة التخطيط".takeIf { isPlannerGroupInherited },
+                    "مركز التكلفة".takeIf { isCostCenterInherited },
+                    "موقع الصيانة".takeIf { isMaintenancePlantInherited },
+                    "موقع التخطيط".takeIf { isPlanningPlantInherited }
+                ).joinToString(prefix = "Inherited: "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+            LabeledField("سبب التجاوز اليدوي للوراثة", manualOverrideReason, { manualOverrideReason = it })
+            LabeledField("الشركاء والمسؤولون", partners, { partners = it })
+        }
+
+        if (isStep("Finance")) {
+            Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
         LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
         LabeledField("المورّد (Supplier)", supplier, { supplier = it })
         LabeledField("أمر الشراء (PO)", purchaseOrder, { purchaseOrder = it })
         LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
         DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
-        Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
-        DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
-        DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
-        SaveButton(code.isNotBlank() && name.isNotBlank()) {
+        DateField("تاريخ التشغيل / Commissioning", commissioningAt) { commissioningAt = it }
+        LabeledField("مرجع الأصل المالي", financialAssetRef, { financialAssetRef = it })
+        LabeledField("الحالة المالية", financialStatus, { financialStatus = it })
+        LabeledField("القيمة الدفترية", bookValue, { bookValue = it }, numeric = true)
+        DateField("تاريخ الرسملة", capitalizationAt) { capitalizationAt = it }
+            Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
+            DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
+            DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
+        }
+
+        if (isStep("Safety")) {
+            Text("السلامة والامتثال", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        OptionDropdown("حرج للسلامة", listOf("No", "Yes"), if (safetyCritical) "Yes" else "No") { safetyCritical = it == "Yes" }
+        LabeledField("مستوى الخطر", riskLevel, { riskLevel = it })
+        LabeledField("التصاريح المطلوبة", requiredPermits, { requiredPermits = it })
+        LabeledField("تعليمات السلامة", safetyInstructions, { safetyInstructions = it })
+        LabeledField("معدات الوقاية PPE", ppeRequired, { ppeRequired = it })
+            OptionDropdown("يتطلب عزل", listOf("No", "Yes"), if (isolationRequired) "Yes" else "No") { isolationRequired = it == "Yes" }
+            LabeledField("متطلبات الامتثال", complianceRequirements, { complianceRequirements = it })
+        }
+
+        if (isStep("Technical")) {
+            Text("بيانات الأصل الخطي (إن وجدت)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        LabeledField("نقطة البداية", linearStartPoint, { linearStartPoint = it })
+        LabeledField("نقطة النهاية", linearEndPoint, { linearEndPoint = it })
+        LabeledField("الطول", linearLength, { linearLength = it }, numeric = true)
+        LabeledField("وحدة الطول", linearUnit, { linearUnit = it })
+        LabeledField("المسار", linearRoute, { linearRoute = it })
+        Text("بيانات الأصل المتنقل (إن وجدت)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        LabeledField("مسؤول العهدة الحالي", currentCustodian, { currentCustodian = it })
+        LabeledField("المكان الفعلي الحالي", currentPhysicalLocation, { currentPhysicalLocation = it })
+        LabeledField("آخر موقع معروف", lastKnownLocation, { lastKnownLocation = it })
+        OptionDropdown("حالة الحركة", listOf("", "Available", "Checked Out", "In Transit", "Lost", "Unknown"), movementStatus) { movementStatus = it }
+        LabeledField("مصروف إلى", checkedOutTo, { checkedOutTo = it })
+        DateField("تاريخ الصرف", checkedOutAt) { checkedOutAt = it }
+            DateField("تاريخ الإرجاع المتوقع", expectedReturnAt) { expectedReturnAt = it }
+            LabeledField("ملاحظات", notes, { notes = it })
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                enabled = currentStepIndex() > 0,
+                onClick = { currentStep = formSteps[currentStepIndex() - 1].first },
+                modifier = Modifier.weight(1f)
+            ) { Text("السابق") }
+            Button(
+                enabled = currentStepIndex() < formSteps.lastIndex,
+                onClick = { currentStep = formSteps[currentStepIndex() + 1].first },
+                modifier = Modifier.weight(1f)
+            ) { Text("التالي") }
+        }
+        SaveButton(code.isNotBlank() && name.isNotBlank() && assetType.isNotBlank() && assetCategory.isNotBlank()) {
             val today = DateStrings.today()
             onSave(
                 AssetEntity(
@@ -416,7 +832,99 @@ internal fun AssetFormSheet(
                     supplier = supplier.trim(),
                     purchaseOrder = purchaseOrder.trim(),
                     purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
-                    acquiredAt = acquiredAt.trim()
+                    acquiredAt = acquiredAt.trim(),
+                    assetType = assetType,
+                    assetCategory = assetCategory.trim(),
+                    equipmentCategory = equipmentCategory.trim(),
+                    objectType = objectType.trim(),
+                    assetClass = assetClass.trim(),
+                    assetSubclass = assetSubclass.trim(),
+                    description = description.trim(),
+                    longDescription = longDescription.trim(),
+                    alternativeLabel = alternativeLabel.trim(),
+                    externalAssetCode = externalAssetCode.trim(),
+                    legacyAssetCode = legacyAssetCode.trim(),
+                    barcode = barcode.trim(),
+                    qrCode = qrCode.trim(),
+                    companyId = companyId.trim(),
+                    companyCode = companyCode.trim(),
+                    companyName = companyName.trim(),
+                    siteId = siteId.trim(),
+                    siteCode = siteCode.trim(),
+                    siteName = siteName.trim(),
+                    plantId = plantId.trim(),
+                    plantCode = plantCode.trim(),
+                    plantName = plantName.trim(),
+                    maintenancePlantId = maintenancePlantId.trim(),
+                    maintenancePlantCode = maintenancePlantCode.trim(),
+                    maintenancePlantName = maintenancePlantName.trim(),
+                    planningPlantId = planningPlantId.trim(),
+                    planningPlantCode = planningPlantCode.trim(),
+                    planningPlantName = planningPlantName.trim(),
+                    workCenterId = workCenterId.trim(),
+                    workCenterCode = workCenterCode.trim(),
+                    workCenterName = workCenterName.trim(),
+                    plannerGroupId = plannerGroupId.trim(),
+                    plannerGroupCode = plannerGroupCode.trim(),
+                    plannerGroupName = plannerGroupName.trim(),
+                    costCenterId = costCenterId.trim(),
+                    costCenterCode = costCenterCode.trim(),
+                    costCenterName = costCenterName.trim(),
+                    departmentId = departmentId.trim(),
+                    departmentCode = departmentCode.trim(),
+                    departmentName = departmentName.trim(),
+                    functionalLocationId = functionalLocationId.trim(),
+                    functionalLocationCode = functionalLocationCode.trim(),
+                    functionalLocationName = functionalLocationName.trim(),
+                    functionalLocationPath = functionalLocationPath.trim(),
+                    functionalLocationLevel = functionalLocationLevel,
+                    physicalLocation = physicalLocation.trim(),
+                    building = building.trim(),
+                    floor = floor.trim(),
+                    room = room.trim(),
+                    area = area.trim(),
+                    line = line.trim(),
+                    position = position.trim(),
+                    storageLocationId = storageLocationId.trim(),
+                    storageLocationCode = storageLocationCode.trim(),
+                    storageLocationName = storageLocationName.trim(),
+                    locationInheritanceSource = locationInheritanceSource.trim(),
+                    isLocationInherited = isLocationInherited,
+                    isWorkCenterInherited = isWorkCenterInherited,
+                    isPlannerGroupInherited = isPlannerGroupInherited,
+                    isCostCenterInherited = isCostCenterInherited,
+                    isMaintenancePlantInherited = isMaintenancePlantInherited,
+                    isPlanningPlantInherited = isPlanningPlantInherited,
+                    inheritedFromFunctionalLocationId = inheritedFromFunctionalLocationId.trim(),
+                    manualOverrideReason = manualOverrideReason.trim(),
+                    responsiblePersonId = responsiblePersonId.trim(),
+                    constructionType = constructionType.trim(),
+                    commissioningAt = commissioningAt.trim(),
+                    financialAssetRef = financialAssetRef.trim(),
+                    notes = notes.trim(),
+                    partners = partners.trim(),
+                    safetyCritical = safetyCritical,
+                    riskLevel = riskLevel.trim(),
+                    requiredPermits = requiredPermits.trim(),
+                    safetyInstructions = safetyInstructions.trim(),
+                    ppeRequired = ppeRequired.trim(),
+                    isolationRequired = isolationRequired,
+                    complianceRequirements = complianceRequirements.trim(),
+                    financialStatus = financialStatus.trim(),
+                    bookValue = bookValue.toDoubleOrNull() ?: 0.0,
+                    capitalizationAt = capitalizationAt.trim(),
+                    linearStartPoint = linearStartPoint.trim(),
+                    linearEndPoint = linearEndPoint.trim(),
+                    linearLength = linearLength.toDoubleOrNull() ?: 0.0,
+                    linearUnit = linearUnit.trim(),
+                    linearRoute = linearRoute.trim(),
+                    currentCustodian = currentCustodian.trim(),
+                    currentPhysicalLocation = currentPhysicalLocation.trim(),
+                    lastKnownLocation = lastKnownLocation.trim(),
+                    movementStatus = movementStatus.trim(),
+                    checkedOutTo = checkedOutTo.trim(),
+                    checkedOutAt = checkedOutAt.trim(),
+                    expectedReturnAt = expectedReturnAt.trim()
                 )
             )
         }
@@ -995,11 +1503,13 @@ internal fun MovementFormSheet(
     asset: AssetEntity,
     locations: List<FunctionalLocationEntity>,
     onDismiss: () -> Unit,
-    onSave: (type: String, locId: Long?, locName: String, notes: String) -> Unit
+    onSave: (type: String, locId: Long?, locName: String, notes: String, approvedBy: String, attachment: String) -> Unit
 ) {
     var type by remember { mutableStateOf(MovementType.INSTALL) }
     var locId by remember { mutableStateOf<Long?>(asset.locationId) }
     var notes by remember { mutableStateOf("") }
+    var approvedBy by remember { mutableStateOf("") }
+    var attachment by remember { mutableStateOf("") }
     val needsLocation = type == MovementType.INSTALL || type == MovementType.TRANSFER
 
     FormSheet("حركة الأصل: ${asset.code}", onDismiss) {
@@ -1014,9 +1524,13 @@ internal fun MovementFormSheet(
             LocationDropdown("الموقع الوجهة", locations, locId, onSelect = { locId = it })
         }
         LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
-        SaveButton(!needsLocation || locId != null) {
+        if (type == MovementType.TRANSFER) {
+            LabeledField("اعتمد بواسطة", approvedBy, { approvedBy = it })
+            LabeledField("مرفق / مرجع الموافقة", attachment, { attachment = it })
+        }
+        SaveButton((!needsLocation || locId != null) && (type != MovementType.TRANSFER || notes.isNotBlank())) {
             val name = locations.firstOrNull { it.id == locId }?.name ?: ""
-            onSave(type, if (needsLocation) locId else null, if (needsLocation) name else "", notes.trim())
+            onSave(type, if (needsLocation) locId else null, if (needsLocation) name else "", notes.trim(), approvedBy.trim(), attachment.trim())
         }
     }
 }

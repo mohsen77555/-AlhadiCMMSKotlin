@@ -13,14 +13,21 @@ import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
+import com.alhadi.cmms.data.entity.CompanyEntity
+import com.alhadi.cmms.data.entity.CostCenterEntity
+import com.alhadi.cmms.data.entity.DepartmentEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PlannerGroupEntity
+import com.alhadi.cmms.data.entity.PlantEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SiteEntity
+import com.alhadi.cmms.data.entity.StorageLocationEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -29,6 +36,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WorkCenterEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PdfExporter
 import com.alhadi.cmms.util.XlsxReader
@@ -119,6 +127,23 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val functionalLocations: StateFlow<List<FunctionalLocationEntity>> = repository.functionalLocations
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val companies: StateFlow<List<CompanyEntity>> = repository.companies
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val sites: StateFlow<List<SiteEntity>> = repository.sites
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val plants: StateFlow<List<PlantEntity>> = repository.plants
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val workCenters: StateFlow<List<WorkCenterEntity>> = repository.workCenters
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val plannerGroups: StateFlow<List<PlannerGroupEntity>> = repository.plannerGroups
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val departments: StateFlow<List<DepartmentEntity>> = repository.departments
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val costCenters: StateFlow<List<CostCenterEntity>> = repository.costCenters
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val storageLocations: StateFlow<List<StorageLocationEntity>> = repository.storageLocations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val capaActions: StateFlow<List<CapaEntity>> = repository.capaActions
@@ -284,6 +309,24 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun saveFunctionalLocation(location: FunctionalLocationEntity) = launchAction("تم حفظ الموقع الفني") { repository.saveFunctionalLocation(location, actor()) }
     fun deleteFunctionalLocation(location: FunctionalLocationEntity) = launchAction("تم حذف الموقع الفني") { repository.deleteFunctionalLocation(location, actor()) }
 
+    // ----- Organization master data -----
+    fun saveCompany(item: CompanyEntity) = launchAction("تم حفظ الشركة") { repository.saveCompany(item, actor()) }
+    fun deleteCompany(item: CompanyEntity) = launchAction("تم حذف/تعطيل الشركة") { repository.deleteCompany(item, actor()) }
+    fun saveSite(item: SiteEntity) = launchAction("تم حفظ الموقع العام") { repository.saveSite(item, actor()) }
+    fun deleteSite(item: SiteEntity) = launchAction("تم حذف/تعطيل الموقع العام") { repository.deleteSite(item, actor()) }
+    fun savePlant(item: PlantEntity) = launchAction("تم حفظ المصنع") { repository.savePlant(item, actor()) }
+    fun deletePlant(item: PlantEntity) = launchAction("تم حذف/تعطيل المصنع") { repository.deletePlant(item, actor()) }
+    fun saveWorkCenter(item: WorkCenterEntity) = launchAction("تم حفظ مركز العمل") { repository.saveWorkCenter(item, actor()) }
+    fun deleteWorkCenter(item: WorkCenterEntity) = launchAction("تم حذف/تعطيل مركز العمل") { repository.deleteWorkCenter(item, actor()) }
+    fun savePlannerGroup(item: PlannerGroupEntity) = launchAction("تم حفظ مجموعة التخطيط") { repository.savePlannerGroup(item, actor()) }
+    fun deletePlannerGroup(item: PlannerGroupEntity) = launchAction("تم حذف/تعطيل مجموعة التخطيط") { repository.deletePlannerGroup(item, actor()) }
+    fun saveDepartment(item: DepartmentEntity) = launchAction("تم حفظ القسم") { repository.saveDepartment(item, actor()) }
+    fun deleteDepartment(item: DepartmentEntity) = launchAction("تم حذف/تعطيل القسم") { repository.deleteDepartment(item, actor()) }
+    fun saveCostCenter(item: CostCenterEntity) = launchAction("تم حفظ مركز التكلفة") { repository.saveCostCenter(item, actor()) }
+    fun deleteCostCenter(item: CostCenterEntity) = launchAction("تم حذف/تعطيل مركز التكلفة") { repository.deleteCostCenter(item, actor()) }
+    fun saveStorageLocation(item: StorageLocationEntity) = launchAction("تم حفظ موقع التخزين") { repository.saveStorageLocation(item, actor()) }
+    fun deleteStorageLocation(item: StorageLocationEntity) = launchAction("تم حذف/تعطيل موقع التخزين") { repository.deleteStorageLocation(item, actor()) }
+
     // ----- Asset documents -----
     fun saveAssetDocument(doc: AssetDocumentEntity) = launchAction("تم حفظ المستند") { repository.saveAssetDocument(doc, actor()) }
     fun deleteAssetDocument(doc: AssetDocumentEntity) = launchAction("تم حذف المستند") { repository.deleteAssetDocument(doc, actor()) }
@@ -296,8 +339,8 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
     fun saveBomItem(item: AssetBomItemEntity) = launchAction("تم حفظ بند المكوّنات") { repository.saveBomItem(item, actor()) }
     fun deleteBomItem(item: AssetBomItemEntity) = launchAction("تم حذف بند المكوّنات") { repository.deleteBomItem(item, actor()) }
 
-    fun performAssetMovement(asset: AssetEntity, eventType: String, toLocationId: Long?, toLocationName: String, notes: String) =
-        launchAction("تم تسجيل الحركة") { repository.performAssetMovement(asset, eventType, toLocationId, toLocationName, notes, actor()) }
+    fun performAssetMovement(asset: AssetEntity, eventType: String, toLocationId: Long?, toLocationName: String, notes: String, approvedBy: String = "", attachment: String = "") =
+        launchAction("تم تسجيل الحركة") { repository.performAssetMovement(asset, eventType, toLocationId, toLocationName, notes, approvedBy, attachment, actor()) }
     fun deleteAssetMovement(movement: AssetMovementEntity) = launchAction("تم حذف الحركة") { repository.deleteAssetMovement(movement, actor()) }
 
     fun saveChecklistItem(item: PmChecklistItemEntity) = launchAction("تم حفظ بند الفحص") { repository.saveChecklistItem(item, actor()) }

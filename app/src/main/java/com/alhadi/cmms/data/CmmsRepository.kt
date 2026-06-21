@@ -8,14 +8,21 @@ import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
+import com.alhadi.cmms.data.entity.CompanyEntity
+import com.alhadi.cmms.data.entity.CostCenterEntity
+import com.alhadi.cmms.data.entity.DepartmentEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PlannerGroupEntity
+import com.alhadi.cmms.data.entity.PlantEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SiteEntity
+import com.alhadi.cmms.data.entity.StorageLocationEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -24,6 +31,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WorkCenterEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PasswordHasher
 import kotlinx.coroutines.flow.Flow
@@ -52,6 +60,14 @@ class CmmsRepository(private val database: AppDatabase) {
     private val photoDao = database.workOrderPhotoDao()
     private val taskListDao = database.taskListDao()
     private val permitDao = database.workPermitDao()
+    private val companyDao = database.companyDao()
+    private val siteDao = database.siteDao()
+    private val plantDao = database.plantDao()
+    private val workCenterDao = database.workCenterDao()
+    private val plannerGroupDao = database.plannerGroupDao()
+    private val departmentDao = database.departmentDao()
+    private val costCenterDao = database.costCenterDao()
+    private val storageLocationDao = database.storageLocationDao()
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
     val workOrders: Flow<List<WorkOrderEntity>> = workOrderDao.observeWorkOrders()
@@ -77,6 +93,14 @@ class CmmsRepository(private val database: AppDatabase) {
     val taskLists: Flow<List<TaskListEntity>> = taskListDao.observeTaskLists()
     val taskListOperations: Flow<List<TaskListOperationEntity>> = taskListDao.observeTaskListOperations()
     val workPermits: Flow<List<WorkPermitEntity>> = permitDao.observePermits()
+    val companies: Flow<List<CompanyEntity>> = companyDao.observeAll()
+    val sites: Flow<List<SiteEntity>> = siteDao.observeAll()
+    val plants: Flow<List<PlantEntity>> = plantDao.observeAll()
+    val workCenters: Flow<List<WorkCenterEntity>> = workCenterDao.observeAll()
+    val plannerGroups: Flow<List<PlannerGroupEntity>> = plannerGroupDao.observeAll()
+    val departments: Flow<List<DepartmentEntity>> = departmentDao.observeAll()
+    val costCenters: Flow<List<CostCenterEntity>> = costCenterDao.observeAll()
+    val storageLocations: Flow<List<StorageLocationEntity>> = storageLocationDao.observeAll()
 
     fun observeOpenCapaCount(): Flow<Int> = capaDao.observeOpenCount()
 
@@ -440,6 +464,7 @@ class CmmsRepository(private val database: AppDatabase) {
         estimatedCost: Double,
         actor: String
     ) {
+        validateAssetCanReceiveWorkOrder(assetId)
         val now = DateStrings.today()
         workOrderDao.insertWorkOrder(
             WorkOrderEntity(
@@ -604,18 +629,203 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveAsset(asset: AssetEntity, actor: String = "System") {
         val isNew = asset.id == 0L
+        val existing = if (isNew) null else assetDao.getAssetById(asset.id)
+        validateAssetForSave(asset, isNew)
         assetDao.insertAsset(asset)
         recordAudit(if (isNew) "Create" else "Update", "Asset", "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code}", actor)
+        if (existing != null) recordAssetSensitiveChanges(existing, asset, actor)
+    }
+
+    private suspend fun recordAssetSensitiveChanges(before: AssetEntity, after: AssetEntity, actor: String) {
+        fun valueOrDash(value: String): String = value.ifBlank { "-" }
+        suspend fun recordIfChanged(rule: String, field: String, oldValue: String, newValue: String) {
+            if (oldValue != newValue) {
+                recordAudit(
+                    action = "Governance",
+                    entityType = "Asset",
+                    details = "$rule: تغيير $field للأصل ${after.code}: ${valueOrDash(oldValue)} → ${valueOrDash(newValue)}",
+                    actor = actor
+                )
+            }
+        }
+
+        recordIfChanged("AUD-002", "الحالة", before.status, after.status)
+        recordIfChanged("AUD-002", "الموقع الفني", before.functionalLocationCode.ifBlank { before.locationId?.toString().orEmpty() }, after.functionalLocationCode.ifBlank { after.locationId?.toString().orEmpty() })
+        recordIfChanged("AUD-002", "مركز العمل", before.workCenterCode.ifBlank { before.workCenterId }, after.workCenterCode.ifBlank { after.workCenterId })
+        recordIfChanged("AUD-002", "مجموعة التخطيط", before.plannerGroupCode.ifBlank { before.plannerGroupId }, after.plannerGroupCode.ifBlank { after.plannerGroupId })
+        recordIfChanged("AUD-002", "مركز التكلفة", before.costCenterCode.ifBlank { before.costCenterId }, after.costCenterCode.ifBlank { after.costCenterId })
+
+        val critical = after.criticality.equals("Critical", ignoreCase = true) || after.criticality.equals("High", ignoreCase = true)
+        if (critical && before.manualOverrideReason != after.manualOverrideReason && after.manualOverrideReason.isNotBlank()) {
+            recordAudit("Governance", "Asset", "AST-INH-008: Override يدوي على أصل حرج ${after.code}: ${after.manualOverrideReason}", actor)
+        }
     }
 
     suspend fun deleteAsset(asset: AssetEntity, actor: String = "System") {
+        val hasHistory = assetHasHistory(asset.id)
+        if (hasHistory) {
+            assetDao.insertAsset(asset.copy(status = "Retired", notes = asset.notes.ifBlank { "تم تقاعد الأصل بدل الحذف لوجود تاريخ مرتبط." }))
+            recordAudit("Retire", "Asset", "لم يتم حذف أصل له تاريخ؛ تم تقاعده بدل الحذف: ${asset.code}", actor)
+            return
+        }
         assetDao.deleteById(asset.id)
         recordAudit("Delete", "Asset", "حذف أصل: ${asset.code}", actor)
     }
 
     suspend fun changeAssetStatus(asset: AssetEntity, status: String, actor: String = "System") {
-        assetDao.insertAsset(asset.copy(status = status))
+        val updated = asset.copy(status = status)
+        validateAssetForSave(updated, isNew = false)
+        assetDao.insertAsset(updated)
         recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status", actor)
+    }
+
+    private suspend fun validateAssetForSave(asset: AssetEntity, isNew: Boolean) {
+        fun fail(rule: String, message: String): Nothing = throw IllegalArgumentException("$rule: $message")
+
+        if (asset.code.isBlank()) fail("AST-REG-001", "كود الأصل مطلوب وفريد.")
+        if (asset.name.isBlank()) fail("AST-REG-002", "اسم الأصل مطلوب.")
+        if (asset.assetType.isBlank()) fail("AST-REG-002", "نوع الأصل مطلوب.")
+        if (asset.assetCategory.isBlank()) fail("AST-ID-004", "فئة الأصل مطلوبة.")
+        if (asset.status.isBlank()) fail("STAT-001", "حالة الأصل مطلوبة.")
+        if (asset.criticality.isBlank()) fail("CRIT-001", "أهمية الأصل مطلوبة.")
+
+        val duplicateCode = assetDao.findByCode(asset.code)
+        if (duplicateCode != null && duplicateCode.id != asset.id) {
+            fail("AST-REG-001", "كود الأصل مستخدم بالفعل: ${asset.code}")
+        }
+
+        val allAssets = assets.first()
+        if (asset.serialNumber.isNotBlank() && allAssets.any { it.id != asset.id && it.serialNumber.equals(asset.serialNumber, ignoreCase = true) }) {
+            fail("SN-002", "الرقم التسلسلي مستخدم بالفعل: ${asset.serialNumber}")
+        }
+        if (asset.assetType in setOf("Serialized Component", "Refurbishable Component") && asset.serialNumber.isBlank()) {
+            fail("AST-ID-008", "الرقم التسلسلي إلزامي للأصل المتسلسل.")
+        }
+        if (asset.barcode.isNotBlank() && allAssets.any { it.id != asset.id && it.barcode.equals(asset.barcode, ignoreCase = true) }) {
+            fail("AST-ID-009", "Barcode مستخدم بالفعل: ${asset.barcode}")
+        }
+        if (asset.qrCode.isNotBlank() && allAssets.any { it.id != asset.id && it.qrCode.equals(asset.qrCode, ignoreCase = true) }) {
+            fail("AST-ID-009", "QR Code مستخدم بالفعل: ${asset.qrCode}")
+        }
+
+        val existing = if (asset.id == 0L) null else assetDao.getAssetById(asset.id)
+        if (existing != null && existing.code != asset.code && assetHasHistory(asset.id)) {
+            fail("AST-ID-006", "لا يمكن تغيير كود أصل له بلاغات أو أوامر أو قراءات أو حركات.")
+        }
+
+        if (asset.parentAssetId == asset.id && asset.id != 0L) {
+            fail("HIER-002", "لا يمكن أن يكون الأصل أبًا لنفسه.")
+        }
+        if (asset.parentAssetId != null && createsAssetCycle(asset, allAssets)) {
+            fail("HIER-002", "لا يسمح بوجود علاقة دائرية في هرمية الأصول.")
+        }
+
+        val activeStatuses = setOf("Active", "Running", "Under Maintenance", "Breakdown")
+        if (asset.status in activeStatuses && asset.locationId == null && asset.location.isBlank() && asset.notes.isBlank()) {
+            fail("AST-REG-003", "الأصل النشط يجب أن يرتبط بموقع أو يحتوي ملاحظة تبرر عدم التركيب.")
+        }
+        val hasCompany = asset.companyId.isNotBlank() || asset.companyCode.isNotBlank() || asset.companyName.isNotBlank()
+        val hasPlant = asset.plantId.isNotBlank() || asset.plantCode.isNotBlank() || asset.plantName.isNotBlank()
+        val hasFunctionalLocation = asset.locationId != null || asset.functionalLocationId.isNotBlank() || asset.functionalLocationCode.isNotBlank()
+        if (asset.status in activeStatuses && !hasCompany) fail("AST-ORG-SAVE-001", "لا يمكن تفعيل الأصل بدون شركة.")
+        if (asset.status in activeStatuses && !hasPlant) fail("AST-ORG-SAVE-002", "لا يمكن تفعيل الأصل بدون Plant.")
+        if (asset.status in setOf("Active", "Running") && asset.assetType != "Mobile Asset" && asset.status != "In Storage" && !hasFunctionalLocation) {
+            fail("AST-ORG-SAVE-003", "لا يمكن حفظ أصل مركب بدون موقع فني.")
+        }
+        if (asset.status in activeStatuses) {
+            val floc = asset.locationId?.let { id -> functionalLocations.first().firstOrNull { it.id == id } }
+            if (floc?.status == "Inactive") fail("AST-ORG-SAVE-007", "الموقع الفني المحدد غير نشط.")
+            companies.first().firstOrNull { it.id.toString() == asset.companyId || it.code.equals(asset.companyCode, ignoreCase = true) }
+                ?.takeIf { it.status == "Inactive" }
+                ?.let { fail("ORG-COMP-002", "لا يمكن استخدام شركة غير نشطة في أصل نشط: ${it.code}") }
+            sites.first().firstOrNull { it.id.toString() == asset.siteId || it.code.equals(asset.siteCode, ignoreCase = true) }
+                ?.takeIf { it.status == "Inactive" }
+                ?.let { fail("ORG-SITE-003", "لا يمكن استخدام موقع عام غير نشط في أصل نشط: ${it.code}") }
+            plants.first().firstOrNull { it.id.toString() == asset.plantId || it.code.equals(asset.plantCode, ignoreCase = true) }
+                ?.takeIf { it.status == "Inactive" }
+                ?.let { fail("ORG-PLANT-004", "لا يمكن استخدام Plant غير نشط في أصل نشط: ${it.code}") }
+            workCenters.first().firstOrNull { it.id.toString() == asset.workCenterId || it.code.equals(asset.workCenterCode, ignoreCase = true) }
+                ?.takeIf { it.status == "Inactive" }
+                ?.let { fail("AST-ORG-SAVE-008", "مركز العمل المحدد غير نشط: ${it.code}") }
+            plannerGroups.first().firstOrNull { it.id.toString() == asset.plannerGroupId || it.code.equals(asset.plannerGroupCode, ignoreCase = true) }
+                ?.takeIf { it.status == "Inactive" }
+                ?.let { fail("AST-ORG-SAVE-009", "مجموعة التخطيط المحددة غير نشطة: ${it.code}") }
+            costCenters.first().firstOrNull { it.id.toString() == asset.costCenterId || it.code.equals(asset.costCenterCode, ignoreCase = true) }
+                ?.takeIf { it.status == "Inactive" }
+                ?.let { fail("AST-ORG-SAVE-010", "مركز التكلفة المحدد غير نشط: ${it.code}") }
+        }
+        if (existing != null && existing.locationId != asset.locationId && assetHasHistory(asset.id)) {
+            fail("AST-ORG-SAVE-011", "لا يمكن تعديل الموقع الفني مباشرة، استخدم حركة نقل.")
+        }
+        if (asset.assetType == "Mobile Asset" && asset.status in activeStatuses && asset.currentPhysicalLocation.isBlank() && asset.physicalLocation.isBlank() && asset.location.isBlank()) {
+            fail("AST-MOB-002", "الأصل المتنقل يجب أن يملك مكانًا فعليًا حاليًا.")
+        }
+        if (asset.assetType == "Mobile Asset" && asset.status in activeStatuses && asset.currentCustodian.isBlank() && asset.checkedOutTo.isBlank() && asset.responsiblePersonId.isBlank()) {
+            fail("AST-MOB-003", "الأصل المتنقل يجب أن يملك مسؤول عهدة أو مستخدمًا حاليًا.")
+        }
+        if (asset.status == "In Storage" && asset.storageLocationId.isBlank() && asset.storageLocationCode.isBlank()) {
+            fail("AST-STO-001", "الأصل في المخزن يجب أن يملك Storage Location.")
+        }
+        if (asset.status == "In Storage") {
+            storageLocations.first().firstOrNull { it.id.toString() == asset.storageLocationId || it.code.equals(asset.storageLocationCode, ignoreCase = true) }
+                ?.takeIf { it.status == "Inactive" }
+                ?.let { fail("SL-ORG-003", "موقع التخزين المحدد غير نشط: ${it.code}") }
+        }
+        if (asset.status == "In Storage" && hasFunctionalLocation) {
+            fail("AST-STO-002", "الأصل في المخزن لا يجب أن يملك موقع تركيب فني نشط.")
+        }
+        val hasManualOverride = listOf(asset.workCenterId, asset.plannerGroupId, asset.costCenterId, asset.maintenancePlantId, asset.planningPlantId)
+            .any { it.isNotBlank() } && asset.inheritedFromFunctionalLocationId.isNotBlank()
+        if (hasManualOverride && asset.manualOverrideReason.isBlank()) {
+            fail("AST-ORG-SAVE-012", "تم تعديل قيمة موروثة يدويًا، يرجى إدخال سبب.")
+        }
+
+        val critical = asset.criticality.equals("Critical", ignoreCase = true) || asset.criticality.equals("High", ignoreCase = true)
+        if (critical) {
+            if (asset.locationId == null && asset.location.isBlank()) fail("AST-REG-004", "الأصل الحرج يحتاج بيانات موقع.")
+            if (asset.workCenterId.isBlank() && asset.responsiblePersonId.isBlank()) fail("AST-REG-004", "الأصل الحرج يحتاج مسؤولًا أو مركز عمل.")
+            if (asset.workCenterId.isBlank() && asset.workCenterCode.isBlank()) fail("AST-ORG-SAVE-004", "لا يمكن تفعيل أصل حرج بدون مركز عمل.")
+            if (asset.plannerGroupId.isBlank() && asset.plannerGroupCode.isBlank()) fail("AST-ORG-SAVE-005", "لا يمكن تفعيل أصل حرج بدون مجموعة تخطيط.")
+            if (asset.manufacturer.isBlank() && asset.model.isBlank()) fail("TECH-001", "الأصل الحرج يحتاج بيانات مصنّع أو موديل.")
+            val hasPm = preventiveMaintenance.first().any { it.assetId == asset.id }
+            if (!isNew && !hasPm && asset.notes.isBlank()) fail("CRIT-002", "الأصل الحرج يحتاج خطة وقائية أو مبررًا في الملاحظات.")
+        }
+        if ((asset.purchaseCost > 0.0 || asset.bookValue > 0.0) && asset.costCenterId.isBlank() && asset.costCenterCode.isBlank()) {
+            fail("AST-ORG-SAVE-006", "لا يمكن حفظ أصل له تكلفة بدون مركز تكلفة.")
+        }
+
+        if (asset.safetyCritical && asset.safetyInstructions.isBlank() && asset.requiredPermits.isBlank()) {
+            fail("SAFE-001", "الأصل الحرج للسلامة يحتاج تعليمات سلامة أو تصاريح مطلوبة.")
+        }
+        if (asset.assetType == "Linear Asset" && asset.linearLength <= 0.0 && (asset.linearStartPoint.isBlank() || asset.linearEndPoint.isBlank())) {
+            fail("LIN-001", "الأصل الخطي يحتاج طولًا أو نقطة بداية ونهاية.")
+        }
+        if (asset.status in setOf("Retired", "Disposed") && asset.notes.isBlank()) {
+            fail("STAT-003", "تغيير الحالة إلى Retired أو Disposed يحتاج سببًا في الملاحظات.")
+        }
+    }
+
+    private suspend fun assetHasHistory(assetId: Long): Boolean =
+        workOrders.first().any { it.assetId == assetId } ||
+            preventiveMaintenance.first().any { it.assetId == assetId } ||
+            assetDocuments.first().any { it.assetId == assetId } ||
+            assetCharacteristics.first().any { it.assetId == assetId } ||
+            assetBom.first().any { it.assetId == assetId } ||
+            assetMovements.first().any { it.assetId == assetId } ||
+            measuringPoints.first().any { it.assetId == assetId } ||
+            notifications.first().any { it.assetId == assetId }
+
+    private fun createsAssetCycle(asset: AssetEntity, allAssets: List<AssetEntity>): Boolean {
+        val byId = allAssets.associateBy { it.id }.toMutableMap()
+        byId[asset.id] = asset
+        val seen = mutableSetOf<Long>()
+        var current = asset.parentAssetId
+        while (current != null) {
+            if (!seen.add(current)) return true
+            if (current == asset.id && asset.id != 0L) return true
+            current = byId[current]?.parentAssetId
+        }
+        return false
     }
 
     // ---------------------------------------------------------------------
@@ -634,11 +844,168 @@ class CmmsRepository(private val database: AppDatabase) {
     }
 
     // ---------------------------------------------------------------------
+    // CRUD — Organization master data
+    // ---------------------------------------------------------------------
+
+    suspend fun saveCompany(item: CompanyEntity, actor: String = "System") {
+        if (item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("ORG-COMP-001: كود واسم الشركة مطلوبان.")
+        if (companies.first().any { it.id != item.id && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("ORG-COMP-001: لا يسمح بتكرار كود الشركة: ${item.code}")
+        }
+        companyDao.insert(item)
+        recordAudit("Upsert", "Company", "حفظ شركة: ${item.code}", actor)
+    }
+
+    suspend fun deleteCompany(item: CompanyEntity, actor: String = "System") {
+        if (sites.first().any { it.companyId == item.id } || assets.first().any { it.companyId == item.id.toString() || it.companyCode == item.code }) {
+            companyDao.insert(item.copy(status = "Inactive"))
+            recordAudit("Deactivate", "Company", "تعطيل شركة مستخدمة: ${item.code}", actor)
+            return
+        }
+        companyDao.deleteById(item.id)
+        recordAudit("Delete", "Company", "حذف شركة: ${item.code}", actor)
+    }
+
+    suspend fun saveSite(item: SiteEntity, actor: String = "System") {
+        if (item.companyId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("ORG-SITE-001: الموقع العام يحتاج شركة وكودًا واسمًا.")
+        if (sites.first().any { it.id != item.id && it.companyId == item.companyId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("ORG-SITE-002: لا يتكرر كود الموقع داخل نفس الشركة: ${item.code}")
+        }
+        siteDao.insert(item)
+        recordAudit("Upsert", "Site", "حفظ موقع عام: ${item.code}", actor)
+    }
+
+    suspend fun deleteSite(item: SiteEntity, actor: String = "System") {
+        if (plants.first().any { it.siteId == item.id } || assets.first().any { it.siteId == item.id.toString() || it.siteCode == item.code }) {
+            siteDao.insert(item.copy(status = "Inactive"))
+            recordAudit("Deactivate", "Site", "تعطيل موقع عام مستخدم: ${item.code}", actor)
+            return
+        }
+        siteDao.deleteById(item.id)
+        recordAudit("Delete", "Site", "حذف موقع عام: ${item.code}", actor)
+    }
+
+    suspend fun savePlant(item: PlantEntity, actor: String = "System") {
+        if (item.companyId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("ORG-PLANT-001: Plant يحتاج شركة وكودًا واسمًا.")
+        if (plants.first().any { it.id != item.id && it.companyId == item.companyId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("ORG-PLANT-003: لا يتكرر كود Plant داخل الشركة: ${item.code}")
+        }
+        plantDao.insert(item)
+        recordAudit("Upsert", "Plant", "حفظ Plant: ${item.code}", actor)
+    }
+
+    suspend fun deletePlant(item: PlantEntity, actor: String = "System") {
+        if (assets.first().any { it.plantId == item.id.toString() || it.plantCode == item.code } || functionalLocations.first().any { it.plantId == item.id.toString() }) {
+            plantDao.insert(item.copy(status = "Inactive"))
+            recordAudit("Deactivate", "Plant", "تعطيل Plant مستخدم: ${item.code}", actor)
+            return
+        }
+        plantDao.deleteById(item.id)
+        recordAudit("Delete", "Plant", "حذف Plant: ${item.code}", actor)
+    }
+
+    suspend fun saveWorkCenter(item: WorkCenterEntity, actor: String = "System") {
+        if (item.plantId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("WC-ORG-001: مركز العمل يحتاج Plant وكودًا واسمًا.")
+        if (workCenters.first().any { it.id != item.id && it.plantId == item.plantId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("WC-ORG-002: لا يتكرر كود مركز العمل داخل نفس Plant: ${item.code}")
+        }
+        workCenterDao.insert(item)
+        recordAudit("Upsert", "WorkCenter", "حفظ مركز عمل: ${item.code}", actor)
+    }
+
+    suspend fun deleteWorkCenter(item: WorkCenterEntity, actor: String = "System") {
+        if (assets.first().any { it.workCenterId == item.id.toString() || it.workCenterCode == item.code }) {
+            workCenterDao.insert(item.copy(status = "Inactive"))
+            recordAudit("Deactivate", "WorkCenter", "تعطيل مركز عمل مستخدم: ${item.code}", actor)
+            return
+        }
+        workCenterDao.deleteById(item.id)
+        recordAudit("Delete", "WorkCenter", "حذف مركز عمل: ${item.code}", actor)
+    }
+
+    suspend fun savePlannerGroup(item: PlannerGroupEntity, actor: String = "System") {
+        if (item.planningPlantId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("PG-ORG-001: مجموعة التخطيط تحتاج Planning Plant وكودًا واسمًا.")
+        if (plannerGroups.first().any { it.id != item.id && it.planningPlantId == item.planningPlantId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("PG-ORG-002: لا يتكرر كود مجموعة التخطيط داخل نفس Planning Plant: ${item.code}")
+        }
+        plannerGroupDao.insert(item)
+        recordAudit("Upsert", "PlannerGroup", "حفظ مجموعة تخطيط: ${item.code}", actor)
+    }
+
+    suspend fun deletePlannerGroup(item: PlannerGroupEntity, actor: String = "System") {
+        if (assets.first().any { it.plannerGroupId == item.id.toString() || it.plannerGroupCode == item.code }) {
+            plannerGroupDao.insert(item.copy(status = "Inactive"))
+            recordAudit("Deactivate", "PlannerGroup", "تعطيل مجموعة تخطيط مستخدمة: ${item.code}", actor)
+            return
+        }
+        plannerGroupDao.deleteById(item.id)
+        recordAudit("Delete", "PlannerGroup", "حذف مجموعة تخطيط: ${item.code}", actor)
+    }
+
+    suspend fun saveDepartment(item: DepartmentEntity, actor: String = "System") {
+        if (item.companyId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("DEPT-ORG-001: القسم يحتاج شركة وكودًا واسمًا.")
+        if (departments.first().any { it.id != item.id && it.companyId == item.companyId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("DEPT-ORG-002: لا يتكرر كود القسم داخل نفس الشركة: ${item.code}")
+        }
+        departmentDao.insert(item)
+        recordAudit("Upsert", "Department", "حفظ قسم: ${item.code}", actor)
+    }
+
+    suspend fun deleteDepartment(item: DepartmentEntity, actor: String = "System") {
+        if (assets.first().any { it.departmentId == item.id.toString() || it.departmentCode == item.code }) {
+            departmentDao.insert(item.copy(status = "Inactive"))
+            recordAudit("Deactivate", "Department", "تعطيل قسم مستخدم: ${item.code}", actor)
+            return
+        }
+        departmentDao.deleteById(item.id)
+        recordAudit("Delete", "Department", "حذف قسم: ${item.code}", actor)
+    }
+
+    suspend fun saveCostCenter(item: CostCenterEntity, actor: String = "System") {
+        if (item.companyId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("CC-ORG-001: مركز التكلفة يحتاج شركة وكودًا واسمًا.")
+        if (costCenters.first().any { it.id != item.id && it.companyId == item.companyId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("CC-ORG-002: لا يتكرر كود مركز التكلفة داخل نفس الشركة: ${item.code}")
+        }
+        costCenterDao.insert(item)
+        recordAudit("Upsert", "CostCenter", "حفظ مركز تكلفة: ${item.code}", actor)
+    }
+
+    suspend fun deleteCostCenter(item: CostCenterEntity, actor: String = "System") {
+        if (assets.first().any { it.costCenterId == item.id.toString() || it.costCenterCode == item.code }) {
+            costCenterDao.insert(item.copy(status = "Inactive"))
+            recordAudit("Deactivate", "CostCenter", "تعطيل مركز تكلفة مستخدم: ${item.code}", actor)
+            return
+        }
+        costCenterDao.deleteById(item.id)
+        recordAudit("Delete", "CostCenter", "حذف مركز تكلفة: ${item.code}", actor)
+    }
+
+    suspend fun saveStorageLocation(item: StorageLocationEntity, actor: String = "System") {
+        if (item.plantId == 0L || item.code.isBlank() || item.name.isBlank()) throw IllegalArgumentException("SL-ORG-001: موقع التخزين يحتاج Plant وكودًا واسمًا.")
+        if (storageLocations.first().any { it.id != item.id && it.plantId == item.plantId && it.code.equals(item.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("SL-ORG-002: لا يتكرر كود Storage Location داخل نفس Plant: ${item.code}")
+        }
+        storageLocationDao.insert(item)
+        recordAudit("Upsert", "StorageLocation", "حفظ موقع تخزين: ${item.code}", actor)
+    }
+
+    suspend fun deleteStorageLocation(item: StorageLocationEntity, actor: String = "System") {
+        if (assets.first().any { it.storageLocationId == item.id.toString() || it.storageLocationCode == item.code }) {
+            storageLocationDao.insert(item.copy(status = "Inactive"))
+            recordAudit("Deactivate", "StorageLocation", "تعطيل موقع تخزين مستخدم: ${item.code}", actor)
+            return
+        }
+        storageLocationDao.deleteById(item.id)
+        recordAudit("Delete", "StorageLocation", "حذف موقع تخزين: ${item.code}", actor)
+    }
+
+    // ---------------------------------------------------------------------
     // CRUD — Work orders (edit / delete)
     // ---------------------------------------------------------------------
 
     suspend fun saveWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
         val isNew = workOrder.id == 0L
+        if (isNew) validateAssetCanReceiveWorkOrder(workOrder.assetId)
         // Keep an existing decision; otherwise (re)derive whether sign-off is needed.
         val toSave = if (workOrder.approvalStatus == "Approved" || workOrder.approvalStatus == "Rejected") {
             workOrder
@@ -647,6 +1014,13 @@ class CmmsRepository(private val database: AppDatabase) {
         }
         workOrderDao.insertWorkOrder(toSave)
         recordAudit(if (isNew) "Create" else "Update", "WorkOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر عمل: ${workOrder.title}", actor)
+    }
+
+    private suspend fun validateAssetCanReceiveWorkOrder(assetId: Long) {
+        val asset = assetDao.getAssetById(assetId) ?: throw IllegalArgumentException("AST-REG-009: لا يمكن إنشاء أمر صيانة بدون أصل واضح.")
+        if (asset.status in setOf("Retired", "Disposed")) {
+            throw IllegalArgumentException("STAT-002: لا يمكن إنشاء أمر صيانة عادي على أصل ${asset.status}.")
+        }
     }
 
     suspend fun setWorkOrderApproval(workOrder: WorkOrderEntity, approved: Boolean, actor: String = "System") {
@@ -711,6 +1085,8 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveMeasuringPoint(point: MeasuringPointEntity, actor: String = "System") {
         val isNew = point.id == 0L
+        if (point.name.isBlank()) throw IllegalArgumentException("MP-003: اسم نقطة القياس مطلوب.")
+        if (point.unit.isBlank()) throw IllegalArgumentException("MP-003: وحدة القياس مطلوبة.")
         measurementDao.insertPoint(point)
         recordAudit(if (isNew) "Create" else "Update", "Meter", "${if (isNew) "إضافة" else "تعديل"} نقطة قياس: ${point.name}", actor)
     }
@@ -753,13 +1129,41 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
         val isNew = location.id == 0L
+        validateFunctionalLocation(location)
         locationDao.insert(location)
         recordAudit(if (isNew) "Create" else "Update", "Location", "${if (isNew) "إضافة" else "تعديل"} موقع فني: ${location.code}", actor)
     }
 
     suspend fun deleteFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
+        val hasChildren = functionalLocations.first().any { it.parentId == location.id }
+        val hasAssets = assets.first().any { it.locationId == location.id }
+        if (hasChildren || hasAssets) {
+            throw IllegalArgumentException("FLOC-006: لا يمكن حذف موقع فني له أصول أو مواقع فرعية.")
+        }
         locationDao.deleteById(location.id)
         recordAudit("Delete", "Location", "حذف موقع فني: ${location.code}", actor)
+    }
+
+    private suspend fun validateFunctionalLocation(location: FunctionalLocationEntity) {
+        if (location.code.isBlank()) throw IllegalArgumentException("FLOC-001: كود الموقع الفني مطلوب وفريد.")
+        if (location.name.isBlank()) throw IllegalArgumentException("FLOC-001: اسم الموقع الفني مطلوب.")
+        val all = functionalLocations.first()
+        if (all.any { it.id != location.id && it.code.equals(location.code, ignoreCase = true) }) {
+            throw IllegalArgumentException("FLOC-001: كود الموقع الفني مستخدم بالفعل: ${location.code}")
+        }
+        if (location.parentId == location.id && location.id != 0L) {
+            throw IllegalArgumentException("FLOC-003: لا يمكن أن يكون الموقع أبًا لنفسه.")
+        }
+        val byId = all.associateBy { it.id }.toMutableMap()
+        byId[location.id] = location
+        val seen = mutableSetOf<Long>()
+        var current = location.parentId
+        while (current != null) {
+            if (!seen.add(current) || (current == location.id && location.id != 0L)) {
+                throw IllegalArgumentException("FLOC-003: لا يسمح بوجود حلقة في هرمية المواقع الفنية.")
+            }
+            current = byId[current]?.parentId
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -793,12 +1197,18 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveAssetDocument(doc: AssetDocumentEntity, actor: String = "System") {
         val isNew = doc.id == 0L
+        if (doc.type.isBlank() || doc.title.isBlank()) throw IllegalArgumentException("DOC-002: كل مستند يحتاج نوعًا وعنوانًا.")
         val toSave = if (isNew) doc.copy(uploadedBy = actor, uploadedAt = DateStrings.now()) else doc
         documentDao.insert(toSave)
         recordAudit(if (isNew) "Create" else "Update", "Document", "${if (isNew) "إضافة" else "تعديل"} مستند: ${doc.title}", actor)
     }
 
     suspend fun deleteAssetDocument(doc: AssetDocumentEntity, actor: String = "System") {
+        val asset = assetDao.getAssetById(doc.assetId)
+        val sensitive = doc.type in setOf("Warranty", "Certificate", "Safety", "Safety Document", "Calibration")
+        if (sensitive && (asset?.criticality == "Critical" || asset?.safetyCritical == true)) {
+            throw IllegalArgumentException("DOC-003: حذف مستند حساس لأصل حرج/سلامة يحتاج صلاحية واعتمادًا؛ أضف إصدارًا جديدًا بدل الحذف.")
+        }
         documentDao.deleteById(doc.id)
         recordAudit("Delete", "Document", "حذف مستند: ${doc.title}", actor)
     }
@@ -809,6 +1219,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveCharacteristic(item: AssetCharacteristicEntity, actor: String = "System") {
         val isNew = item.id == 0L
+        if (item.name.isBlank() || item.value.isBlank()) throw IllegalArgumentException("CLASS-002: الخاصية تحتاج اسمًا وقيمة.")
         characteristicDao.insert(item)
         recordAudit(if (isNew) "Create" else "Update", "Characteristic", "${if (isNew) "إضافة" else "تعديل"} خاصية: ${item.name}", actor)
     }
@@ -824,6 +1235,7 @@ class CmmsRepository(private val database: AppDatabase) {
 
     suspend fun saveBomItem(item: AssetBomItemEntity, actor: String = "System") {
         val isNew = item.id == 0L
+        if (item.quantity <= 0) throw IllegalArgumentException("BOM-003: كمية بند المكونات يجب أن تكون أكبر من صفر.")
         bomDao.insert(item)
         recordAudit(if (isNew) "Create" else "Update", "BOM", "${if (isNew) "إضافة" else "تعديل"} بند مكوّنات (قطعة #${item.partId})", actor)
     }
@@ -850,10 +1262,27 @@ class CmmsRepository(private val database: AppDatabase) {
         toLocationId: Long?,
         toLocationName: String,
         notes: String,
+        approvedBy: String = "",
+        attachment: String = "",
         actor: String = "System"
     ) {
         database.withTransaction {
             val now = DateStrings.now()
+            val targetLocation = toLocationId?.let { id -> functionalLocations.first().firstOrNull { it.id == id } }
+            val oldPlant = asset.plantCode.ifBlank { asset.plantId }
+            val newPlant = targetLocation?.plantId.orEmpty().ifBlank { oldPlant }
+            val oldWorkCenter = asset.workCenterCode.ifBlank { asset.workCenterId }
+            val newWorkCenter = targetLocation?.workCenterId.orEmpty().ifBlank { oldWorkCenter }
+            val oldCostCenter = asset.costCenterCode.ifBlank { asset.costCenterId }
+            val newCostCenter = targetLocation?.costCenterId.orEmpty().ifBlank { oldCostCenter }
+            if (eventType == MovementType.TRANSFER) {
+                if (workOrders.first().any { it.assetId == asset.id && it.status != "Closed" }) {
+                    throw IllegalArgumentException("AST-TRF-003: لا يسمح بنقل أصل عليه أمر صيانة مفتوح.")
+                }
+                if (oldPlant.isNotBlank() && newPlant.isNotBlank() && oldPlant != newPlant && approvedBy.isBlank()) {
+                    throw IllegalArgumentException("AST-TRF-004: النقل بين Plant مختلف يحتاج اعتمادًا.")
+                }
+            }
             val updated = when (eventType) {
                 MovementType.INSTALL, MovementType.TRANSFER ->
                     asset.copy(locationId = toLocationId, location = toLocationName.ifBlank { asset.location }, status = "Running")
@@ -874,7 +1303,16 @@ class CmmsRepository(private val database: AppDatabase) {
                     toLocationName = if (eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) "" else toLocationName,
                     notes = notes,
                     performedBy = actor,
-                    occurredAt = now
+                    occurredAt = now,
+                    oldPlant = oldPlant,
+                    newPlant = if (eventType == MovementType.TRANSFER) newPlant else "",
+                    oldWorkCenter = oldWorkCenter,
+                    newWorkCenter = if (eventType == MovementType.TRANSFER) newWorkCenter else "",
+                    oldCostCenter = oldCostCenter,
+                    newCostCenter = if (eventType == MovementType.TRANSFER) newCostCenter else "",
+                    transferReason = if (eventType == MovementType.TRANSFER) notes else "",
+                    approvedBy = approvedBy,
+                    attachment = attachment
                 )
             )
             recordAudit("Movement", "Asset", "${MovementType.label(eventType)} للأصل: ${asset.code}", actor)

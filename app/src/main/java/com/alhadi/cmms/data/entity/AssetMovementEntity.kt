@@ -30,5 +30,14 @@ data class AssetMovementEntity(
     val toLocationName: String = "",
     val notes: String = "",
     val performedBy: String,
-    val occurredAt: String
+    val occurredAt: String,
+    val oldPlant: String = "",
+    val newPlant: String = "",
+    val oldWorkCenter: String = "",
+    val newWorkCenter: String = "",
+    val oldCostCenter: String = "",
+    val newCostCenter: String = "",
+    val transferReason: String = "",
+    val approvedBy: String = "",
+    val attachment: String = ""
 )
