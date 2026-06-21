@@ -1683,6 +1683,50 @@ private fun GovernancePill(label: String, ok: Boolean, modifier: Modifier = Modi
 }
 
 @Composable
+private fun AssetDetailActionBar(
+    blocksNewWork: Boolean,
+    underWarranty: Boolean,
+    canAddBom: Boolean,
+    onEdit: () -> Unit,
+    onStatus: () -> Unit,
+    onMove: () -> Unit,
+    onWorkOrder: () -> Unit,
+    onDocument: () -> Unit,
+    onCharacteristic: () -> Unit,
+    onBom: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("إجراءات الأصل")
+                Spacer(modifier = Modifier.weight(1f))
+                if (underWarranty) StatusBadge("ضمن الضمان", statusTone("running"))
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) { Text("تعديل") }
+                OutlinedButton(onClick = onStatus, modifier = Modifier.weight(1f)) { Text("الحالة") }
+                OutlinedButton(onClick = onMove, modifier = Modifier.weight(1f)) { Text("نقل/تركيب") }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onWorkOrder, enabled = !blocksNewWork, modifier = Modifier.weight(1f)) { Text("أمر عمل") }
+                OutlinedButton(onClick = onDocument, modifier = Modifier.weight(1f)) { Text("مستند") }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCharacteristic, modifier = Modifier.weight(1f)) { Text("خاصية") }
+                OutlinedButton(onClick = onBom, enabled = canAddBom, modifier = Modifier.weight(1f)) { Text("BOM") }
+            }
+            if (blocksNewWork) {
+                Text(
+                    "لا يمكن إنشاء أمر عمل جديد على أصل Retired أو Disposed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun AssetDetailScreen(
     innerPadding: PaddingValues,
     asset: AssetEntity,
@@ -1757,6 +1801,23 @@ private fun AssetDetailScreen(
                     LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 StatusBadge(asset.status, statusTone(asset.status))
+            }
+        }
+
+        if (canManage) {
+            item {
+                AssetDetailActionBar(
+                    blocksNewWork = blocksNewWork,
+                    underWarranty = underWarranty,
+                    canAddBom = spareParts.isNotEmpty(),
+                    onEdit = { showEdit = true },
+                    onStatus = { showStatus = true },
+                    onMove = { showMoveForm = true },
+                    onWorkOrder = { showWoForm = true },
+                    onDocument = { editingDoc = null; showDocForm = true },
+                    onCharacteristic = { editingChar = null; showCharForm = true },
+                    onBom = { showBomForm = true }
+                )
             }
         }
 
