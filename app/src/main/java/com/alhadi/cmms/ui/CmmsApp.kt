@@ -1259,6 +1259,7 @@ private fun AssetsScreen(
     var detailId by remember { mutableStateOf<Long?>(null) }
     var statusFilter by rememberSaveable { mutableStateOf("All") }
     var criticalityFilter by rememberSaveable { mutableStateOf("All") }
+    var organizationFilter by rememberSaveable { mutableStateOf("All") }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val raw = result.contents
@@ -1322,7 +1323,13 @@ private fun AssetsScreen(
     val criticalityOptions = remember(assets) {
         listOf("All") + assets.map { it.criticality }.filter { it.isNotBlank() }.distinct().sorted()
     }
-    val filtered = remember(query, statusFilter, criticalityFilter, assets) {
+    val organizationOptions = remember(assets) {
+        listOf("All") + assets
+            .flatMap { it.organizationFilterValues() }
+            .distinct()
+            .sorted()
+    }
+    val filtered = remember(query, statusFilter, criticalityFilter, organizationFilter, assets) {
         assets.filter { asset ->
             val q = query.lowercase(Locale.getDefault())
             val matchesQuery = query.isBlank() ||
@@ -1330,6 +1337,29 @@ private fun AssetsScreen(
                 asset.name.lowercase(Locale.getDefault()).contains(q) ||
                 asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
                 asset.location.lowercase(Locale.getDefault()).contains(q) ||
+                asset.companyCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.companyName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.siteCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.siteName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.plantCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.plantName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.functionalLocationCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.functionalLocationName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.functionalLocationPath.lowercase(Locale.getDefault()).contains(q) ||
+                asset.workCenterCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.workCenterName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.plannerGroupCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.plannerGroupName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.departmentCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.departmentName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.costCenterCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.costCenterName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.storageLocationCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.storageLocationName.lowercase(Locale.getDefault()).contains(q) ||
+                asset.area.lowercase(Locale.getDefault()).contains(q) ||
+                asset.line.lowercase(Locale.getDefault()).contains(q) ||
+                asset.currentPhysicalLocation.lowercase(Locale.getDefault()).contains(q) ||
+                asset.lastKnownLocation.lowercase(Locale.getDefault()).contains(q) ||
                 asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
                 asset.assetTag.lowercase(Locale.getDefault()).contains(q) ||
                 asset.assetType.lowercase(Locale.getDefault()).contains(q) ||
@@ -1350,7 +1380,8 @@ private fun AssetsScreen(
                 asset.financialAssetRef.lowercase(Locale.getDefault()).contains(q)
             val matchesStatus = statusFilter == "All" || asset.status == statusFilter
             val matchesCriticality = criticalityFilter == "All" || asset.criticality == criticalityFilter
-            matchesQuery && matchesStatus && matchesCriticality
+            val matchesOrganization = organizationFilter == "All" || organizationFilter in asset.organizationFilterValues()
+            matchesQuery && matchesStatus && matchesCriticality && matchesOrganization
         }.sortedWith(compareBy<AssetEntity> { it.groupName }.thenBy { it.code })
     }
     val grouped = filtered.groupBy { it.groupName }
@@ -1409,9 +1440,16 @@ private fun AssetsScreen(
                         allLabel = "كل الأهميات",
                         onSelect = { criticalityFilter = it }
                     )
+                    AssetFilterChips(
+                        title = "الموقع والتنظيم",
+                        options = organizationOptions,
+                        selected = organizationFilter,
+                        allLabel = "كل المواقع والتنظيم",
+                        onSelect = { organizationFilter = it }
+                    )
                 }
             }
-            if (query.isNotBlank() || statusFilter != "All" || criticalityFilter != "All") {
+            if (query.isNotBlank() || statusFilter != "All" || criticalityFilter != "All" || organizationFilter != "All") {
                 item {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -1424,6 +1462,7 @@ private fun AssetsScreen(
                             query = ""
                             statusFilter = "All"
                             criticalityFilter = "All"
+                            organizationFilter = "All"
                         }) { Text("مسح الفلاتر") }
                     }
                 }
@@ -1535,6 +1574,20 @@ private fun AssetFilterChips(
         }
     }
 }
+
+private fun AssetEntity.organizationFilterValues(): List<String> = listOf(
+    companyCode.ifBlank { companyName },
+    siteCode.ifBlank { siteName },
+    plantCode.ifBlank { plantName },
+    functionalLocationCode.ifBlank { functionalLocationName.ifBlank { functionalLocationPath } },
+    workCenterCode.ifBlank { workCenterName },
+    plannerGroupCode.ifBlank { plannerGroupName },
+    departmentCode.ifBlank { departmentName },
+    costCenterCode.ifBlank { costCenterName },
+    storageLocationCode.ifBlank { storageLocationName },
+    area,
+    line
+).map { it.trim() }.filter { it.isNotBlank() }
 
 @Composable
 private fun AssetGovernanceCard(
