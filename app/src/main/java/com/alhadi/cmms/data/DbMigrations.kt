@@ -167,7 +167,13 @@ object DbMigrations {
     }
 
     /** All migrations, in order. Append new `Migration` objects here as the schema evolves. */
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
+    val ALL: Array<Migration> = arrayOf(
+        MIGRATION_22_23,
+        MIGRATION_23_24,
+        MIGRATION_24_25,
+        MIGRATION_25_26,
+        MIGRATION_26_27
+    )
 
     private fun assetOrgColumns(): Array<String> = arrayOf(
         "ALTER TABLE assets ADD COLUMN companyCode TEXT NOT NULL DEFAULT ''",
