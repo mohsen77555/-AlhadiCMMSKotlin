@@ -479,6 +479,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         MoreRoute.MasterData -> OrganizationMasterDataScreen(
                             innerPadding = innerPadding,
                             canManage = canManage,
+                            assets = assets,
                             companies = companies,
                             sites = sites,
                             plants = plants,
@@ -4594,6 +4595,7 @@ private data class OrgMasterOption(val id: String, val label: String)
 private fun OrganizationMasterDataScreen(
     innerPadding: PaddingValues,
     canManage: Boolean,
+    assets: List<AssetEntity>,
     companies: List<CompanyEntity>,
     sites: List<SiteEntity>,
     plants: List<PlantEntity>,
@@ -4621,6 +4623,7 @@ private fun OrganizationMasterDataScreen(
 ) {
     var editing by remember { mutableStateOf<OrgMasterEdit?>(null) }
     var deleteTarget by remember { mutableStateOf<OrgMasterEdit?>(null) }
+    var selectedKind by rememberSaveable { mutableStateOf("All") }
 
     fun delete(edit: OrgMasterEdit) {
         when (edit.kind) {
@@ -4644,14 +4647,30 @@ private fun OrganizationMasterDataScreen(
             Text("Master Data — Location & Organization", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Text("إدارة الشركات والمواقع والمصانع ومراكز العمل والتكلفة والتخزين.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        orgMasterSection(OrgMasterKind.Company, companies.map { company -> OrgMasterEdit(OrgMasterKind.Company, company.id, company.code, company.name, status = company.status, usageCount = assets.count { it.companyId == company.id.toString() || it.companyCode == company.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Company, 0, "", "") }, { editing = it }, { deleteTarget = it })
-        orgMasterSection(OrgMasterKind.Site, sites.map { site -> OrgMasterEdit(OrgMasterKind.Site, site.id, site.code, site.name, site.companyId.toString(), site.status, site.physicalAddress, assets.count { it.siteId == site.id.toString() || it.siteCode == site.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Site, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
-        orgMasterSection(OrgMasterKind.Plant, plants.map { plant -> OrgMasterEdit(OrgMasterKind.Plant, plant.id, plant.code, plant.name, plant.companyId.toString(), plant.status, plant.plantType, assets.count { it.plantId == plant.id.toString() || it.plantCode == plant.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Plant, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "", extra = "Operational") }, { editing = it }, { deleteTarget = it })
-        orgMasterSection(OrgMasterKind.WorkCenter, workCenters.map { workCenter -> OrgMasterEdit(OrgMasterKind.WorkCenter, workCenter.id, workCenter.code, workCenter.name, workCenter.plantId.toString(), workCenter.status, workCenter.discipline, assets.count { it.workCenterId == workCenter.id.toString() || it.workCenterCode == workCenter.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.WorkCenter, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
-        orgMasterSection(OrgMasterKind.PlannerGroup, plannerGroups.map { plannerGroup -> OrgMasterEdit(OrgMasterKind.PlannerGroup, plannerGroup.id, plannerGroup.code, plannerGroup.name, plannerGroup.planningPlantId.toString(), plannerGroup.status, plannerGroup.discipline, assets.count { it.plannerGroupId == plannerGroup.id.toString() || it.plannerGroupCode == plannerGroup.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.PlannerGroup, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
-        orgMasterSection(OrgMasterKind.Department, departments.map { department -> OrgMasterEdit(OrgMasterKind.Department, department.id, department.code, department.name, department.companyId.toString(), department.status, usageCount = assets.count { it.departmentId == department.id.toString() || it.departmentCode == department.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Department, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
-        orgMasterSection(OrgMasterKind.CostCenter, costCenters.map { costCenter -> OrgMasterEdit(OrgMasterKind.CostCenter, costCenter.id, costCenter.code, costCenter.name, costCenter.companyId.toString(), costCenter.status, usageCount = assets.count { it.costCenterId == costCenter.id.toString() || it.costCenterCode == costCenter.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.CostCenter, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
-        orgMasterSection(OrgMasterKind.StorageLocation, storageLocations.map { storageLocation -> OrgMasterEdit(OrgMasterKind.StorageLocation, storageLocation.id, storageLocation.code, storageLocation.name, storageLocation.plantId.toString(), storageLocation.status, storageLocation.storageType, assets.count { it.storageLocationId == storageLocation.id.toString() || it.storageLocationCode == storageLocation.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.StorageLocation, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "", extra = "General") }, { editing = it }, { deleteTarget = it })
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilterChip(selected = selectedKind == "All", onClick = { selectedKind = "All" }, label = { Text("الكل") })
+                OrgMasterKind.values().forEach { kind ->
+                    FilterChip(
+                        selected = selectedKind == kind.name,
+                        onClick = { selectedKind = kind.name },
+                        label = { Text(kind.title) }
+                    )
+                }
+            }
+        }
+        if (selectedKind == "All" || selectedKind == OrgMasterKind.Company.name) orgMasterSection(OrgMasterKind.Company, companies.map { company -> OrgMasterEdit(OrgMasterKind.Company, company.id, company.code, company.name, status = company.status, usageCount = assets.count { it.companyId == company.id.toString() || it.companyCode == company.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Company, 0, "", "") }, { editing = it }, { deleteTarget = it })
+        if (selectedKind == "All" || selectedKind == OrgMasterKind.Site.name) orgMasterSection(OrgMasterKind.Site, sites.map { site -> OrgMasterEdit(OrgMasterKind.Site, site.id, site.code, site.name, site.companyId.toString(), site.status, site.physicalAddress, assets.count { it.siteId == site.id.toString() || it.siteCode == site.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Site, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        if (selectedKind == "All" || selectedKind == OrgMasterKind.Plant.name) orgMasterSection(OrgMasterKind.Plant, plants.map { plant -> OrgMasterEdit(OrgMasterKind.Plant, plant.id, plant.code, plant.name, plant.companyId.toString(), plant.status, plant.plantType, assets.count { it.plantId == plant.id.toString() || it.plantCode == plant.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Plant, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "", extra = "Operational") }, { editing = it }, { deleteTarget = it })
+        if (selectedKind == "All" || selectedKind == OrgMasterKind.WorkCenter.name) orgMasterSection(OrgMasterKind.WorkCenter, workCenters.map { workCenter -> OrgMasterEdit(OrgMasterKind.WorkCenter, workCenter.id, workCenter.code, workCenter.name, workCenter.plantId.toString(), workCenter.status, workCenter.discipline, assets.count { it.workCenterId == workCenter.id.toString() || it.workCenterCode == workCenter.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.WorkCenter, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        if (selectedKind == "All" || selectedKind == OrgMasterKind.PlannerGroup.name) orgMasterSection(OrgMasterKind.PlannerGroup, plannerGroups.map { plannerGroup -> OrgMasterEdit(OrgMasterKind.PlannerGroup, plannerGroup.id, plannerGroup.code, plannerGroup.name, plannerGroup.planningPlantId.toString(), plannerGroup.status, plannerGroup.discipline, assets.count { it.plannerGroupId == plannerGroup.id.toString() || it.plannerGroupCode == plannerGroup.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.PlannerGroup, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        if (selectedKind == "All" || selectedKind == OrgMasterKind.Department.name) orgMasterSection(OrgMasterKind.Department, departments.map { department -> OrgMasterEdit(OrgMasterKind.Department, department.id, department.code, department.name, department.companyId.toString(), department.status, usageCount = assets.count { it.departmentId == department.id.toString() || it.departmentCode == department.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Department, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        if (selectedKind == "All" || selectedKind == OrgMasterKind.CostCenter.name) orgMasterSection(OrgMasterKind.CostCenter, costCenters.map { costCenter -> OrgMasterEdit(OrgMasterKind.CostCenter, costCenter.id, costCenter.code, costCenter.name, costCenter.companyId.toString(), costCenter.status, usageCount = assets.count { it.costCenterId == costCenter.id.toString() || it.costCenterCode == costCenter.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.CostCenter, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        if (selectedKind == "All" || selectedKind == OrgMasterKind.StorageLocation.name) orgMasterSection(OrgMasterKind.StorageLocation, storageLocations.map { storageLocation -> OrgMasterEdit(OrgMasterKind.StorageLocation, storageLocation.id, storageLocation.code, storageLocation.name, storageLocation.plantId.toString(), storageLocation.status, storageLocation.storageType, assets.count { it.storageLocationId == storageLocation.id.toString() || it.storageLocationCode == storageLocation.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.StorageLocation, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "", extra = "General") }, { editing = it }, { deleteTarget = it })
     }
 
     editing?.let { edit ->
