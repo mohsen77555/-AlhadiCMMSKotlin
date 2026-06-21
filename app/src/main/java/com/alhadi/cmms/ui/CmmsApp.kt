@@ -1854,6 +1854,23 @@ private fun AssetDetailScreen(
             }
         }
 
+        if (asset.assetType == "Mobile Asset" || asset.currentCustodian.isNotBlank() || asset.currentPhysicalLocation.isNotBlank() || asset.lastKnownLocation.isNotBlank() || asset.movementStatus.isNotBlank() || asset.checkedOutTo.isNotBlank()) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("بيانات الأصل المتنقل")
+                        if (asset.currentCustodian.isNotBlank()) InfoRow("مسؤول العهدة الحالي", asset.currentCustodian)
+                        if (asset.currentPhysicalLocation.isNotBlank()) InfoRow("المكان الفعلي الحالي", asset.currentPhysicalLocation)
+                        if (asset.lastKnownLocation.isNotBlank()) InfoRow("آخر موقع معروف", asset.lastKnownLocation)
+                        if (asset.movementStatus.isNotBlank()) InfoRow("حالة الحركة", asset.movementStatus)
+                        if (asset.checkedOutTo.isNotBlank()) InfoRow("مصروف إلى", asset.checkedOutTo)
+                        if (asset.checkedOutAt.isNotBlank()) InfoRow("تاريخ الصرف", asset.checkedOutAt)
+                        if (asset.expectedReturnAt.isNotBlank()) InfoRow("الإرجاع المتوقع", asset.expectedReturnAt)
+                    }
+                }
+            }
+        }
+
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 SectionHeader("الخصائص الفنية (${characteristics.size})")
