@@ -11,13 +11,20 @@ import com.alhadi.cmms.data.dao.AssetDocumentDao
 import com.alhadi.cmms.data.dao.AssetMovementDao
 import com.alhadi.cmms.data.dao.AuditLogDao
 import com.alhadi.cmms.data.dao.CapaDao
+import com.alhadi.cmms.data.dao.CompanyDao
+import com.alhadi.cmms.data.dao.CostCenterDao
+import com.alhadi.cmms.data.dao.DepartmentDao
 import com.alhadi.cmms.data.dao.FunctionalLocationDao
 import com.alhadi.cmms.data.dao.InventoryTransactionDao
 import com.alhadi.cmms.data.dao.MaintenanceNotificationDao
 import com.alhadi.cmms.data.dao.MeasurementDao
+import com.alhadi.cmms.data.dao.PlannerGroupDao
+import com.alhadi.cmms.data.dao.PlantDao
 import com.alhadi.cmms.data.dao.PmChecklistDao
 import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
 import com.alhadi.cmms.data.dao.SparePartDao
+import com.alhadi.cmms.data.dao.SiteDao
+import com.alhadi.cmms.data.dao.StorageLocationDao
 import com.alhadi.cmms.data.dao.TaskListDao
 import com.alhadi.cmms.data.dao.UserDao
 import com.alhadi.cmms.data.dao.WorkOrderConfirmationDao
@@ -25,6 +32,7 @@ import com.alhadi.cmms.data.dao.WorkOrderDao
 import com.alhadi.cmms.data.dao.WorkOrderOperationDao
 import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
 import com.alhadi.cmms.data.dao.WorkPermitDao
+import com.alhadi.cmms.data.dao.WorkCenterDao
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -32,14 +40,21 @@ import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
+import com.alhadi.cmms.data.entity.CompanyEntity
+import com.alhadi.cmms.data.entity.CostCenterEntity
+import com.alhadi.cmms.data.entity.DepartmentEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PlannerGroupEntity
+import com.alhadi.cmms.data.entity.PlantEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SiteEntity
+import com.alhadi.cmms.data.entity.StorageLocationEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -48,6 +63,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WorkCenterEntity
 
 @Database(
     entities = [
@@ -73,9 +89,17 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         WorkOrderPhotoEntity::class,
         TaskListEntity::class,
         TaskListOperationEntity::class,
-        WorkPermitEntity::class
+        WorkPermitEntity::class,
+        CompanyEntity::class,
+        SiteEntity::class,
+        PlantEntity::class,
+        WorkCenterEntity::class,
+        PlannerGroupEntity::class,
+        DepartmentEntity::class,
+        CostCenterEntity::class,
+        StorageLocationEntity::class
     ],
-    version = 22,
+    version = 27,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -100,6 +124,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workOrderPhotoDao(): WorkOrderPhotoDao
     abstract fun taskListDao(): TaskListDao
     abstract fun workPermitDao(): WorkPermitDao
+    abstract fun companyDao(): CompanyDao
+    abstract fun siteDao(): SiteDao
+    abstract fun plantDao(): PlantDao
+    abstract fun workCenterDao(): WorkCenterDao
+    abstract fun plannerGroupDao(): PlannerGroupDao
+    abstract fun departmentDao(): DepartmentDao
+    abstract fun costCenterDao(): CostCenterDao
+    abstract fun storageLocationDao(): StorageLocationDao
 
     companion object {
         @Volatile

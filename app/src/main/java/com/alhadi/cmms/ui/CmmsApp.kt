@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -139,14 +140,21 @@ import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
+import com.alhadi.cmms.data.entity.CompanyEntity
+import com.alhadi.cmms.data.entity.CostCenterEntity
+import com.alhadi.cmms.data.entity.DepartmentEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PlannerGroupEntity
+import com.alhadi.cmms.data.entity.PlantEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SiteEntity
+import com.alhadi.cmms.data.entity.StorageLocationEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -155,6 +163,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WorkCenterEntity
 import com.alhadi.cmms.ui.theme.AccentBlue
 import com.alhadi.cmms.ui.theme.AccentBrown
 import com.alhadi.cmms.ui.theme.AccentGreen
@@ -189,7 +198,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures }
+private enum class MoreRoute { Notifications, Inventory, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, MasterData, Capa, Failures }
 
 private data class ScreenMeta(
     val title: String,
@@ -212,6 +221,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
+    val companies by viewModel.companies.collectAsStateWithLifecycle()
+    val sites by viewModel.sites.collectAsStateWithLifecycle()
+    val plants by viewModel.plants.collectAsStateWithLifecycle()
+    val workCenters by viewModel.workCenters.collectAsStateWithLifecycle()
+    val plannerGroups by viewModel.plannerGroups.collectAsStateWithLifecycle()
+    val departments by viewModel.departments.collectAsStateWithLifecycle()
+    val costCenters by viewModel.costCenters.collectAsStateWithLifecycle()
+    val storageLocations by viewModel.storageLocations.collectAsStateWithLifecycle()
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
     val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
@@ -378,6 +395,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         characteristics = assetCharacteristics,
                         bomItems = assetBom,
                         movements = assetMovements,
+                        measuringPoints = measuringPoints,
+                        notifications = notifications,
+                        auditLog = auditLog,
                         spareParts = spareParts,
                         canManage = canManage,
                         defaultAssignee = actorName,
@@ -454,6 +474,34 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             canManage = canManage,
                             onSave = viewModel::saveFunctionalLocation,
                             onDelete = viewModel::deleteFunctionalLocation
+                        )
+                        MoreRoute.MasterData -> OrganizationMasterDataScreen(
+                            innerPadding = innerPadding,
+                            canManage = canManage,
+                            companies = companies,
+                            sites = sites,
+                            plants = plants,
+                            workCenters = workCenters,
+                            plannerGroups = plannerGroups,
+                            departments = departments,
+                            costCenters = costCenters,
+                            storageLocations = storageLocations,
+                            onSaveCompany = viewModel::saveCompany,
+                            onDeleteCompany = viewModel::deleteCompany,
+                            onSaveSite = viewModel::saveSite,
+                            onDeleteSite = viewModel::deleteSite,
+                            onSavePlant = viewModel::savePlant,
+                            onDeletePlant = viewModel::deletePlant,
+                            onSaveWorkCenter = viewModel::saveWorkCenter,
+                            onDeleteWorkCenter = viewModel::deleteWorkCenter,
+                            onSavePlannerGroup = viewModel::savePlannerGroup,
+                            onDeletePlannerGroup = viewModel::deletePlannerGroup,
+                            onSaveDepartment = viewModel::saveDepartment,
+                            onDeleteDepartment = viewModel::deleteDepartment,
+                            onSaveCostCenter = viewModel::saveCostCenter,
+                            onDeleteCostCenter = viewModel::deleteCostCenter,
+                            onSaveStorageLocation = viewModel::saveStorageLocation,
+                            onDeleteStorageLocation = viewModel::deleteStorageLocation
                         )
                         MoreRoute.Capa -> CapaScreen(
                             innerPadding = innerPadding,
@@ -534,6 +582,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.TaskLists -> ScreenMeta("قوالب العمل", "قوالب العمليات للخطط الوقائية", Icons.AutoMirrored.Filled.List, AccentBlue)
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
+        MoreRoute.MasterData -> ScreenMeta("البيانات التنظيمية", "الشركات والمواقع والمصانع ومراكز العمل", Icons.Filled.AdminPanelSettings, AccentBrown)
         MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
         MoreRoute.Failures -> ScreenMeta("تحليل الأعطال", "MTTR و MTBF وتكرار الأعطال", Icons.Filled.TrendingUp, AccentRed)
     }
@@ -1086,13 +1135,23 @@ private fun MoreGrid(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
-                ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
+                ModuleCard("البيانات التنظيمية", "Master Data", Icons.Filled.AdminPanelSettings, AccentBrown, Modifier.weight(1f)) { onOpen(MoreRoute.MasterData) }
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
                 ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
+                if (isAdmin) {
+                    ModuleCard("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Admin) }
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
         if (isAdmin) {
@@ -1173,6 +1232,9 @@ private fun AssetsScreen(
     characteristics: List<AssetCharacteristicEntity>,
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
+    measuringPoints: List<MeasuringPointEntity>,
+    notifications: List<MaintenanceNotificationEntity>,
+    auditLog: List<AuditLogEntity>,
     spareParts: List<SparePartEntity>,
     canManage: Boolean,
     defaultAssignee: String,
@@ -1187,13 +1249,15 @@ private fun AssetsScreen(
     onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onSaveBom: (AssetBomItemEntity) -> Unit,
     onDeleteBom: (AssetBomItemEntity) -> Unit,
-    onMove: (AssetEntity, String, Long?, String, String) -> Unit
+    onMove: (AssetEntity, String, Long?, String, String, String, String) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AssetEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<AssetEntity?>(null) }
     var detailId by remember { mutableStateOf<Long?>(null) }
+    var statusFilter by rememberSaveable { mutableStateOf("All") }
+    var criticalityFilter by rememberSaveable { mutableStateOf("All") }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val raw = result.contents
@@ -1227,6 +1291,9 @@ private fun AssetsScreen(
             characteristics = characteristics.filter { it.assetId == detailAsset.id },
             bomItems = bomItems.filter { it.assetId == detailAsset.id },
             movements = movements.filter { it.assetId == detailAsset.id },
+            measuringPoints = measuringPoints.filter { it.assetId == detailAsset.id },
+            notifications = notifications.filter { it.assetId == detailAsset.id },
+            auditLog = auditLog.filter { it.entityType == "Asset" && (it.details.contains(detailAsset.code) || it.details.contains(detailAsset.name)) },
             spareParts = spareParts,
             locations = locations,
             canManage = canManage,
@@ -1248,16 +1315,42 @@ private fun AssetsScreen(
         return
     }
 
-    val filtered = remember(query, assets) {
-        if (query.isBlank()) assets else assets.filter { asset ->
+    val statusOptions = remember(assets) {
+        listOf("All") + assets.map { it.status }.filter { it.isNotBlank() }.distinct().sorted()
+    }
+    val criticalityOptions = remember(assets) {
+        listOf("All") + assets.map { it.criticality }.filter { it.isNotBlank() }.distinct().sorted()
+    }
+    val filtered = remember(query, statusFilter, criticalityFilter, assets) {
+        assets.filter { asset ->
             val q = query.lowercase(Locale.getDefault())
-            asset.code.lowercase(Locale.getDefault()).contains(q) ||
+            val matchesQuery = query.isBlank() ||
+                asset.code.lowercase(Locale.getDefault()).contains(q) ||
                 asset.name.lowercase(Locale.getDefault()).contains(q) ||
                 asset.groupName.lowercase(Locale.getDefault()).contains(q) ||
                 asset.location.lowercase(Locale.getDefault()).contains(q) ||
                 asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
-                asset.assetTag.lowercase(Locale.getDefault()).contains(q)
-        }
+                asset.assetTag.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetType.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetCategory.lowercase(Locale.getDefault()).contains(q) ||
+                asset.equipmentCategory.lowercase(Locale.getDefault()).contains(q) ||
+                asset.objectType.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetClass.lowercase(Locale.getDefault()).contains(q) ||
+                asset.assetSubclass.lowercase(Locale.getDefault()).contains(q) ||
+                asset.alternativeLabel.lowercase(Locale.getDefault()).contains(q) ||
+                asset.externalAssetCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.legacyAssetCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.barcode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.qrCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.model.lowercase(Locale.getDefault()).contains(q) ||
+                asset.responsiblePersonId.lowercase(Locale.getDefault()).contains(q) ||
+                asset.workCenterId.lowercase(Locale.getDefault()).contains(q) ||
+                asset.costCenterId.lowercase(Locale.getDefault()).contains(q) ||
+                asset.financialAssetRef.lowercase(Locale.getDefault()).contains(q)
+            val matchesStatus = statusFilter == "All" || asset.status == statusFilter
+            val matchesCriticality = criticalityFilter == "All" || asset.criticality == criticalityFilter
+            matchesQuery && matchesStatus && matchesCriticality
+        }.sortedWith(compareBy<AssetEntity> { it.groupName }.thenBy { it.code })
     }
     val grouped = filtered.groupBy { it.groupName }
 
@@ -1271,9 +1364,9 @@ private fun AssetsScreen(
         ) {
             if (query.isBlank() && assets.isNotEmpty()) {
                 item {
-                    val running = assets.count { it.status == "Running" }
-                    val stopped = assets.count { it.status == "Stopped" || it.status == "Retired" }
-                    val warning = assets.count { it.status == "Warning" || it.status == "Under Maintenance" }
+                    val running = assets.count { it.status == "Running" || it.status == "Active" }
+                    val stopped = assets.count { it.status in listOf("Stopped", "Retired", "Disposed", "Inactive", "Out of Service", "Breakdown") }
+                    val warning = assets.count { it.status in listOf("Warning", "Under Maintenance", "Standby", "In Storage", "Sent to Vendor", "Refurbishment") }
                     val other = assets.size - running - stopped - warning
                     val seg = listOf(
                         ChartSegment("تعمل", running, AccentGreen),
@@ -1292,10 +1385,45 @@ private fun AssetsScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.weight(1f)) {
-                        SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill")
+                        SearchField(query = query, onChange = { query = it }, placeholder = "بحث: RM-01 أو Rollermill أو الموقع")
                     }
                     FilledTonalIconButton(onClick = { launchScan() }) {
                         Icon(Icons.Filled.QrCodeScanner, contentDescription = "مسح رمز الأصل")
+                    }
+                }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssetFilterChips(
+                        title = "الحالة",
+                        options = statusOptions,
+                        selected = statusFilter,
+                        allLabel = "الكل",
+                        onSelect = { statusFilter = it }
+                    )
+                    AssetFilterChips(
+                        title = "الأهمية",
+                        options = criticalityOptions,
+                        selected = criticalityFilter,
+                        allLabel = "كل الأهميات",
+                        onSelect = { criticalityFilter = it }
+                    )
+                }
+            }
+            if (query.isNotBlank() || statusFilter != "All" || criticalityFilter != "All") {
+                item {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "النتائج: ${filtered.size} من ${assets.size}",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = {
+                            query = ""
+                            statusFilter = "All"
+                            criticalityFilter = "All"
+                        }) { Text("مسح الفلاتر") }
                     }
                 }
             }
@@ -1363,8 +1491,139 @@ private fun AssetCard(
                 StatusBadge(asset.criticality, priorityTone(asset.criticality))
                 AssistChip(onClick = {}, label = { Text(asset.location, maxLines = 1) })
             }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (asset.lastInspectionAt.isNotBlank()) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("آخر فحص: ${asset.lastInspectionAt}", maxLines = 1) },
+                        leadingIcon = { Icon(Icons.Filled.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+                if (asset.warrantyEnd.isNotBlank()) {
+                    val warrantyTone = statusTone(if (asset.isUnderWarranty(DateStrings.today())) "running" else "stopped")
+                    StatusBadge("الضمان: ${asset.warrantyEnd}", warrantyTone)
+                }
+            }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
+    }
+}
+
+@Composable
+private fun AssetFilterChips(
+    title: String,
+    options: List<String>,
+    selected: String,
+    allLabel: String,
+    onSelect: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        options.forEach { option ->
+            FilterChip(
+                selected = selected == option,
+                onClick = { onSelect(option) },
+                label = { Text(if (option == "All") allLabel else option, maxLines = 1) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AssetGovernanceCard(
+    asset: AssetEntity,
+    workOrders: List<WorkOrderEntity>,
+    pmItems: List<PreventiveMaintenanceEntity>,
+    documents: List<AssetDocumentEntity>,
+    characteristics: List<AssetCharacteristicEntity>,
+    bomItems: List<AssetBomItemEntity>,
+    movements: List<AssetMovementEntity>,
+    measuringPoints: List<MeasuringPointEntity>,
+    notifications: List<MaintenanceNotificationEntity>,
+    auditLog: List<AuditLogEntity>,
+    hasLocation: Boolean
+) {
+    val critical = asset.criticality.equals("Critical", ignoreCase = true) || asset.criticality.equals("High", ignoreCase = true)
+    val checks = listOf(
+        "تعريف فريد" to asset.code.isNotBlank(),
+        "نوع وفئة" to (asset.assetType.isNotBlank() && asset.assetCategory.isNotBlank()),
+        "تصنيف وهوية" to (asset.objectType.isNotBlank() || asset.assetClass.isNotBlank() || asset.assetSubclass.isNotBlank()),
+        "موقع واضح" to hasLocation,
+        "حالة تشغيلية" to asset.status.isNotBlank(),
+        "أهمية محددة" to asset.criticality.isNotBlank(),
+        "تنظيم ومسؤولية" to (asset.workCenterId.isNotBlank() || asset.responsiblePersonId.isNotBlank() || asset.departmentId.isNotBlank()),
+        "بيانات مصنّع/موديل" to (asset.manufacturer.isNotBlank() || asset.model.isNotBlank()),
+        "رقم تسلسلي/وسم" to (asset.serialNumber.isNotBlank() || asset.assetTag.isNotBlank()),
+        "شركاء" to asset.partners.isNotBlank(),
+        "خصائص فنية" to characteristics.isNotEmpty(),
+        "مستندات" to documents.isNotEmpty(),
+        "قياسات/عدادات" to measuringPoints.isNotEmpty(),
+        "خطة وقائية" to pmItems.isNotEmpty(),
+        "قائمة مكونات BOM" to bomItems.isNotEmpty(),
+        "سلامة وامتثال" to (!asset.safetyCritical || asset.safetyInstructions.isNotBlank() || asset.requiredPermits.isNotBlank()),
+        "ربط مالي" to (asset.financialAssetRef.isNotBlank() || asset.costCenterId.isNotBlank() || asset.purchaseCost > 0.0),
+        "بيانات خطية" to (asset.assetType != "Linear Asset" || asset.linearLength > 0.0 || (asset.linearStartPoint.isNotBlank() && asset.linearEndPoint.isNotBlank())),
+        "تاريخ/تتبع" to (movements.isNotEmpty() || workOrders.isNotEmpty() || notifications.isNotEmpty() || auditLog.isNotEmpty())
+    )
+    val passed = checks.count { it.second }
+    val missingCritical = critical && (documents.isEmpty() || pmItems.isEmpty() || characteristics.isEmpty())
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("حوكمة الأصل")
+                Spacer(modifier = Modifier.weight(1f))
+                StatusBadge("$passed/${checks.size}", statusTone(if (missingCritical) "warning" else "running"))
+            }
+            Text(
+                "تغطي هذه البطاقة القاعدة الذهبية للأصل: الموقع، الحالة، الأهمية، التصنيف، المستندات، القياسات، BOM، البلاغات، الأوامر، الخطط، التكلفة، التاريخ، والتدقيق.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (missingCritical) {
+                Text(
+                    "تنبيه حوكمة: الأصل عالي/حرج ويحتاج خصائص فنية ومستندات وخطة وقائية مكتملة أو مبررًا موثقًا.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AccentOrange,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            checks.chunked(2).forEach { row ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { (label, ok) ->
+                        GovernancePill(label = label, ok = ok, modifier = Modifier.weight(1f))
+                    }
+                    if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GovernancePill(label: String, ok: Boolean, modifier: Modifier = Modifier) {
+    val tone = if (ok) statusTone("running") else statusTone("warning")
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(tone.container)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            if (ok) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+            contentDescription = null,
+            tint = tone.content,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(label, color = tone.content, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1379,6 +1638,9 @@ private fun AssetDetailScreen(
     characteristics: List<AssetCharacteristicEntity>,
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
+    measuringPoints: List<MeasuringPointEntity>,
+    notifications: List<MaintenanceNotificationEntity>,
+    auditLog: List<AuditLogEntity>,
     spareParts: List<SparePartEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
@@ -1395,7 +1657,7 @@ private fun AssetDetailScreen(
     onDeleteCharacteristic: (AssetCharacteristicEntity) -> Unit,
     onSaveBom: (AssetBomItemEntity) -> Unit,
     onDeleteBom: (AssetBomItemEntity) -> Unit,
-    onMove: (AssetEntity, String, Long?, String, String) -> Unit
+    onMove: (AssetEntity, String, Long?, String, String, String, String) -> Unit
 ) {
     var showDocForm by remember { mutableStateOf(false) }
     var editingDoc by remember { mutableStateOf<AssetDocumentEntity?>(null) }
@@ -1416,8 +1678,8 @@ private fun AssetDetailScreen(
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
     var showMoveForm by remember { mutableStateOf(false) }
-    val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
-    val retired = asset.status.equals("Retired", ignoreCase = true)
+    val lifecycle = listOf("Draft", "Active", "Running", "Standby", "Under Maintenance", "Breakdown", "Stopped", "Out of Service", "In Storage", "Sent to Vendor", "Refurbishment", "Retired", "Disposed", "Inactive")
+    val blocksNewWork = asset.status.equals("Retired", ignoreCase = true) || asset.status.equals("Disposed", ignoreCase = true)
 
     LazyColumn(
         modifier = Modifier
@@ -1447,16 +1709,56 @@ private fun AssetDetailScreen(
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     SectionHeader("المعلومات")
+                    InfoRow("نوع الأصل", asset.assetType)
+                    if (asset.assetCategory.isNotBlank()) InfoRow("فئة الأصل", asset.assetCategory)
+                    if (asset.equipmentCategory.isNotBlank()) InfoRow("فئة المعدة", asset.equipmentCategory)
+                    if (asset.objectType.isNotBlank()) InfoRow("نوع الكائن الفني", asset.objectType)
+                    if (asset.assetClass.isNotBlank()) InfoRow("تصنيف الأصل", asset.assetClass)
+                    if (asset.assetSubclass.isNotBlank()) InfoRow("التصنيف الفرعي", asset.assetSubclass)
+                    if (asset.alternativeLabel.isNotBlank()) InfoRow("تسمية بديلة", asset.alternativeLabel)
+                    if (asset.externalAssetCode.isNotBlank()) InfoRow("كود خارجي", asset.externalAssetCode)
+                    if (asset.legacyAssetCode.isNotBlank()) InfoRow("كود قديم", asset.legacyAssetCode)
+                    if (asset.barcode.isNotBlank()) InfoRow("Barcode", asset.barcode)
+                    if (asset.qrCode.isNotBlank()) InfoRow("QR Code", asset.qrCode)
+                    if (asset.description.isNotBlank()) InfoRow("الوصف", asset.description)
+                    if (asset.longDescription.isNotBlank()) InfoRow("الوصف التفصيلي", asset.longDescription)
                     InfoRow("المجموعة", asset.groupName)
                     InfoRow("الموقع", asset.location)
                     InfoRow("الموقع الفني", locationLabel)
                     InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
                     InfoRow("الشركة/الموديل", "${asset.manufacturer} • ${asset.model}")
+                    if (asset.constructionType.isNotBlank()) InfoRow("نوع البناء", asset.constructionType)
                     if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
                     if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
                     InfoRow("الأهمية", asset.criticality)
                     InfoRow("تاريخ التركيب", asset.installedAt)
+                    if (asset.commissioningAt.isNotBlank()) InfoRow("تاريخ التشغيل", asset.commissioningAt)
                     InfoRow("آخر فحص", asset.lastInspectionAt)
+                    if (asset.notes.isNotBlank()) InfoRow("ملاحظات", asset.notes)
+                }
+            }
+        }
+
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SectionHeader("الموقع والتنظيم والمسؤولية")
+                    if (asset.companyId.isNotBlank()) InfoRow("الشركة", asset.companyId)
+                    if (asset.siteId.isNotBlank()) InfoRow("الموقع العام", asset.siteId)
+                    if (asset.plantId.isNotBlank()) InfoRow("المصنع / الموقع التشغيلي", asset.plantId)
+                    if (asset.maintenancePlantId.isNotBlank()) InfoRow("موقع الصيانة", asset.maintenancePlantId)
+                    if (asset.planningPlantId.isNotBlank()) InfoRow("موقع التخطيط", asset.planningPlantId)
+                    if (asset.workCenterId.isNotBlank()) InfoRow("مركز العمل", asset.workCenterId)
+                    if (asset.plannerGroupId.isNotBlank()) InfoRow("مجموعة التخطيط", asset.plannerGroupId)
+                    if (asset.costCenterId.isNotBlank()) InfoRow("مركز التكلفة", asset.costCenterId)
+                    if (asset.departmentId.isNotBlank()) InfoRow("الإدارة المالكة", asset.departmentId)
+                    if (asset.responsiblePersonId.isNotBlank()) InfoRow("المسؤول", asset.responsiblePersonId)
+                    if (asset.partners.isNotBlank()) InfoRow("الشركاء", asset.partners)
+                    if (
+                        listOf(asset.companyId, asset.siteId, asset.plantId, asset.maintenancePlantId, asset.planningPlantId, asset.workCenterId, asset.plannerGroupId, asset.costCenterId, asset.departmentId, asset.responsiblePersonId, asset.partners).all { it.isBlank() }
+                    ) {
+                        Text("لم يتم تسجيل بيانات تنظيمية أو مسؤوليات لهذا الأصل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -1481,8 +1783,25 @@ private fun AssetDetailScreen(
             }
         }
 
+        item {
+            AssetGovernanceCard(
+                asset = asset,
+                workOrders = workOrders,
+                pmItems = pmItems,
+                documents = documents,
+                characteristics = characteristics,
+                bomItems = bomItems,
+                movements = movements,
+                measuringPoints = measuringPoints,
+                notifications = notifications,
+                auditLog = auditLog,
+                hasLocation = asset.locationId != null || asset.location.isNotBlank()
+            )
+        }
+
         val hasFinancial = asset.supplier.isNotBlank() || asset.purchaseOrder.isNotBlank() ||
-            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank()
+            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank() || asset.financialAssetRef.isNotBlank() ||
+            asset.financialStatus.isNotBlank() || asset.bookValue > 0.0 || asset.capitalizationAt.isNotBlank()
         if (hasFinancial) {
             item {
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -1492,6 +1811,44 @@ private fun AssetDetailScreen(
                         if (asset.purchaseOrder.isNotBlank()) InfoRow("أمر الشراء", asset.purchaseOrder)
                         if (asset.purchaseCost > 0.0) InfoRow("تكلفة الشراء", money(asset.purchaseCost))
                         if (asset.acquiredAt.isNotBlank()) InfoRow("تاريخ الاقتناء", asset.acquiredAt)
+                        if (asset.financialAssetRef.isNotBlank()) InfoRow("مرجع الأصل المالي", asset.financialAssetRef)
+                        if (asset.financialStatus.isNotBlank()) InfoRow("الحالة المالية", asset.financialStatus)
+                        if (asset.bookValue > 0.0) InfoRow("القيمة الدفترية", money(asset.bookValue))
+                        if (asset.capitalizationAt.isNotBlank()) InfoRow("تاريخ الرسملة", asset.capitalizationAt)
+                    }
+                }
+            }
+        }
+
+        if (asset.safetyCritical || asset.riskLevel.isNotBlank() || asset.requiredPermits.isNotBlank() || asset.safetyInstructions.isNotBlank() || asset.ppeRequired.isNotBlank() || asset.complianceRequirements.isNotBlank()) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            SectionHeader("السلامة والامتثال")
+                            Spacer(modifier = Modifier.weight(1f))
+                            if (asset.safetyCritical) StatusBadge("حرج للسلامة", statusTone("critical"))
+                        }
+                        if (asset.riskLevel.isNotBlank()) InfoRow("مستوى الخطر", asset.riskLevel)
+                        if (asset.requiredPermits.isNotBlank()) InfoRow("التصاريح المطلوبة", asset.requiredPermits)
+                        if (asset.safetyInstructions.isNotBlank()) InfoRow("تعليمات السلامة", asset.safetyInstructions)
+                        if (asset.ppeRequired.isNotBlank()) InfoRow("معدات الوقاية", asset.ppeRequired)
+                        InfoRow("يتطلب عزل", if (asset.isolationRequired) "نعم" else "لا")
+                        if (asset.complianceRequirements.isNotBlank()) InfoRow("متطلبات الامتثال", asset.complianceRequirements)
+                    }
+                }
+            }
+        }
+
+        if (asset.assetType == "Linear Asset" || asset.linearStartPoint.isNotBlank() || asset.linearEndPoint.isNotBlank() || asset.linearLength > 0.0 || asset.linearRoute.isNotBlank()) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("بيانات الأصل الخطي")
+                        if (asset.linearStartPoint.isNotBlank()) InfoRow("نقطة البداية", asset.linearStartPoint)
+                        if (asset.linearEndPoint.isNotBlank()) InfoRow("نقطة النهاية", asset.linearEndPoint)
+                        if (asset.linearLength > 0.0) InfoRow("الطول", "${asset.linearLength} ${asset.linearUnit}".trim())
+                        if (asset.linearRoute.isNotBlank()) InfoRow("المسار", asset.linearRoute)
                     }
                 }
             }
@@ -1631,9 +1988,9 @@ private fun AssetDetailScreen(
                 }
             }
             item {
-                if (retired) {
+                if (blocksNewWork) {
                     Text(
-                        "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه.",
+                        "الأصل متقاعد/متخلص منه — لا يمكن إنشاء أوامر عمل جديدة عليه.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -1735,6 +2092,46 @@ private fun AssetDetailScreen(
             }
         }
 
+        item { SectionHeader("القياسات والعدادات (${measuringPoints.size})") }
+        if (measuringPoints.isEmpty()) {
+            item { EmptyState("لا توجد نقاط قياس أو عدادات لهذا الأصل", Icons.Filled.Speed) }
+        }
+        items(measuringPoints, key = { "mp-${it.id}" }) { point ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.Speed, AccentTeal, AccentTeal.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(point.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            if (point.isCounter) "عداد تراكمي" else "قراءة قياسية",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        LtrText("${point.lastReading} ${point.unit}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(point.lastReadingAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        item { SectionHeader("البلاغات المرتبطة (${notifications.size})") }
+        if (notifications.isEmpty()) {
+            item { EmptyState("لا توجد بلاغات مرتبطة بهذا الأصل", Icons.Filled.NotificationsActive) }
+        }
+        items(notifications, key = { "nt-${it.id}" }) { notification ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(notification.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        StatusBadge(notificationStatusLabel(notification.status), statusTone(notification.status))
+                    }
+                    Text(notification.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 SectionHeader("المستندات (${documents.size})")
@@ -1796,8 +2193,35 @@ private fun AssetDetailScreen(
                             else -> ""
                         }
                         if (route.isNotBlank()) LtrText(route, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (mv.eventType == MovementType.TRANSFER) {
+                            val transferMeta = listOfNotNull(
+                                "Plant: ${mv.oldPlant} → ${mv.newPlant}".takeIf { mv.oldPlant.isNotBlank() || mv.newPlant.isNotBlank() },
+                                "WC: ${mv.oldWorkCenter} → ${mv.newWorkCenter}".takeIf { mv.oldWorkCenter.isNotBlank() || mv.newWorkCenter.isNotBlank() },
+                                "CC: ${mv.oldCostCenter} → ${mv.newCostCenter}".takeIf { mv.oldCostCenter.isNotBlank() || mv.newCostCenter.isNotBlank() },
+                                "Approved: ${mv.approvedBy}".takeIf { mv.approvedBy.isNotBlank() },
+                                "Attachment: ${mv.attachment}".takeIf { mv.attachment.isNotBlank() }
+                            ).joinToString(" • ")
+                            if (transferMeta.isNotBlank()) LtrText(transferMeta, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         if (mv.notes.isNotBlank()) Text(mv.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${mv.performedBy} • ${mv.occurredAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        item { SectionHeader("التدقيق والتتبع (${auditLog.size})") }
+        if (auditLog.isEmpty()) {
+            item { EmptyState("لا توجد سجلات تدقيق مباشرة لهذا الأصل", Icons.Filled.History) }
+        }
+        items(auditLog.take(10), key = { "audit-${it.id}" }) { audit ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.History, AccentNavy, AccentNavy.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(audit.action, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(audit.details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text("${audit.performedBy} • ${audit.createdAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -1809,7 +2233,7 @@ private fun AssetDetailScreen(
             asset = asset,
             locations = locations,
             onDismiss = { showMoveForm = false },
-            onSave = { type, locId, locName, notes -> onMove(asset, type, locId, locName, notes); showMoveForm = false }
+            onSave = { type, locId, locName, notes, approvedBy, attachment -> onMove(asset, type, locId, locName, notes, approvedBy, attachment); showMoveForm = false }
         )
     }
     if (showBomForm) {
@@ -3302,13 +3726,30 @@ private fun ReportsScreen(
     val pendingApprovals = workOrders.count { it.approvalStatus == "Pending" }
     val windowHours = (assets.size.coerceAtLeast(1)) * 30.0 * 24.0
     val availability = ((windowHours - totalDowntime) / windowHours * 100.0).coerceIn(0.0, 100.0)
+    val activeStatuses = setOf("Active", "Running", "Under Maintenance", "Breakdown")
+    val installedStatuses = setOf("Active", "Running", "Under Maintenance", "Breakdown")
+    val missingCompany = assets.filter { it.status in activeStatuses && it.companyId.isBlank() && it.companyCode.isBlank() && it.companyName.isBlank() }
+    val missingPlant = assets.filter { it.status in activeStatuses && it.plantId.isBlank() && it.plantCode.isBlank() && it.plantName.isBlank() }
+    val installedWithoutFunctionalLocation = assets.filter { it.status in installedStatuses && it.assetType != "Mobile Asset" && it.locationId == null && it.functionalLocationId.isBlank() && it.functionalLocationCode.isBlank() }
+    val criticalWithoutWorkCenter = assets.filter { it.criticality in setOf("High", "Critical") && it.workCenterId.isBlank() && it.workCenterCode.isBlank() }
+    val criticalWithoutPlannerGroup = assets.filter { it.criticality in setOf("High", "Critical") && it.plannerGroupId.isBlank() && it.plannerGroupCode.isBlank() }
+    val withoutCostCenter = assets.filter { it.status in activeStatuses && it.costCenterId.isBlank() && it.costCenterCode.isBlank() }
+    val withManualOverrides = assets.filter { it.manualOverrideReason.isNotBlank() }
+    val inStorageAssets = assets.filter { it.status == "In Storage" }
+    val mobileAssets = assets.filter { it.assetType == "Mobile Asset" }
     val context = LocalContext.current
     val reportText = buildReportText(
         assets = stats.assets, openWo = stats.openWorkOrders, closed = closed,
         totalCost = totalCost, laborCost = laborCost, partsCost = partsCost, openCost = openCost,
         availability = availability, failures = failures.size, downtime = totalDowntime, mttr = mttr,
         overdue = overdueWos, pendingApprovals = pendingApprovals, duePm = duePm.size,
-        lowStock = lowStock.size, underWarranty = underWarranty.size, expiringSoon = expiringSoon.size
+        lowStock = lowStock.size, underWarranty = underWarranty.size, expiringSoon = expiringSoon.size,
+        missingCompany = missingCompany.size, missingPlant = missingPlant.size,
+        installedWithoutFunctionalLocation = installedWithoutFunctionalLocation.size,
+        criticalWithoutWorkCenter = criticalWithoutWorkCenter.size,
+        criticalWithoutPlannerGroup = criticalWithoutPlannerGroup.size,
+        withoutCostCenter = withoutCostCenter.size, withManualOverrides = withManualOverrides.size,
+        inStorageAssets = inStorageAssets.size, mobileAssets = mobileAssets.size
     )
 
     LazyColumn(
@@ -3421,6 +3862,26 @@ private fun ReportsScreen(
                 "أصول ضمن الضمان: ${underWarranty.size}",
                 "ضمانات تنتهي خلال 30 يوم: ${expiringSoon.size}",
                 "الأقرب انتهاءً: ${expiringSoon.minByOrNull { it.warrantyEnd }?.let { "${it.code} (${it.warrantyEnd})" } ?: "لا يوجد"}"
+            ))
+        }
+        item {
+            ReportCard("جودة بيانات الموقع والتنظيم", listOf(
+                "Assets Missing Company: ${missingCompany.size}",
+                "Assets Missing Plant: ${missingPlant.size}",
+                "Installed Assets Without Functional Location: ${installedWithoutFunctionalLocation.size}",
+                "Critical Assets Without Work Center: ${criticalWithoutWorkCenter.size}",
+                "Critical Assets Without Planner Group: ${criticalWithoutPlannerGroup.size}",
+                "Assets Without Cost Center: ${withoutCostCenter.size}",
+                "Assets With Manual Overrides: ${withManualOverrides.size}"
+            ))
+        }
+        item {
+            ReportCard("توزيع الأصول التنظيمي", listOf(
+                "Assets By Plant: ${assets.groupingBy { it.plantCode.ifBlank { it.plantName.ifBlank { "غير محدد" } } }.eachCount().entries.sortedByDescending { it.value }.take(5).joinToString { "${it.key}: ${it.value}" }.ifBlank { "لا يوجد" }}",
+                "Assets By Work Center: ${assets.groupingBy { it.workCenterCode.ifBlank { it.workCenterId.ifBlank { "غير محدد" } } }.eachCount().entries.sortedByDescending { it.value }.take(5).joinToString { "${it.key}: ${it.value}" }.ifBlank { "لا يوجد" }}",
+                "Assets By Cost Center: ${assets.groupingBy { it.costCenterCode.ifBlank { it.costCenterId.ifBlank { "غير محدد" } } }.eachCount().entries.sortedByDescending { it.value }.take(5).joinToString { "${it.key}: ${it.value}" }.ifBlank { "لا يوجد" }}",
+                "In Storage Assets: ${inStorageAssets.size}",
+                "Mobile Assets Location Report: ${mobileAssets.count { it.currentPhysicalLocation.isNotBlank() || it.physicalLocation.isNotBlank() || it.location.isNotBlank() }} / ${mobileAssets.size} لديها موقع معروف"
             ))
         }
     }
@@ -4012,6 +4473,226 @@ private fun LocationCard(
     }
 }
 
+private enum class OrgMasterKind(val title: String) {
+    Company("الشركات"),
+    Site("المواقع العامة"),
+    Plant("المصانع"),
+    WorkCenter("مراكز العمل"),
+    PlannerGroup("مجموعات التخطيط"),
+    Department("الأقسام"),
+    CostCenter("مراكز التكلفة"),
+    StorageLocation("مواقع التخزين")
+}
+
+private data class OrgMasterEdit(
+    val kind: OrgMasterKind,
+    val id: Long,
+    val code: String,
+    val name: String,
+    val parentId: String = "",
+    val status: String = "Active",
+    val extra: String = "",
+    val usageCount: Int = 0
+)
+
+private data class OrgMasterOption(val id: String, val label: String)
+
+@Composable
+private fun OrganizationMasterDataScreen(
+    innerPadding: PaddingValues,
+    canManage: Boolean,
+    companies: List<CompanyEntity>,
+    sites: List<SiteEntity>,
+    plants: List<PlantEntity>,
+    workCenters: List<WorkCenterEntity>,
+    plannerGroups: List<PlannerGroupEntity>,
+    departments: List<DepartmentEntity>,
+    costCenters: List<CostCenterEntity>,
+    storageLocations: List<StorageLocationEntity>,
+    onSaveCompany: (CompanyEntity) -> Unit,
+    onDeleteCompany: (CompanyEntity) -> Unit,
+    onSaveSite: (SiteEntity) -> Unit,
+    onDeleteSite: (SiteEntity) -> Unit,
+    onSavePlant: (PlantEntity) -> Unit,
+    onDeletePlant: (PlantEntity) -> Unit,
+    onSaveWorkCenter: (WorkCenterEntity) -> Unit,
+    onDeleteWorkCenter: (WorkCenterEntity) -> Unit,
+    onSavePlannerGroup: (PlannerGroupEntity) -> Unit,
+    onDeletePlannerGroup: (PlannerGroupEntity) -> Unit,
+    onSaveDepartment: (DepartmentEntity) -> Unit,
+    onDeleteDepartment: (DepartmentEntity) -> Unit,
+    onSaveCostCenter: (CostCenterEntity) -> Unit,
+    onDeleteCostCenter: (CostCenterEntity) -> Unit,
+    onSaveStorageLocation: (StorageLocationEntity) -> Unit,
+    onDeleteStorageLocation: (StorageLocationEntity) -> Unit
+) {
+    var editing by remember { mutableStateOf<OrgMasterEdit?>(null) }
+    var deleteTarget by remember { mutableStateOf<OrgMasterEdit?>(null) }
+
+    fun delete(edit: OrgMasterEdit) {
+        when (edit.kind) {
+            OrgMasterKind.Company -> companies.firstOrNull { it.id == edit.id }?.let(onDeleteCompany)
+            OrgMasterKind.Site -> sites.firstOrNull { it.id == edit.id }?.let(onDeleteSite)
+            OrgMasterKind.Plant -> plants.firstOrNull { it.id == edit.id }?.let(onDeletePlant)
+            OrgMasterKind.WorkCenter -> workCenters.firstOrNull { it.id == edit.id }?.let(onDeleteWorkCenter)
+            OrgMasterKind.PlannerGroup -> plannerGroups.firstOrNull { it.id == edit.id }?.let(onDeletePlannerGroup)
+            OrgMasterKind.Department -> departments.firstOrNull { it.id == edit.id }?.let(onDeleteDepartment)
+            OrgMasterKind.CostCenter -> costCenters.firstOrNull { it.id == edit.id }?.let(onDeleteCostCenter)
+            OrgMasterKind.StorageLocation -> storageLocations.firstOrNull { it.id == edit.id }?.let(onDeleteStorageLocation)
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(innerPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("Master Data — Location & Organization", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text("إدارة الشركات والمواقع والمصانع ومراكز العمل والتكلفة والتخزين.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        orgMasterSection(OrgMasterKind.Company, companies.map { company -> OrgMasterEdit(OrgMasterKind.Company, company.id, company.code, company.name, status = company.status, usageCount = assets.count { it.companyId == company.id.toString() || it.companyCode == company.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Company, 0, "", "") }, { editing = it }, { deleteTarget = it })
+        orgMasterSection(OrgMasterKind.Site, sites.map { site -> OrgMasterEdit(OrgMasterKind.Site, site.id, site.code, site.name, site.companyId.toString(), site.status, site.physicalAddress, assets.count { it.siteId == site.id.toString() || it.siteCode == site.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Site, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        orgMasterSection(OrgMasterKind.Plant, plants.map { plant -> OrgMasterEdit(OrgMasterKind.Plant, plant.id, plant.code, plant.name, plant.companyId.toString(), plant.status, plant.plantType, assets.count { it.plantId == plant.id.toString() || it.plantCode == plant.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Plant, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "", extra = "Operational") }, { editing = it }, { deleteTarget = it })
+        orgMasterSection(OrgMasterKind.WorkCenter, workCenters.map { workCenter -> OrgMasterEdit(OrgMasterKind.WorkCenter, workCenter.id, workCenter.code, workCenter.name, workCenter.plantId.toString(), workCenter.status, workCenter.discipline, assets.count { it.workCenterId == workCenter.id.toString() || it.workCenterCode == workCenter.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.WorkCenter, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        orgMasterSection(OrgMasterKind.PlannerGroup, plannerGroups.map { plannerGroup -> OrgMasterEdit(OrgMasterKind.PlannerGroup, plannerGroup.id, plannerGroup.code, plannerGroup.name, plannerGroup.planningPlantId.toString(), plannerGroup.status, plannerGroup.discipline, assets.count { it.plannerGroupId == plannerGroup.id.toString() || it.plannerGroupCode == plannerGroup.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.PlannerGroup, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        orgMasterSection(OrgMasterKind.Department, departments.map { department -> OrgMasterEdit(OrgMasterKind.Department, department.id, department.code, department.name, department.companyId.toString(), department.status, usageCount = assets.count { it.departmentId == department.id.toString() || it.departmentCode == department.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.Department, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        orgMasterSection(OrgMasterKind.CostCenter, costCenters.map { costCenter -> OrgMasterEdit(OrgMasterKind.CostCenter, costCenter.id, costCenter.code, costCenter.name, costCenter.companyId.toString(), costCenter.status, usageCount = assets.count { it.costCenterId == costCenter.id.toString() || it.costCenterCode == costCenter.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.CostCenter, 0, "", "", parentId = companies.firstOrNull()?.id?.toString() ?: "") }, { editing = it }, { deleteTarget = it })
+        orgMasterSection(OrgMasterKind.StorageLocation, storageLocations.map { storageLocation -> OrgMasterEdit(OrgMasterKind.StorageLocation, storageLocation.id, storageLocation.code, storageLocation.name, storageLocation.plantId.toString(), storageLocation.status, storageLocation.storageType, assets.count { it.storageLocationId == storageLocation.id.toString() || it.storageLocationCode == storageLocation.code }) }, canManage, { editing = OrgMasterEdit(OrgMasterKind.StorageLocation, 0, "", "", parentId = plants.firstOrNull()?.id?.toString() ?: "", extra = "General") }, { editing = it }, { deleteTarget = it })
+    }
+
+    editing?.let { edit ->
+        val parentOptions = when (edit.kind) {
+            OrgMasterKind.Company -> emptyList()
+            OrgMasterKind.Site, OrgMasterKind.Plant, OrgMasterKind.Department, OrgMasterKind.CostCenter ->
+                companies.map { OrgMasterOption(it.id.toString(), "${it.code} • ${it.name}") }
+            OrgMasterKind.WorkCenter, OrgMasterKind.PlannerGroup, OrgMasterKind.StorageLocation ->
+                plants.map { OrgMasterOption(it.id.toString(), "${it.code} • ${it.name}") }
+        }
+        val parentLabel = when (edit.kind) {
+            OrgMasterKind.Company -> ""
+            OrgMasterKind.Site, OrgMasterKind.Plant, OrgMasterKind.Department, OrgMasterKind.CostCenter -> "الشركة"
+            OrgMasterKind.WorkCenter, OrgMasterKind.StorageLocation -> "المصنع / Plant"
+            OrgMasterKind.PlannerGroup -> "مصنع التخطيط / Planning Plant"
+        }
+        OrgMasterFormSheet(
+            initial = edit,
+            parentOptions = parentOptions,
+            parentLabel = parentLabel,
+            onDismiss = { editing = null },
+            onSave = { saved ->
+                when (saved.kind) {
+                    OrgMasterKind.Company -> onSaveCompany(CompanyEntity(saved.id, saved.code, saved.name, saved.status))
+                    OrgMasterKind.Site -> onSaveSite(SiteEntity(saved.id, saved.parentId.toLongOrNull() ?: 0L, saved.code, saved.name, saved.extra, saved.status))
+                    OrgMasterKind.Plant -> onSavePlant(PlantEntity(saved.id, saved.parentId.toLongOrNull() ?: 0L, null, saved.code, saved.name, saved.extra.ifBlank { "Operational" }, saved.status))
+                    OrgMasterKind.WorkCenter -> onSaveWorkCenter(WorkCenterEntity(saved.id, saved.code, saved.name, saved.parentId.toLongOrNull() ?: 0L, saved.extra, status = saved.status))
+                    OrgMasterKind.PlannerGroup -> onSavePlannerGroup(PlannerGroupEntity(saved.id, saved.code, saved.name, saved.parentId.toLongOrNull() ?: 0L, saved.extra, status = saved.status))
+                    OrgMasterKind.Department -> onSaveDepartment(DepartmentEntity(saved.id, saved.code, saved.name, saved.parentId.toLongOrNull() ?: 0L, status = saved.status))
+                    OrgMasterKind.CostCenter -> onSaveCostCenter(CostCenterEntity(saved.id, saved.code, saved.name, saved.parentId.toLongOrNull() ?: 0L, status = saved.status))
+                    OrgMasterKind.StorageLocation -> onSaveStorageLocation(StorageLocationEntity(saved.id, saved.code, saved.name, saved.parentId.toLongOrNull() ?: 0L, saved.extra.ifBlank { "General" }, saved.status))
+                }
+                editing = null
+            }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف ${target.kind.title}",
+            text = "هل تريد حذف ${target.code} - ${target.name}؟",
+            onConfirm = { delete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+private fun LazyListScope.orgMasterSection(
+    kind: OrgMasterKind,
+    rows: List<OrgMasterEdit>,
+    canManage: Boolean,
+    onAdd: () -> Unit,
+    onEdit: (OrgMasterEdit) -> Unit,
+    onDelete: (OrgMasterEdit) -> Unit
+) {
+    item {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SectionHeader("${kind.title} (${rows.size})")
+            Spacer(modifier = Modifier.weight(1f))
+            if (canManage) OutlinedButton(onClick = onAdd) { Text("إضافة") }
+        }
+    }
+    if (rows.isEmpty()) {
+        item { EmptyState("لا توجد بيانات في ${kind.title}") }
+    }
+    items(rows, key = { "${kind.name}-${it.id}" }) { row ->
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        LtrText(row.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        Text(row.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    StatusBadge(row.status, statusTone(row.status))
+                }
+                if (row.parentId.isNotBlank()) LtrText("Parent: ${row.parentId}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                StatusBadge("أصول مرتبطة: ${row.usageCount}", statusTone(if (row.usageCount > 0) "info" else "neutral"))
+                if (canManage) EditDeleteRow({ onEdit(row) }, { onDelete(row) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrgMasterFormSheet(
+    initial: OrgMasterEdit,
+    parentOptions: List<OrgMasterOption>,
+    parentLabel: String,
+    onDismiss: () -> Unit,
+    onSave: (OrgMasterEdit) -> Unit
+) {
+    var code by remember { mutableStateOf(initial.code) }
+    var name by remember { mutableStateOf(initial.name) }
+    var parentId by remember { mutableStateOf(initial.parentId) }
+    var status by remember { mutableStateOf(initial.status) }
+    var extra by remember { mutableStateOf(initial.extra) }
+    val requiresParent = initial.kind != OrgMasterKind.Company
+    val showExtra = initial.kind in setOf(OrgMasterKind.Site, OrgMasterKind.Plant, OrgMasterKind.WorkCenter, OrgMasterKind.PlannerGroup, OrgMasterKind.StorageLocation)
+    FormSheet("${if (initial.id == 0L) "إضافة" else "تعديل"} ${initial.kind.title}", onDismiss) {
+        LabeledField("الكود", code, { code = it })
+        LabeledField("الاسم", name, { name = it })
+        if (requiresParent) {
+            if (parentOptions.isEmpty()) {
+                Text("أضف ${parentLabel.ifBlank { "المرجع الأب" }} أولاً قبل إنشاء هذا السجل.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                LabeledField("المعرف الأب / الربط", parentId, { parentId = it }, numeric = true)
+            } else {
+                OptionDropdown(
+                    label = parentLabel,
+                    options = parentOptions.map { it.id },
+                    selected = parentId,
+                    display = { id -> parentOptions.firstOrNull { it.id == id }?.label ?: "اختر…" },
+                    onSelect = { parentId = it }
+                )
+            }
+        }
+        if (showExtra) {
+            LabeledField(
+                when (initial.kind) {
+                    OrgMasterKind.Site -> "العنوان الفعلي"
+                    OrgMasterKind.Plant -> "نوع المصنع"
+                    OrgMasterKind.WorkCenter, OrgMasterKind.PlannerGroup -> "التخصص"
+                    OrgMasterKind.StorageLocation -> "نوع التخزين"
+                    else -> "بيانات إضافية"
+                },
+                extra,
+                { extra = it }
+            )
+        }
+        OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+        SaveButton(code.isNotBlank() && name.isNotBlank() && (!requiresParent || parentId.isNotBlank())) {
+            onSave(initial.copy(code = code.trim(), name = name.trim(), parentId = parentId.trim(), status = status, extra = extra.trim()))
+        }
+    }
+}
+
 @Composable
 private fun LocationDetailScreen(
     innerPadding: PaddingValues,
@@ -4357,7 +5038,10 @@ private fun buildReportText(
     totalCost: Double, laborCost: Double, partsCost: Double, openCost: Double,
     availability: Double, failures: Int, downtime: Double, mttr: Double,
     overdue: Int, pendingApprovals: Int, duePm: Int,
-    lowStock: Int, underWarranty: Int, expiringSoon: Int
+    lowStock: Int, underWarranty: Int, expiringSoon: Int,
+    missingCompany: Int, missingPlant: Int, installedWithoutFunctionalLocation: Int,
+    criticalWithoutWorkCenter: Int, criticalWithoutPlannerGroup: Int,
+    withoutCostCenter: Int, withManualOverrides: Int, inStorageAssets: Int, mobileAssets: Int
 ): String = buildString {
     appendLine("تقرير الصيانة — الهادي CMMS")
     appendLine("التاريخ: ${DateStrings.today()}")
@@ -4370,6 +5054,10 @@ private fun buildReportText(
     appendLine("الصيانة الدورية المستحقة: $duePm")
     appendLine("المخزون تحت الحد الأدنى: $lowStock")
     appendLine("الضمان — ساري: $underWarranty | ينتهي خلال 30 يوم: $expiringSoon")
+    appendLine("جودة بيانات الموقع والتنظيم — بدون شركة: $missingCompany | بدون Plant: $missingPlant | مركبة بدون موقع فني: $installedWithoutFunctionalLocation")
+    appendLine("الأصول الحرجة — بدون مركز عمل: $criticalWithoutWorkCenter | بدون مجموعة تخطيط: $criticalWithoutPlannerGroup")
+    appendLine("التكلفة والوراثة — بدون مركز تكلفة: $withoutCostCenter | تجاوزات يدوية: $withManualOverrides")
+    appendLine("المخزن والمتنقلة — في المخزن: $inStorageAssets | متنقلة: $mobileAssets")
 }
 
 @Composable
