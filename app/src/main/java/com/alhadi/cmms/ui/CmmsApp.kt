@@ -1311,6 +1311,10 @@ private fun AssetsScreen(
                 asset.location.lowercase(Locale.getDefault()).contains(q) ||
                 asset.serialNumber.lowercase(Locale.getDefault()).contains(q) ||
                 asset.assetTag.lowercase(Locale.getDefault()).contains(q) ||
+                asset.externalAssetCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.legacyAssetCode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.barcode.lowercase(Locale.getDefault()).contains(q) ||
+                asset.qrCode.lowercase(Locale.getDefault()).contains(q) ||
                 asset.description.lowercase(Locale.getDefault()).contains(q) ||
                 asset.category.lowercase(Locale.getDefault()).contains(q) ||
                 asset.objectType.lowercase(Locale.getDefault()).contains(q) ||
@@ -1520,6 +1524,8 @@ private fun AssetDetailScreen(
     val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
     val retired = asset.status.equals("Retired", ignoreCase = true)
     val hasOrganization = listOf(
+        asset.company,
+        asset.site,
         asset.maintenancePlant,
         asset.planningPlant,
         asset.plannerGroup,
@@ -1527,6 +1533,20 @@ private fun AssetDetailScreen(
         asset.productionWorkCenter,
         asset.costCenter,
         asset.responsiblePerson
+    ).any { it.isNotBlank() }
+    val hasIdentityCodes = listOf(
+        asset.alternativeLabel,
+        asset.externalAssetCode,
+        asset.legacyAssetCode,
+        asset.barcode,
+        asset.qrCode
+    ).any { it.isNotBlank() }
+    val hasSafety = asset.safetyCritical || asset.isolationRequired || listOf(
+        asset.riskLevel,
+        asset.requiredPermits,
+        asset.safetyInstructions,
+        asset.ppeRequired,
+        asset.complianceRequirements
     ).any { it.isNotBlank() }
     val hasPartner = listOf(asset.partnerName, asset.partnerRole, asset.partnerPhone, asset.partnerEmail).any { it.isNotBlank() }
     val hasAddress = listOf(asset.addressLine, asset.city, asset.country).any { it.isNotBlank() }
@@ -1638,6 +1658,8 @@ private fun AssetDetailScreen(
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         SectionHeader("التنظيم والمسؤولية")
+                        if (asset.company.isNotBlank()) InfoRow("الشركة", asset.company)
+                        if (asset.site.isNotBlank()) InfoRow("الموقع/المنشأة", asset.site)
                         if (asset.maintenancePlant.isNotBlank()) InfoRow("مصنع الصيانة", asset.maintenancePlant)
                         if (asset.planningPlant.isNotBlank()) InfoRow("مصنع التخطيط", asset.planningPlant)
                         if (asset.plannerGroup.isNotBlank()) InfoRow("مجموعة المخططين", asset.plannerGroup)
@@ -1667,6 +1689,38 @@ private fun AssetDetailScreen(
             }
         }
 
+        if (hasIdentityCodes) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("الهوية والترميز")
+                        if (asset.alternativeLabel.isNotBlank()) InfoRow("التسمية البديلة", asset.alternativeLabel)
+                        if (asset.externalAssetCode.isNotBlank()) InfoRow("الكود الخارجي", asset.externalAssetCode)
+                        if (asset.legacyAssetCode.isNotBlank()) InfoRow("الكود القديم", asset.legacyAssetCode)
+                        if (asset.barcode.isNotBlank()) InfoRow("الباركود", asset.barcode)
+                        if (asset.qrCode.isNotBlank()) InfoRow("رمز QR", asset.qrCode)
+                    }
+                }
+            }
+        }
+
+        if (hasSafety) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("السلامة والامتثال")
+                        InfoRow("أصل حرج للسلامة", if (asset.safetyCritical) "نعم" else "لا")
+                        if (asset.riskLevel.isNotBlank()) InfoRow("مستوى المخاطر", asset.riskLevel)
+                        InfoRow("يتطلب عزل الطاقة", if (asset.isolationRequired) "نعم" else "لا")
+                        if (asset.requiredPermits.isNotBlank()) InfoRow("التصاريح المطلوبة", asset.requiredPermits)
+                        if (asset.ppeRequired.isNotBlank()) InfoRow("معدات الوقاية (PPE)", asset.ppeRequired)
+                        if (asset.safetyInstructions.isNotBlank()) InfoRow("تعليمات السلامة", asset.safetyInstructions)
+                        if (asset.complianceRequirements.isNotBlank()) InfoRow("متطلبات الامتثال", asset.complianceRequirements)
+                    }
+                }
+            }
+        }
+
         item {
             val laborTotal = workOrders.sumOf { it.laborCost() }
             val partsTotal = workOrders.sumOf { it.partsCost }
@@ -1688,7 +1742,8 @@ private fun AssetDetailScreen(
         }
 
         val hasFinancial = asset.supplier.isNotBlank() || asset.purchaseOrder.isNotBlank() ||
-            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank()
+            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank() ||
+            asset.financialStatus.isNotBlank() || asset.bookValue > 0.0 || asset.capitalizationAt.isNotBlank()
         if (hasFinancial) {
             item {
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -1698,6 +1753,9 @@ private fun AssetDetailScreen(
                         if (asset.purchaseOrder.isNotBlank()) InfoRow("أمر الشراء", asset.purchaseOrder)
                         if (asset.purchaseCost > 0.0) InfoRow("تكلفة الشراء", money(asset.purchaseCost))
                         if (asset.acquiredAt.isNotBlank()) InfoRow("تاريخ الاقتناء", asset.acquiredAt)
+                        if (asset.financialStatus.isNotBlank()) InfoRow("الحالة المالية", asset.financialStatus)
+                        if (asset.bookValue > 0.0) InfoRow("القيمة الدفترية", money(asset.bookValue))
+                        if (asset.capitalizationAt.isNotBlank()) InfoRow("تاريخ الرسملة", asset.capitalizationAt)
                     }
                 }
             }
@@ -1720,6 +1778,9 @@ private fun AssetDetailScreen(
             ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     InfoRow("التصنيف القياسي", asset.standardClass.ifBlank { "غير محدد" })
+                    if (asset.equipmentCategory.isNotBlank()) InfoRow("فئة المعدّة", asset.equipmentCategory)
+                    if (asset.assetClass.isNotBlank()) InfoRow("صنف الأصل", asset.assetClass)
+                    if (asset.assetSubclass.isNotBlank()) InfoRow("الصنف الفرعي", asset.assetSubclass)
                     InfoRow("توريث خصائص الأصل الأب", if (asset.inheritParentCharacteristics) "مفعّل" else "متوقف")
                     InfoRow("الخصائص المباشرة", directCharacteristics.size.toString())
                     if (inheritedCharacteristics.isNotEmpty()) {

@@ -464,6 +464,28 @@ internal fun AssetFormSheet(
     var linearStartLongitude by remember { mutableStateOf(initial?.linearStartLongitude?.let(::formatLinearNumber) ?: "") }
     var linearEndLatitude by remember { mutableStateOf(initial?.linearEndLatitude?.let(::formatLinearNumber) ?: "") }
     var linearEndLongitude by remember { mutableStateOf(initial?.linearEndLongitude?.let(::formatLinearNumber) ?: "") }
+    // Asset identity governance
+    var longDescription by remember { mutableStateOf(initial?.longDescription ?: "") }
+    var alternativeLabel by remember { mutableStateOf(initial?.alternativeLabel ?: "") }
+    var externalAssetCode by remember { mutableStateOf(initial?.externalAssetCode ?: "") }
+    var legacyAssetCode by remember { mutableStateOf(initial?.legacyAssetCode ?: "") }
+    var barcode by remember { mutableStateOf(initial?.barcode ?: "") }
+    var qrCode by remember { mutableStateOf(initial?.qrCode ?: "") }
+    var equipmentCategory by remember { mutableStateOf(initial?.equipmentCategory ?: "") }
+    var assetClass by remember { mutableStateOf(initial?.assetClass ?: "") }
+    var assetSubclass by remember { mutableStateOf(initial?.assetSubclass ?: "") }
+    var company by remember { mutableStateOf(initial?.company ?: "") }
+    var site by remember { mutableStateOf(initial?.site ?: "") }
+    var safetyCritical by remember { mutableStateOf(initial?.safetyCritical ?: false) }
+    var riskLevel by remember { mutableStateOf(initial?.riskLevel ?: "") }
+    var requiredPermits by remember { mutableStateOf(initial?.requiredPermits ?: "") }
+    var safetyInstructions by remember { mutableStateOf(initial?.safetyInstructions ?: "") }
+    var ppeRequired by remember { mutableStateOf(initial?.ppeRequired ?: "") }
+    var isolationRequired by remember { mutableStateOf(initial?.isolationRequired ?: false) }
+    var complianceRequirements by remember { mutableStateOf(initial?.complianceRequirements ?: "") }
+    var financialStatus by remember { mutableStateOf(initial?.financialStatus ?: "") }
+    var bookValue by remember { mutableStateOf((initial?.bookValue ?: 0.0).toString()) }
+    var capitalizationAt by remember { mutableStateOf(initial?.capitalizationAt ?: "") }
 
     val linearStartValue = linearStartPoint.toDoubleOrNull()
     val linearEndValue = linearEndPoint.toDoubleOrNull()
@@ -500,6 +522,9 @@ internal fun AssetFormSheet(
 
         Text("التصنيف", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("التصنيف القياسي", standardClass, { standardClass = it })
+        LabeledField("فئة المعدّة", equipmentCategory, { equipmentCategory = it })
+        LabeledField("صنف الأصل", assetClass, { assetClass = it })
+        LabeledField("الصنف الفرعي", assetSubclass, { assetSubclass = it })
         LabeledField("نوع الإنشاء المشترك", constructionType, { constructionType = it })
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("توريث خصائص الأصل الأب", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
@@ -577,6 +602,8 @@ internal fun AssetFormSheet(
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
 
         Text("التنظيم والمسؤولية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("الشركة", company, { company = it })
+        LabeledField("الموقع/المنشأة", site, { site = it })
         LabeledField("مصنع الصيانة", maintenancePlant, { maintenancePlant = it })
         LabeledField("مصنع التخطيط", planningPlant, { planningPlant = it })
         LabeledField("مجموعة المخططين", plannerGroup, { plannerGroup = it })
@@ -585,14 +612,40 @@ internal fun AssetFormSheet(
         LabeledField("مركز التكلفة", costCenter, { costCenter = it })
         LabeledField("الشخص المسؤول", responsiblePerson, { responsiblePerson = it })
 
-        Text("الهوية والمعلومات المالية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("الهوية والترميز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("الرقم التسلسلي", serialNumber, { serialNumber = it })
         LabeledField("وسم الأصل", assetTag, { assetTag = it })
+        LabeledField("التسمية البديلة", alternativeLabel, { alternativeLabel = it })
+        LabeledField("الوصف المطوّل", longDescription, { longDescription = it }, singleLine = false)
+        LabeledField("الكود الخارجي", externalAssetCode, { externalAssetCode = it })
+        LabeledField("الكود القديم (Legacy)", legacyAssetCode, { legacyAssetCode = it })
+        LabeledField("الباركود", barcode, { barcode = it })
+        LabeledField("رمز QR", qrCode, { qrCode = it })
+
+        Text("السلامة والامتثال", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("أصل حرج للسلامة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = safetyCritical, onCheckedChange = { safetyCritical = it })
+        }
+        OptionDropdown("مستوى المخاطر", listOf("", "Low", "Medium", "High", "Critical"), riskLevel) { riskLevel = it }
+        LabeledField("التصاريح المطلوبة", requiredPermits, { requiredPermits = it }, singleLine = false)
+        LabeledField("تعليمات السلامة", safetyInstructions, { safetyInstructions = it }, singleLine = false)
+        LabeledField("معدات الوقاية المطلوبة (PPE)", ppeRequired, { ppeRequired = it }, singleLine = false)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("يتطلب عزل الطاقة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = isolationRequired, onCheckedChange = { isolationRequired = it })
+        }
+        LabeledField("متطلبات الامتثال", complianceRequirements, { complianceRequirements = it }, singleLine = false)
+
+        Text("المعلومات المالية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("رقم الأصل المالي", assetNumber, { assetNumber = it })
         LabeledField("المورّد", supplier, { supplier = it })
         LabeledField("أمر الشراء", purchaseOrder, { purchaseOrder = it })
         LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
         DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
+        OptionDropdown("الحالة المالية", listOf("", "Active", "Capitalized", "Depreciated", "Disposed", "Written Off"), financialStatus) { financialStatus = it }
+        LabeledField("القيمة الدفترية", bookValue, { bookValue = it }, numeric = true)
+        DateField("تاريخ الرسملة", capitalizationAt) { capitalizationAt = it }
 
         Text("جهة الاتصال والعنوان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("اسم الجهة أو الشخص", partnerName, { partnerName = it })
@@ -684,7 +737,28 @@ internal fun AssetFormSheet(
                     linearStartLatitude = if (isLinearAsset) linearStartLatitude.toDoubleOrNull() else null,
                     linearStartLongitude = if (isLinearAsset) linearStartLongitude.toDoubleOrNull() else null,
                     linearEndLatitude = if (isLinearAsset) linearEndLatitude.toDoubleOrNull() else null,
-                    linearEndLongitude = if (isLinearAsset) linearEndLongitude.toDoubleOrNull() else null
+                    linearEndLongitude = if (isLinearAsset) linearEndLongitude.toDoubleOrNull() else null,
+                    longDescription = longDescription.trim(),
+                    alternativeLabel = alternativeLabel.trim(),
+                    externalAssetCode = externalAssetCode.trim(),
+                    legacyAssetCode = legacyAssetCode.trim(),
+                    barcode = barcode.trim(),
+                    qrCode = qrCode.trim(),
+                    equipmentCategory = equipmentCategory.trim(),
+                    assetClass = assetClass.trim(),
+                    assetSubclass = assetSubclass.trim(),
+                    company = company.trim(),
+                    site = site.trim(),
+                    safetyCritical = safetyCritical,
+                    riskLevel = riskLevel,
+                    requiredPermits = requiredPermits.trim(),
+                    safetyInstructions = safetyInstructions.trim(),
+                    ppeRequired = ppeRequired.trim(),
+                    isolationRequired = isolationRequired,
+                    complianceRequirements = complianceRequirements.trim(),
+                    financialStatus = financialStatus,
+                    bookValue = bookValue.toDoubleOrNull() ?: 0.0,
+                    capitalizationAt = capitalizationAt.trim()
                 )
             )
         }

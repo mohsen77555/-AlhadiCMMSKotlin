@@ -175,7 +175,37 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
+    /** Completes asset identity governance: secondary identifiers, classification,
+     *  organizational hierarchy, safety/compliance, and financial valuation. */
+    val MIGRATION_27_28 = object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN longDescription TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN alternativeLabel TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN externalAssetCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN legacyAssetCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN barcode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN qrCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN equipmentCategory TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN assetClass TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN assetSubclass TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN company TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN site TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN safetyCritical INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE assets ADD COLUMN riskLevel TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN requiredPermits TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN safetyInstructions TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN ppeRequired TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN isolationRequired INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE assets ADD COLUMN complianceRequirements TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN financialStatus TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN bookValue REAL NOT NULL DEFAULT 0.0",
+                "ALTER TABLE assets ADD COLUMN capitalizationAt TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

@@ -127,7 +127,54 @@ data class AssetEntity(
     val linearEndLatitude: Double? = null,
     val linearEndLongitude: Double? = null,
     val linkedSerialId: Long? = null,
-    val serializedPartId: Long? = null
+    val serializedPartId: Long? = null,
+    // --- Asset identity governance: secondary identifiers ---
+    @ColumnInfo(defaultValue = "''")
+    val longDescription: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val alternativeLabel: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val externalAssetCode: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val legacyAssetCode: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val barcode: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val qrCode: String = "",
+    // --- Classification hierarchy ---
+    @ColumnInfo(defaultValue = "''")
+    val equipmentCategory: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val assetClass: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val assetSubclass: String = "",
+    // --- Organizational hierarchy ---
+    @ColumnInfo(defaultValue = "''")
+    val company: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val site: String = "",
+    // --- Safety & compliance governance ---
+    @ColumnInfo(defaultValue = "0")
+    val safetyCritical: Boolean = false,
+    @ColumnInfo(defaultValue = "''")
+    val riskLevel: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val requiredPermits: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val safetyInstructions: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val ppeRequired: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val isolationRequired: Boolean = false,
+    @ColumnInfo(defaultValue = "''")
+    val complianceRequirements: String = "",
+    // --- Financial governance ---
+    @ColumnInfo(defaultValue = "''")
+    val financialStatus: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val bookValue: Double = 0.0,
+    @ColumnInfo(defaultValue = "''")
+    val capitalizationAt: String = ""
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

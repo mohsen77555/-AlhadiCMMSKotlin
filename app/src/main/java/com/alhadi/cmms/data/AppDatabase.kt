@@ -85,7 +85,7 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         TaskListOperationEntity::class,
         WorkPermitEntity::class
     ],
-    version = 27,
+    version = 28,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
