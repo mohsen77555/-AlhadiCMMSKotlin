@@ -250,7 +250,10 @@ data class AssetEntity(
     val mobility: String = "Fixed",
     /** AST-ORG-006: assets that incur operating cost require a cost center to activate. */
     @ColumnInfo(defaultValue = "0")
-    val incursOperatingCost: Boolean = false
+    val incursOperatingCost: Boolean = false,
+    /** AST-ORG-SAVE-012: reason captured when an inherited organizational value is overridden manually. */
+    @ColumnInfo(defaultValue = "''")
+    val orgOverrideReason: String = ""
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

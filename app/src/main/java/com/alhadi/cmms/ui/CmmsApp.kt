@@ -1710,6 +1710,7 @@ private fun AssetDetailScreen(
                         if (asset.productionWorkCenter.isNotBlank()) InfoRow("مركز عمل الإنتاج", asset.productionWorkCenter)
                         if (asset.costCenter.isNotBlank()) InfoRow("مركز التكلفة", asset.costCenter)
                         if (asset.responsiblePerson.isNotBlank()) InfoRow("الشخص المسؤول", asset.responsiblePerson)
+                        if (asset.orgOverrideReason.isNotBlank()) InfoRow("سبب تجاوز الموروث", asset.orgOverrideReason)
                     }
                 }
             }

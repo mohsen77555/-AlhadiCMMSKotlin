@@ -499,6 +499,7 @@ internal fun AssetFormSheet(
     var locationId by remember { mutableStateOf(initial?.locationId) }
     var mobility by remember { mutableStateOf(initial?.mobility ?: "Fixed") }
     var incursOperatingCost by remember { mutableStateOf(initial?.incursOperatingCost ?: false) }
+    var orgOverrideReason by remember { mutableStateOf(initial?.orgOverrideReason ?: "") }
     var parentAssetId by remember { mutableStateOf(initial?.parentAssetId) }
     var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
     var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
@@ -647,9 +648,19 @@ internal fun AssetFormSheet(
     val org008WcActive = !activating || !orgRefInactive("WorkCenter", mainWorkCenter)      // SAVE-008
     val org009PgActive = !activating || !orgRefInactive("PlannerGroup", plannerGroup)      // SAVE-009
     val org010CcActive = !activating || !orgRefInactive("CostCenter", costCenter)          // SAVE-010
+    // AST-ORG-SAVE-012: overriding a value inherited from the functional location needs a reason.
+    fun overridesInherited(flValue: String, assetValue: String): Boolean =
+        flValue.isNotBlank() && assetValue.isNotBlank() && !assetValue.equals(flValue, ignoreCase = true)
+    val hasOrgOverride = selectedLoc != null && (
+        overridesInherited(selectedLoc.plantCode, maintenancePlant) ||
+            overridesInherited(selectedLoc.workCenterCode, mainWorkCenter) ||
+            overridesInherited(selectedLoc.costCenterCode, costCenter) ||
+            overridesInherited(selectedLoc.plannerGroupCode, plannerGroup)
+        )
+    val org012OverrideReason = !hasOrgOverride || orgOverrideReason.isNotBlank()
     val orgValid = org001Company && org002Plant && org003Location &&
         org004WorkCenter && org005Planner && org006CostCenter && org007FlActive &&
-        org008WcActive && org009PgActive && org010CcActive
+        org008WcActive && org009PgActive && org010CcActive && org012OverrideReason
 
     // AST-ORG-009: when a functional location is chosen, suggest its plant / work center /
     // cost center / planner group into any blank asset field (inherited defaults).
@@ -843,6 +854,10 @@ internal fun AssetFormSheet(
         InheritedCaption(selectedLoc != null && costCenter.isNotBlank() && costCenter.equals(selectedLoc.costCenterCode, ignoreCase = true))
         if (!org006CostCenter) Text("AST-ORG-SAVE-006: الأصل ذو التكلفة التشغيلية يتطلب Cost Center.", color = MaterialTheme.colorScheme.error)
         if (!org010CcActive) Text("AST-ORG-SAVE-010: لا يمكن ربط Cost Center غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
+        if (hasOrgOverride) {
+            LabeledField("سبب تجاوز البيانات الموروثة (Override)", orgOverrideReason, { orgOverrideReason = it }, singleLine = false)
+            if (!org012OverrideReason) Text("AST-ORG-SAVE-012: أدخل سبب تجاوز القيم الموروثة من الموقع الفني.", color = MaterialTheme.colorScheme.error)
+        }
         if (!org003Location) Text(
             if (isMobile) "AST-ORG-003: الأصل المتنقل يتطلب تحديد مكانه الحالي (الموقع النصّي)."
             else "AST-ORG-SAVE-003: الأصل المركّب يتطلب موقعاً فنياً.",
@@ -1082,7 +1097,8 @@ internal fun AssetFormSheet(
                     warrantyStart = if (warrantyDatesLocked) (initial?.warrantyStart ?: "") else warrantyStart.trim(),
                     warrantyEnd = if (warrantyDatesLocked) (initial?.warrantyEnd ?: "") else warrantyEnd.trim(),
                     mobility = mobility,
-                    incursOperatingCost = incursOperatingCost
+                    incursOperatingCost = incursOperatingCost,
+                    orgOverrideReason = if (hasOrgOverride) orgOverrideReason.trim() else ""
                 )
         }
         // Save Draft: allow persisting an incomplete asset as a draft (skips mandatory rules).
