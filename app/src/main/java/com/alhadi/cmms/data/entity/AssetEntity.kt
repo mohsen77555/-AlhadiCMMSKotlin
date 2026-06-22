@@ -174,7 +174,43 @@ data class AssetEntity(
     @ColumnInfo(defaultValue = "0")
     val bookValue: Double = 0.0,
     @ColumnInfo(defaultValue = "''")
-    val capitalizationAt: String = ""
+    val capitalizationAt: String = "",
+    // --- Manufacturing & technical specifications (nameplate data) ---
+    @ColumnInfo(defaultValue = "''")
+    val countryOfOrigin: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val nameplateData: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val capacity: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val power: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val voltage: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val current: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val frequency: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val speed: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val pressure: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val flowRate: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val temperatureRange: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val weight: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val dimensions: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val material: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val designStandard: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val technicalSpecGroup: String = "",
+    /** Rule AST-TECH-002: when true the asset must carry a serial number (individual tracking). */
+    @ColumnInfo(defaultValue = "0")
+    val requiresSerialTracking: Boolean = false
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

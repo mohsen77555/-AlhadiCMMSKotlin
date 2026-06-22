@@ -215,7 +215,32 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29)
+    /** Adds manufacturing & technical specification (nameplate) fields to assets. */
+    val MIGRATION_29_30 = object : Migration(29, 30) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN countryOfOrigin TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN nameplateData TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN capacity TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN power TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN voltage TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN current TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN frequency TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN speed TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN pressure TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN flowRate TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN temperatureRange TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN weight TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN dimensions TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN material TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN designStandard TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN technicalSpecGroup TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN requiresSerialTracking INTEGER NOT NULL DEFAULT 0"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

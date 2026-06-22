@@ -395,6 +395,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         serials = serialNumbers,
                         serialMovements = serialNumberMovements,
                         canManage = canManage,
+                        isAdmin = isAdmin,
                         defaultAssignee = actorName,
                         onSave = viewModel::saveAsset,
                         onDelete = viewModel::deleteAsset,
@@ -1235,6 +1236,7 @@ private fun AssetsScreen(
     serials: List<SerialNumberEntity>,
     serialMovements: List<SerialNumberMovementEntity>,
     canManage: Boolean,
+    isAdmin: Boolean,
     defaultAssignee: String,
     onSave: (AssetEntity) -> Unit,
     onDelete: (AssetEntity) -> Unit,
@@ -1295,6 +1297,7 @@ private fun AssetsScreen(
             serialMovements = serialMovements,
             locations = locations,
             canManage = canManage,
+            isAdmin = isAdmin,
             defaultAssignee = defaultAssignee,
             onBack = { detailId = null },
             onOpenAsset = { detailId = it },
@@ -1419,7 +1422,7 @@ private fun AssetsScreen(
     }
 
     if (showForm) {
-        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations, allAssets = assets)
+        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations, allAssets = assets, canOverrideSerial = isAdmin, hasLinkedParts = editing?.let { e -> bomItems.any { it.assetId == e.id } } ?: false)
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
@@ -1498,6 +1501,7 @@ private fun AssetDetailScreen(
     serialMovements: List<SerialNumberMovementEntity>,
     locations: List<FunctionalLocationEntity>,
     canManage: Boolean,
+    isAdmin: Boolean,
     defaultAssignee: String,
     onBack: () -> Unit,
     onOpenAsset: (Long) -> Unit,
@@ -1729,6 +1733,42 @@ private fun AssetDetailScreen(
                         if (asset.ppeRequired.isNotBlank()) InfoRow("معدات الوقاية (PPE)", asset.ppeRequired)
                         if (asset.safetyInstructions.isNotBlank()) InfoRow("تعليمات السلامة", asset.safetyInstructions)
                         if (asset.complianceRequirements.isNotBlank()) InfoRow("متطلبات الامتثال", asset.complianceRequirements)
+                    }
+                }
+            }
+        }
+
+        val technicalSpecs = listOf(
+            "بلد المنشأ" to asset.countryOfOrigin,
+            "نوع الإنشاء" to asset.constructionType,
+            "مجموعة المواصفات" to asset.technicalSpecGroup,
+            "السعة" to asset.capacity,
+            "القدرة" to asset.power,
+            "الجهد" to asset.voltage,
+            "التيار" to asset.current,
+            "التردد" to asset.frequency,
+            "السرعة" to asset.speed,
+            "الضغط" to asset.pressure,
+            "معدل التدفق" to asset.flowRate,
+            "نطاق الحرارة" to asset.temperatureRange,
+            "الوزن" to asset.weight,
+            "الأبعاد" to asset.dimensions,
+            "المادة" to asset.material,
+            "معيار التصميم" to asset.designStandard
+        ).filter { it.second.isNotBlank() }
+        val sameConstruction = if (asset.constructionType.isNotBlank()) {
+            allAssets.count { it.id != asset.id && it.constructionType.equals(asset.constructionType, ignoreCase = true) }
+        } else 0
+        if (technicalSpecs.isNotEmpty() || asset.nameplateData.isNotBlank() || asset.requiresSerialTracking) {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SectionHeader("المواصفات الفنية (لوحة الصنع)")
+                        if (asset.requiresSerialTracking) InfoRow("تتبع فردي", "مطلوب رقم تسلسلي")
+                        technicalSpecs.forEach { (label, value) -> InfoRow(label, value) }
+                        if (asset.nameplateData.isNotBlank()) InfoRow("بيانات لوحة الصنع", asset.nameplateData)
+                        // AST-TECH-005: construction type links assets that share components/characteristics.
+                        if (sameConstruction > 0) InfoRow("أصول بنفس نوع الإنشاء", "$sameConstruction أصل")
                     }
                 }
             }
@@ -2164,7 +2204,7 @@ private fun AssetDetailScreen(
     }
 
     if (showEdit) {
-        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations, allAssets = allAssets)
+        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations, allAssets = allAssets, canOverrideSerial = isAdmin, hasLinkedParts = bomItems.any { it.assetId == asset.id })
     }
     if (showStatus) {
         StatusPickerDialog(

@@ -139,13 +139,15 @@ private fun LabeledField(
     value: String,
     onChange: (String) -> Unit,
     numeric: Boolean = false,
-    singleLine: Boolean = true
+    singleLine: Boolean = true,
+    enabled: Boolean = true
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
         singleLine = singleLine,
+        enabled = enabled,
         keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
         modifier = Modifier.fillMaxWidth()
     )
@@ -397,7 +399,9 @@ internal fun AssetFormSheet(
     onDismiss: () -> Unit,
     onSave: (AssetEntity) -> Unit,
     locations: List<FunctionalLocationEntity> = emptyList(),
-    allAssets: List<AssetEntity> = emptyList()
+    allAssets: List<AssetEntity> = emptyList(),
+    canOverrideSerial: Boolean = false,
+    hasLinkedParts: Boolean = false
 ) {
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
@@ -487,6 +491,39 @@ internal fun AssetFormSheet(
     var financialStatus by remember { mutableStateOf(initial?.financialStatus ?: "") }
     var bookValue by remember { mutableStateOf((initial?.bookValue ?: 0.0).toString()) }
     var capitalizationAt by remember { mutableStateOf(initial?.capitalizationAt ?: "") }
+    // Manufacturing & technical specifications
+    var countryOfOrigin by remember { mutableStateOf(initial?.countryOfOrigin ?: "") }
+    var nameplateData by remember { mutableStateOf(initial?.nameplateData ?: "") }
+    var capacity by remember { mutableStateOf(initial?.capacity ?: "") }
+    var power by remember { mutableStateOf(initial?.power ?: "") }
+    var voltage by remember { mutableStateOf(initial?.voltage ?: "") }
+    var current by remember { mutableStateOf(initial?.current ?: "") }
+    var frequency by remember { mutableStateOf(initial?.frequency ?: "") }
+    var speed by remember { mutableStateOf(initial?.speed ?: "") }
+    var pressure by remember { mutableStateOf(initial?.pressure ?: "") }
+    var flowRate by remember { mutableStateOf(initial?.flowRate ?: "") }
+    var temperatureRange by remember { mutableStateOf(initial?.temperatureRange ?: "") }
+    var weight by remember { mutableStateOf(initial?.weight ?: "") }
+    var dimensions by remember { mutableStateOf(initial?.dimensions ?: "") }
+    var material by remember { mutableStateOf(initial?.material ?: "") }
+    var designStandard by remember { mutableStateOf(initial?.designStandard ?: "") }
+    var technicalSpecGroup by remember { mutableStateOf(initial?.technicalSpecGroup ?: "") }
+    var requiresSerialTracking by remember { mutableStateOf(initial?.requiresSerialTracking ?: false) }
+
+    // --- Asset technical governance rules (AST-TECH-001..005) ---
+    val isCritical = criticality.equals("Critical", ignoreCase = true)
+    // AST-TECH-001: critical assets must carry basic technical data.
+    val tech001Valid = !isCritical ||
+        (manufacturer.isNotBlank() && model.isNotBlank() &&
+            listOf(power, capacity, voltage, nameplateData).any { it.isNotBlank() })
+    // AST-TECH-002: serial number required when individual tracking is enabled.
+    val tech002Valid = !requiresSerialTracking || serialNumber.isNotBlank()
+    // AST-TECH-004: model required when the asset has model-linked spare parts.
+    val tech004Valid = !hasLinkedParts || model.isNotBlank()
+    // AST-TECH-003: serial locked once a commissioning/installation date exists, unless overridden.
+    val serialDateExists = (initial?.installedAt?.isNotBlank() == true) ||
+        (initial?.startupDate?.isNotBlank() == true)
+    val serialLocked = initial != null && serialDateExists && !canOverrideSerial
 
     val linearStartValue = linearStartPoint.toDoubleOrNull()
     val linearEndValue = linearEndPoint.toDoubleOrNull()
@@ -601,6 +638,41 @@ internal fun AssetFormSheet(
         DateField("تاريخ بدء التشغيل", startupDate) { startupDate = it }
         OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
+        if (!tech004Valid) Text("AST-TECH-004: الموديل مطلوب لوجود قطع غيار مرتبطة بالموديل.", color = MaterialTheme.colorScheme.error)
+
+        Text("المواصفات الفنية (لوحة الصنع)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        if (isCritical) {
+            Text("AST-TECH-001: الأصل الحرج يجب أن يحتوي بيانات فنية أساسية (الشركة المصنّعة، الموديل، وأحد بيانات لوحة الصنع).",
+                color = if (tech001Valid) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall)
+        }
+        LabeledField("بلد المنشأ", countryOfOrigin, { countryOfOrigin = it })
+        LabeledField("بيانات لوحة الصنع", nameplateData, { nameplateData = it }, singleLine = false)
+        LabeledField("نوع الإنشاء (Construction Type)", constructionType, { constructionType = it })
+        LabeledField("مجموعة المواصفات الفنية", technicalSpecGroup, { technicalSpecGroup = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f)) { LabeledField("السعة (Capacity)", capacity, { capacity = it }) }
+            Box(modifier = Modifier.weight(1f)) { LabeledField("القدرة (Power)", power, { power = it }) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f)) { LabeledField("الجهد (Voltage)", voltage, { voltage = it }) }
+            Box(modifier = Modifier.weight(1f)) { LabeledField("التيار (Current)", current, { current = it }) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f)) { LabeledField("التردد (Frequency)", frequency, { frequency = it }) }
+            Box(modifier = Modifier.weight(1f)) { LabeledField("السرعة (Speed)", speed, { speed = it }) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f)) { LabeledField("الضغط (Pressure)", pressure, { pressure = it }) }
+            Box(modifier = Modifier.weight(1f)) { LabeledField("معدل التدفق (Flow Rate)", flowRate, { flowRate = it }) }
+        }
+        LabeledField("نطاق درجة الحرارة", temperatureRange, { temperatureRange = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f)) { LabeledField("الوزن (Weight)", weight, { weight = it }) }
+            Box(modifier = Modifier.weight(1f)) { LabeledField("الأبعاد (Dimensions)", dimensions, { dimensions = it }) }
+        }
+        LabeledField("المادة (Material)", material, { material = it })
+        LabeledField("معيار التصميم (Design Standard)", designStandard, { designStandard = it })
 
         Text("التنظيم والمسؤولية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("الشركة", company, { company = it })
@@ -614,7 +686,15 @@ internal fun AssetFormSheet(
         LabeledField("الشخص المسؤول", responsiblePerson, { responsiblePerson = it })
 
         Text("الهوية والترميز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LabeledField("الرقم التسلسلي", serialNumber, { serialNumber = it })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("يتطلب تتبعاً فردياً (رقم تسلسلي إلزامي)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = requiresSerialTracking, onCheckedChange = { requiresSerialTracking = it })
+        }
+        LabeledField("الرقم التسلسلي", serialNumber, { serialNumber = it }, enabled = !serialLocked)
+        if (serialLocked) {
+            Text("AST-TECH-003: لا يمكن تعديل الرقم التسلسلي بعد تسجيل تاريخ التشغيل إلا بصلاحية خاصة.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        if (!tech002Valid) Text("AST-TECH-002: الرقم التسلسلي مطلوب لأن الأصل يتطلب تتبعاً فردياً.", color = MaterialTheme.colorScheme.error)
         LabeledField("وسم الأصل", assetTag, { assetTag = it })
         LabeledField("التسمية البديلة", alternativeLabel, { alternativeLabel = it })
         LabeledField("الوصف المطوّل", longDescription, { longDescription = it }, singleLine = false)
@@ -666,7 +746,11 @@ internal fun AssetFormSheet(
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
         DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
         DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
-        SaveButton(code.isNotBlank() && name.isNotBlank() && linearRangeValid && markerDistancesValid && coordinatesValid) {
+        if (!tech001Valid) Text("AST-TECH-001: أكمل البيانات الفنية الأساسية للأصل الحرج قبل الحفظ.", color = MaterialTheme.colorScheme.error)
+        SaveButton(
+            code.isNotBlank() && name.isNotBlank() && linearRangeValid && markerDistancesValid && coordinatesValid &&
+                tech001Valid && tech002Valid && tech004Valid
+        ) {
             val today = DateStrings.today()
             onSave(
                 AssetEntity(
@@ -686,7 +770,7 @@ internal fun AssetFormSheet(
                     warrantyStart = warrantyStart.trim(),
                     warrantyEnd = warrantyEnd.trim(),
                     parentAssetId = parentAssetId,
-                    serialNumber = serialNumber.trim(),
+                    serialNumber = if (serialLocked) (initial?.serialNumber ?: "") else serialNumber.trim(),
                     assetTag = assetTag.trim(),
                     supplier = supplier.trim(),
                     purchaseOrder = purchaseOrder.trim(),
@@ -759,7 +843,24 @@ internal fun AssetFormSheet(
                     complianceRequirements = complianceRequirements.trim(),
                     financialStatus = financialStatus,
                     bookValue = bookValue.toDoubleOrNull() ?: 0.0,
-                    capitalizationAt = capitalizationAt.trim()
+                    capitalizationAt = capitalizationAt.trim(),
+                    countryOfOrigin = countryOfOrigin.trim(),
+                    nameplateData = nameplateData.trim(),
+                    capacity = capacity.trim(),
+                    power = power.trim(),
+                    voltage = voltage.trim(),
+                    current = current.trim(),
+                    frequency = frequency.trim(),
+                    speed = speed.trim(),
+                    pressure = pressure.trim(),
+                    flowRate = flowRate.trim(),
+                    temperatureRange = temperatureRange.trim(),
+                    weight = weight.trim(),
+                    dimensions = dimensions.trim(),
+                    material = material.trim(),
+                    designStandard = designStandard.trim(),
+                    technicalSpecGroup = technicalSpecGroup.trim(),
+                    requiresSerialTracking = requiresSerialTracking
                 )
             )
         }
