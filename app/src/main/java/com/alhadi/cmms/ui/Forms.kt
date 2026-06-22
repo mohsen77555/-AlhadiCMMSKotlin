@@ -1453,7 +1453,18 @@ internal fun WorkOrderFormSheet(
     var linearMarker by remember { mutableStateOf(initial?.linearMarker ?: "") }
     var linearHorizontalOffset by remember { mutableStateOf(initial?.linearHorizontalOffset?.let(::formatLinearNumber) ?: "") }
     var linearVerticalOffset by remember { mutableStateOf(initial?.linearVerticalOffset?.let(::formatLinearNumber) ?: "") }
+    var repairType by remember { mutableStateOf(initial?.repairType ?: "") }
+    var warrantyReviewed by remember { mutableStateOf(initial?.warrantyReviewed ?: false) }
+    var warrantyReviewResult by remember { mutableStateOf(initial?.warrantyReviewResult ?: "") }
     val selectedAsset = assets.firstOrNull { it.id == assetId }
+    // AST-WAR-008/009: warranty decision & cost-policy gate for under-warranty assets.
+    val underWarranty = selectedAsset?.isUnderWarranty(DateStrings.today()) == true
+    val totalInternalCost = (cost.toDoubleOrNull() ?: 0.0) +
+        (laborHours.toDoubleOrNull() ?: 0.0) * (laborRate.toDoubleOrNull() ?: 0.0) +
+        (partsCost.toDoubleOrNull() ?: 0.0)
+    val repairTypeValid = !underWarranty || repairType.isNotBlank()
+    val warrantyCostBlocked = WARRANTY_REVIEW_POLICY && underWarranty &&
+        repairType == "Internal" && !warrantyReviewed && totalInternalCost > 0.0
     val linearReferenceValid = selectedAsset?.let { asset ->
         !asset.isLinearAsset || (
             optionalLinearRangeValid(asset, linearStartPoint, linearEndPoint) &&
@@ -1510,6 +1521,25 @@ internal fun WorkOrderFormSheet(
             Box(modifier = Modifier.weight(1f)) { LabeledField("أجر الساعة", laborRate, { laborRate = it }, numeric = true) }
         }
         LabeledField("تكلفة قطع الغيار", partsCost, { partsCost = it }, numeric = true)
+        if (underWarranty) {
+            Text("قرار الضمان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            // AST-WAR-008: must choose internal repair vs warranty claim.
+            OptionDropdown("نوع الإصلاح", listOf("", "Internal", "WarrantyClaim"), repairType, display = ::repairTypeLabel) { repairType = it }
+            if (!repairTypeValid) Text("AST-WAR-008: حدّد نوع الإصلاح (داخلي أو مطالبة ضمان).", color = MaterialTheme.colorScheme.error)
+            if (repairType.isNotBlank()) {
+                // AST-WAR-010: capture the warranty review outcome (saved to asset history).
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text("تمت مراجعة الضمان", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Switch(checked = warrantyReviewed, onCheckedChange = { warrantyReviewed = it })
+                }
+                if (warrantyReviewed) {
+                    LabeledField("نتيجة مراجعة الضمان", warrantyReviewResult, { warrantyReviewResult = it }, singleLine = false)
+                }
+            }
+            if (warrantyCostBlocked) {
+                Text("AST-WAR-009: لا يمكن تحميل تكلفة داخلية قبل مراجعة الضمان. راجع الضمان أو حوّلها لمطالبة ضمان.", color = MaterialTheme.colorScheme.error)
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("عطل (Breakdown)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = isFailure, onCheckedChange = { isFailure = it })
@@ -1524,7 +1554,7 @@ internal fun WorkOrderFormSheet(
         if (initial == null) {
             LabeledField("الاستحقاق خلال (أيام)", dueDays, { dueDays = it }, numeric = true)
         }
-        SaveButton(title.isNotBlank() && assetId != 0L && linearReferenceValid) {
+        SaveButton(title.isNotBlank() && assetId != 0L && linearReferenceValid && repairTypeValid && !warrantyCostBlocked) {
             val today = DateStrings.today()
             val due = initial?.dueAt ?: DateStrings.daysFromToday(dueDays.toIntOrNull() ?: 3)
             onSave(
@@ -1552,11 +1582,23 @@ internal fun WorkOrderFormSheet(
                     linearEndPoint = if (selectedAsset?.isLinearAsset == true) linearEndPoint.toDoubleOrNull() else null,
                     linearMarker = if (selectedAsset?.isLinearAsset == true) linearMarker.trim() else "",
                     linearHorizontalOffset = if (selectedAsset?.isLinearAsset == true) linearHorizontalOffset.toDoubleOrNull() else null,
-                    linearVerticalOffset = if (selectedAsset?.isLinearAsset == true) linearVerticalOffset.toDoubleOrNull() else null
+                    linearVerticalOffset = if (selectedAsset?.isLinearAsset == true) linearVerticalOffset.toDoubleOrNull() else null,
+                    repairType = if (underWarranty) repairType else "",
+                    warrantyReviewed = underWarranty && warrantyReviewed,
+                    warrantyReviewResult = if (underWarranty && warrantyReviewed) warrantyReviewResult.trim() else ""
                 )
             )
         }
     }
+}
+
+private const val WARRANTY_REVIEW_POLICY = true
+
+private fun repairTypeLabel(type: String): String = when (type) {
+    "" -> "غير محدد"
+    "Internal" -> "إصلاح داخلي"
+    "WarrantyClaim" -> "مطالبة ضمان"
+    else -> type
 }
 
 // ---------------------------------------------------------------------------

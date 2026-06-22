@@ -38,7 +38,17 @@ data class WorkOrderEntity(
     @ColumnInfo(defaultValue = "''")
     val linearMarker: String = "",
     val linearHorizontalOffset: Double? = null,
-    val linearVerticalOffset: Double? = null
+    val linearVerticalOffset: Double? = null,
+    // --- Warranty governance (AST-WAR-008..010) ---
+    /** AST-WAR-008: "Internal" repair or "WarrantyClaim" when the asset is under warranty. */
+    @ColumnInfo(defaultValue = "''")
+    val repairType: String = "",
+    /** AST-WAR-009/010: whether the warranty was reviewed before charging internal cost. */
+    @ColumnInfo(defaultValue = "0")
+    val warrantyReviewed: Boolean = false,
+    /** AST-WAR-010: the recorded outcome of the warranty review. */
+    @ColumnInfo(defaultValue = "''")
+    val warrantyReviewResult: String = ""
 ) {
     /** Recorded labour cost (hours × rate). */
     fun laborCost(): Double = laborHours * laborRate

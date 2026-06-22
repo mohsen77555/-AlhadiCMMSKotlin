@@ -856,6 +856,21 @@ class CmmsRepository(private val database: AppDatabase) {
         }
         workOrderDao.insertWorkOrder(toSave)
         recordAudit(if (isNew) "Create" else "Update", "WorkOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر عمل: ${workOrder.title}", actor)
+        // AST-WAR-010: persist the warranty decision/review outcome into the asset history.
+        if (workOrder.repairType.isNotBlank()) {
+            val assetCode = assetDao.getAssetById(workOrder.assetId)?.code ?: workOrder.assetId.toString()
+            val decision = when (workOrder.repairType) {
+                "Internal" -> "إصلاح داخلي"
+                "WarrantyClaim" -> "مطالبة ضمان"
+                else -> workOrder.repairType
+            }
+            val review = if (workOrder.warrantyReviewed) {
+                "تمت مراجعة الضمان" + workOrder.warrantyReviewResult.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()
+            } else {
+                "بدون مراجعة ضمان"
+            }
+            recordAudit("Warranty", "Asset", "قرار ضمان على الأصل $assetCode بأمر «${workOrder.title}»: $decision — $review", actor)
+        }
     }
 
     suspend fun setWorkOrderApproval(workOrder: WorkOrderEntity, approved: Boolean, actor: String = "System") {

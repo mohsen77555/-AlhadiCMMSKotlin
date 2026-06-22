@@ -263,7 +263,18 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31)
+    /** Adds work-order warranty governance fields (AST-WAR-008..010). */
+    val MIGRATION_31_32 = object : Migration(31, 32) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE work_orders ADD COLUMN repairType TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN warrantyReviewed INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE work_orders ADD COLUMN warrantyReviewResult TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

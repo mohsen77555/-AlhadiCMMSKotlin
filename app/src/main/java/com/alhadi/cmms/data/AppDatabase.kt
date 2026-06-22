@@ -88,7 +88,7 @@ import com.alhadi.cmms.data.entity.WarehouseEntity
         WorkPermitEntity::class,
         WarehouseEntity::class
     ],
-    version = 31,
+    version = 32,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
