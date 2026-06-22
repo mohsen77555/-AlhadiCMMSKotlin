@@ -3429,6 +3429,7 @@ private fun InventoryScreen(
                         part = part,
                         profile = part.serialProfileId?.let { id -> profiles.firstOrNull { it.id == id } },
                         serials = serials.filter { it.partId == part.id },
+                        warehouseLabel = warehouses.firstOrNull { it.code == part.location }?.let { "${it.code} — ${it.name}" } ?: part.location,
                         canReceive = canReceive,
                         canManage = canManage,
                         onIssue = onIssue,
@@ -3470,6 +3471,7 @@ private fun SparePartCard(
     part: SparePartEntity,
     profile: SerialNumberProfileEntity?,
     serials: List<SerialNumberEntity>,
+    warehouseLabel: String,
     canReceive: Boolean,
     canManage: Boolean,
     onIssue: (SparePartEntity, Int) -> Unit,
@@ -3497,7 +3499,7 @@ private fun SparePartCard(
             InfoRow("المعدة", part.equipmentGroup)
             InfoRow("الكمية", "${part.onHandQty} ${part.unit}")
             InfoRow("الحد الأدنى", "${part.minQty} ${part.unit}")
-            InfoRow("الموقع", part.location)
+            InfoRow("المستودع", warehouseLabel.ifBlank { "غير محدد" })
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
             InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))
             if (part.serializationActive) {
@@ -4302,12 +4304,25 @@ private fun WarehousesScreen(
         )
     }
     deleteTarget?.let { target ->
-        ConfirmDialog(
-            title = "حذف المستودع",
-            text = "هل تريد حذف ${target.code} - ${target.name}؟",
-            onConfirm = { onDelete(target); deleteTarget = null },
-            onDismiss = { deleteTarget = null }
-        )
+        val linkedParts = (partCounts[target.code]?.size ?: 0) + (partCounts[target.name]?.size ?: 0)
+        if (linkedParts > 0) {
+            // Integrity guard: never orphan spare parts by deleting their warehouse.
+            AlertDialog(
+                onDismissRequest = { deleteTarget = null },
+                confirmButton = {
+                    TextButton(onClick = { deleteTarget = null }) { Text("حسناً") }
+                },
+                title = { Text("لا يمكن حذف المستودع") },
+                text = { Text("يرتبط بهذا المستودع $linkedParts قطعة غيار. انقل القطع إلى مستودع آخر أولاً، أو اجعل المستودع \"متوقفاً\" بدل حذفه.") }
+            )
+        } else {
+            ConfirmDialog(
+                title = "حذف المستودع",
+                text = "هل تريد حذف ${target.code} - ${target.name}؟",
+                onConfirm = { onDelete(target); deleteTarget = null },
+                onDismiss = { deleteTarget = null }
+            )
+        }
     }
 }
 
