@@ -1619,6 +1619,7 @@ private fun AssetDetailScreen(
                     if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
                     if (asset.assetNumber.isNotBlank()) InfoRow("رقم الأصل المالي", asset.assetNumber)
                     InfoRow("الأهمية", asset.criticality)
+                    InfoRow("نوع التركيب", if (asset.mobility.equals("Mobile", ignoreCase = true)) "متنقّل" else "ثابت / مركّب")
                     if (constructionDate.isNotBlank()) InfoRow("سنة / شهر الصنع", constructionDate)
                     InfoRow("تاريخ التركيب", asset.installedAt)
                     if (asset.startupDate.isNotBlank()) InfoRow("تاريخ بدء التشغيل", asset.startupDate)

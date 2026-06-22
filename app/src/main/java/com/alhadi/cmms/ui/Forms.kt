@@ -455,6 +455,8 @@ internal fun AssetFormSheet(
     var status by remember { mutableStateOf(initial?.status ?: "Running") }
     var criticality by remember { mutableStateOf(initial?.criticality ?: "Medium") }
     var locationId by remember { mutableStateOf(initial?.locationId) }
+    var mobility by remember { mutableStateOf(initial?.mobility ?: "Fixed") }
+    var incursOperatingCost by remember { mutableStateOf(initial?.incursOperatingCost ?: false) }
     var parentAssetId by remember { mutableStateOf(initial?.parentAssetId) }
     var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
     var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
@@ -583,6 +585,23 @@ internal fun AssetFormSheet(
         (initial?.startupDate?.isNotBlank() == true)
     val serialLocked = initial != null && serialDateExists && !canOverrideSerial
 
+    // --- Asset organizational governance (AST-ORG-* / AST-ORG-SAVE-*) ---
+    // Activation = saving as any operational (non-draft) status.
+    val activating = !status.equals("Draft", ignoreCase = true)
+    val isMobile = mobility.equals("Mobile", ignoreCase = true)
+    val selectedLoc = locations.firstOrNull { it.id == locationId }
+    val org001Company = !activating || company.isNotBlank()              // SAVE-001
+    val org002Plant = !activating || maintenancePlant.isNotBlank()       // SAVE-002
+    val org003Location = !activating ||                                  // SAVE-003 / ORG-002 / ORG-003
+        (if (isMobile) location.isNotBlank() else locationId != null)
+    val org004WorkCenter = !activating || !isCritical || mainWorkCenter.isNotBlank()  // SAVE-004
+    val org005Planner = !activating || !isCritical || plannerGroup.isNotBlank()       // SAVE-005
+    val org006CostCenter = !activating || !incursOperatingCost || costCenter.isNotBlank() // SAVE-006
+    // SAVE-007: an active asset cannot reference an inactive functional location.
+    val org007FlActive = !activating || selectedLoc == null || selectedLoc.status.equals("Active", ignoreCase = true)
+    val orgValid = org001Company && org002Plant && org003Location &&
+        org004WorkCenter && org005Planner && org006CostCenter && org007FlActive
+
     val linearStartValue = linearStartPoint.toDoubleOrNull()
     val linearEndValue = linearEndPoint.toDoubleOrNull()
     val linearRangeValid = !isLinearAsset || (linearStartValue != null && linearEndValue != null && linearEndValue > linearStartValue)
@@ -610,7 +629,14 @@ internal fun AssetFormSheet(
         LabeledField("المجموعة", group, { group = it })
         LabeledField("الموقع النصّي", location, { location = it })
         if (locations.isNotEmpty()) {
-            LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+            if (initial == null) {
+                LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+            } else {
+                // AST-ORG-007/008 & SAVE-011: location changes for an existing asset must go via a Transfer movement.
+                val locName = locations.firstOrNull { it.id == locationId }?.let { "${it.code} • ${it.name}" } ?: "غير محدد"
+                LabeledField("الموقع الفني", locName, {}, enabled = false)
+                Text("AST-ORG-008: لتغيير الموقع الفني استخدم حركة نقل (Transfer) من بطاقة الأصل.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
         }
         if (allAssets.isNotEmpty()) {
             AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
@@ -733,14 +759,30 @@ internal fun AssetFormSheet(
         LabeledField("معيار التصميم (Design Standard)", designStandard, { designStandard = it })
 
         Text("التنظيم والمسؤولية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LabeledField("الشركة", company, { company = it })
+        OptionDropdown("نوع التركيب", listOf("Fixed", "Mobile"), mobility, display = ::mobilityLabel) { mobility = it }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("أصل ذو تكلفة تشغيلية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = incursOperatingCost, onCheckedChange = { incursOperatingCost = it })
+        }
+        LabeledField("الشركة (Company)", company, { company = it })
+        if (!org001Company) Text("AST-ORG-SAVE-001: الأصل النشط يتطلب Company.", color = MaterialTheme.colorScheme.error)
         LabeledField("الموقع/المنشأة", site, { site = it })
-        LabeledField("مصنع الصيانة", maintenancePlant, { maintenancePlant = it })
+        LabeledField("المصنع (Plant)", maintenancePlant, { maintenancePlant = it })
+        if (!org002Plant) Text("AST-ORG-SAVE-002: الأصل النشط يتطلب Plant.", color = MaterialTheme.colorScheme.error)
         LabeledField("مصنع التخطيط", planningPlant, { planningPlant = it })
-        LabeledField("مجموعة المخططين", plannerGroup, { plannerGroup = it })
-        LabeledField("مركز العمل الرئيسي", mainWorkCenter, { mainWorkCenter = it })
+        LabeledField("مجموعة المخططين (Planner Group)", plannerGroup, { plannerGroup = it })
+        if (!org005Planner) Text("AST-ORG-SAVE-005: الأصل الحرج يتطلب Planner Group.", color = MaterialTheme.colorScheme.error)
+        LabeledField("مركز العمل الرئيسي (Work Center)", mainWorkCenter, { mainWorkCenter = it })
+        if (!org004WorkCenter) Text("AST-ORG-SAVE-004: الأصل الحرج يتطلب Work Center.", color = MaterialTheme.colorScheme.error)
         LabeledField("مركز عمل الإنتاج", productionWorkCenter, { productionWorkCenter = it })
-        LabeledField("مركز التكلفة", costCenter, { costCenter = it })
+        LabeledField("مركز التكلفة (Cost Center)", costCenter, { costCenter = it })
+        if (!org006CostCenter) Text("AST-ORG-SAVE-006: الأصل ذو التكلفة التشغيلية يتطلب Cost Center.", color = MaterialTheme.colorScheme.error)
+        if (!org003Location) Text(
+            if (isMobile) "AST-ORG-003: الأصل المتنقل يتطلب تحديد مكانه الحالي (الموقع النصّي)."
+            else "AST-ORG-SAVE-003: الأصل المركّب يتطلب موقعاً فنياً.",
+            color = MaterialTheme.colorScheme.error
+        )
+        if (!org007FlActive) Text("AST-ORG-SAVE-007: لا يمكن ربط موقع فني غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
         LabeledField("الشخص المسؤول", responsiblePerson, { responsiblePerson = it })
 
         Text("الهوية والترميز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -972,7 +1014,9 @@ internal fun AssetFormSheet(
                     warrantyReference = warrantyReference.trim(),
                     // AST-WAR-003: preserve locked dates when the user cannot override them.
                     warrantyStart = if (warrantyDatesLocked) (initial?.warrantyStart ?: "") else warrantyStart.trim(),
-                    warrantyEnd = if (warrantyDatesLocked) (initial?.warrantyEnd ?: "") else warrantyEnd.trim()
+                    warrantyEnd = if (warrantyDatesLocked) (initial?.warrantyEnd ?: "") else warrantyEnd.trim(),
+                    mobility = mobility,
+                    incursOperatingCost = incursOperatingCost
                 )
         }
         // Save Draft: allow persisting an incomplete asset as a draft (skips mandatory rules).
@@ -981,10 +1025,10 @@ internal fun AssetFormSheet(
             enabled = code.isNotBlank() && name.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) { Text("حفظ كمسودة") }
-        // Activate / Save: only after mandatory data (technical rules) is complete.
+        // Activate / Save: only after mandatory data (technical + organizational rules) is complete.
         SaveButton(
             code.isNotBlank() && name.isNotBlank() && linearRangeValid && markerDistancesValid && coordinatesValid &&
-                tech001Valid && tech002Valid && tech004Valid
+                tech001Valid && tech002Valid && tech004Valid && orgValid
         ) {
             onSave(buildAsset(if (status.equals("Draft", ignoreCase = true)) "Active" else status))
         }
@@ -1076,6 +1120,12 @@ internal fun WarehouseFormSheet(
             )
         }
     }
+}
+
+private fun mobilityLabel(m: String): String = when (m) {
+    "Fixed" -> "ثابت / مركّب"
+    "Mobile" -> "متنقّل"
+    else -> m
 }
 
 private fun warrantyTypeLabel(type: String): String = when (type) {

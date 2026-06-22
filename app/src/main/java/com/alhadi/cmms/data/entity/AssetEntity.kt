@@ -243,7 +243,14 @@ data class AssetEntity(
     val customerWarranty: Boolean = false,
     /** AST-WAR-007: assets sharing the same warranty reference are covered by one warranty/contract. */
     @ColumnInfo(defaultValue = "''")
-    val warrantyReference: String = ""
+    val warrantyReference: String = "",
+    // --- Organizational governance (AST-ORG-*) ---
+    /** AST-ORG-002/003: "Fixed" (installed/mounted) assets need a functional location; "Mobile" do not. */
+    @ColumnInfo(defaultValue = "'Fixed'")
+    val mobility: String = "Fixed",
+    /** AST-ORG-006: assets that incur operating cost require a cost center to activate. */
+    @ColumnInfo(defaultValue = "0")
+    val incursOperatingCost: Boolean = false
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =
