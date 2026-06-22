@@ -397,6 +397,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         spareParts = spareParts,
                         serials = serialNumbers,
                         serialMovements = serialNumberMovements,
+                        orgUnits = orgUnits,
                         canManage = canManage,
                         isAdmin = isAdmin,
                         defaultAssignee = actorName,
@@ -1253,6 +1254,7 @@ private fun AssetsScreen(
     spareParts: List<SparePartEntity>,
     serials: List<SerialNumberEntity>,
     serialMovements: List<SerialNumberMovementEntity>,
+    orgUnits: List<OrgUnitEntity>,
     canManage: Boolean,
     isAdmin: Boolean,
     defaultAssignee: String,
@@ -1314,6 +1316,7 @@ private fun AssetsScreen(
             serials = serials,
             serialMovements = serialMovements,
             locations = locations,
+            orgUnits = orgUnits,
             canManage = canManage,
             isAdmin = isAdmin,
             defaultAssignee = defaultAssignee,
@@ -1440,7 +1443,7 @@ private fun AssetsScreen(
     }
 
     if (showForm) {
-        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations, allAssets = assets, canOverrideSerial = isAdmin, hasLinkedParts = editing?.let { e -> bomItems.any { it.assetId == e.id } } ?: false)
+        AssetFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false }, locations = locations, allAssets = assets, orgUnits = orgUnits, canOverrideSerial = isAdmin, hasLinkedParts = editing?.let { e -> bomItems.any { it.assetId == e.id } } ?: false)
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
@@ -1518,6 +1521,7 @@ private fun AssetDetailScreen(
     serials: List<SerialNumberEntity>,
     serialMovements: List<SerialNumberMovementEntity>,
     locations: List<FunctionalLocationEntity>,
+    orgUnits: List<OrgUnitEntity>,
     canManage: Boolean,
     isAdmin: Boolean,
     defaultAssignee: String,
@@ -2250,7 +2254,7 @@ private fun AssetDetailScreen(
     }
 
     if (showEdit) {
-        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations, allAssets = allAssets, canOverrideSerial = isAdmin, hasLinkedParts = bomItems.any { it.assetId == asset.id })
+        AssetFormSheet(initial = asset, onDismiss = { showEdit = false }, onSave = { onSaveAsset(it); showEdit = false }, locations = locations, allAssets = allAssets, orgUnits = orgUnits, canOverrideSerial = isAdmin, hasLinkedParts = bomItems.any { it.assetId == asset.id })
     }
     if (showStatus) {
         StatusPickerDialog(

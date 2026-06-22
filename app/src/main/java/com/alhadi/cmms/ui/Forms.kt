@@ -437,6 +437,37 @@ private fun LinearMaintenancePositionFields(
 // Asset form
 // ---------------------------------------------------------------------------
 
+/**
+ * Dropdown sourced from organizational-unit master records of a given [type].
+ * Stores the unit code. Falls back to a free-text field when no master records of the
+ * type exist yet, and keeps any legacy non-matching value selectable (backward compatible).
+ */
+@Composable
+private fun OrgUnitDropdown(
+    label: String,
+    type: String,
+    orgUnits: List<OrgUnitEntity>,
+    value: String,
+    onChange: (String) -> Unit
+) {
+    val ofType = orgUnits.filter { it.type == type }
+    if (ofType.isEmpty()) {
+        LabeledField(label, value, onChange)
+        return
+    }
+    val codes = ofType.map { it.code }
+    val legacy = if (value.isNotBlank() && value !in codes) listOf(value) else emptyList()
+    OptionDropdown(
+        label = label,
+        options = listOf("") + legacy + codes,
+        selected = value,
+        display = { code ->
+            if (code.isBlank()) "—"
+            else ofType.firstOrNull { it.code == code }?.let { "${it.code} • ${it.name}" + if (!it.isActive) " (غير نشط)" else "" } ?: code
+        }
+    ) { onChange(it) }
+}
+
 @Composable
 internal fun AssetFormSheet(
     initial: AssetEntity?,
@@ -444,6 +475,7 @@ internal fun AssetFormSheet(
     onSave: (AssetEntity) -> Unit,
     locations: List<FunctionalLocationEntity> = emptyList(),
     allAssets: List<AssetEntity> = emptyList(),
+    orgUnits: List<OrgUnitEntity> = emptyList(),
     canOverrideSerial: Boolean = false,
     hasLinkedParts: Boolean = false
 ) {
@@ -600,8 +632,15 @@ internal fun AssetFormSheet(
     val org006CostCenter = !activating || !incursOperatingCost || costCenter.isNotBlank() // SAVE-006
     // SAVE-007: an active asset cannot reference an inactive functional location.
     val org007FlActive = !activating || selectedLoc == null || selectedLoc.status.equals("Active", ignoreCase = true)
+    // SAVE-008/009/010: an active asset cannot reference an inactive Work Center / Planner Group / Cost Center.
+    fun orgRefInactive(unitType: String, value: String): Boolean =
+        value.isNotBlank() && orgUnits.any { it.type == unitType && it.code.equals(value, ignoreCase = true) && !it.isActive }
+    val org008WcActive = !activating || !orgRefInactive("WorkCenter", mainWorkCenter)      // SAVE-008
+    val org009PgActive = !activating || !orgRefInactive("PlannerGroup", plannerGroup)      // SAVE-009
+    val org010CcActive = !activating || !orgRefInactive("CostCenter", costCenter)          // SAVE-010
     val orgValid = org001Company && org002Plant && org003Location &&
-        org004WorkCenter && org005Planner && org006CostCenter && org007FlActive
+        org004WorkCenter && org005Planner && org006CostCenter && org007FlActive &&
+        org008WcActive && org009PgActive && org010CcActive
 
     val linearStartValue = linearStartPoint.toDoubleOrNull()
     val linearEndValue = linearEndPoint.toDoubleOrNull()
@@ -765,19 +804,22 @@ internal fun AssetFormSheet(
             Text("أصل ذو تكلفة تشغيلية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = incursOperatingCost, onCheckedChange = { incursOperatingCost = it })
         }
-        LabeledField("الشركة (Company)", company, { company = it })
+        OrgUnitDropdown("الشركة (Company)", "Company", orgUnits, company) { company = it }
         if (!org001Company) Text("AST-ORG-SAVE-001: الأصل النشط يتطلب Company.", color = MaterialTheme.colorScheme.error)
         LabeledField("الموقع/المنشأة", site, { site = it })
-        LabeledField("المصنع (Plant)", maintenancePlant, { maintenancePlant = it })
+        OrgUnitDropdown("المصنع (Plant)", "Plant", orgUnits, maintenancePlant) { maintenancePlant = it }
         if (!org002Plant) Text("AST-ORG-SAVE-002: الأصل النشط يتطلب Plant.", color = MaterialTheme.colorScheme.error)
         LabeledField("مصنع التخطيط", planningPlant, { planningPlant = it })
-        LabeledField("مجموعة المخططين (Planner Group)", plannerGroup, { plannerGroup = it })
+        OrgUnitDropdown("مجموعة المخططين (Planner Group)", "PlannerGroup", orgUnits, plannerGroup) { plannerGroup = it }
         if (!org005Planner) Text("AST-ORG-SAVE-005: الأصل الحرج يتطلب Planner Group.", color = MaterialTheme.colorScheme.error)
-        LabeledField("مركز العمل الرئيسي (Work Center)", mainWorkCenter, { mainWorkCenter = it })
+        if (!org009PgActive) Text("AST-ORG-SAVE-009: لا يمكن ربط Planner Group غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
+        OrgUnitDropdown("مركز العمل الرئيسي (Work Center)", "WorkCenter", orgUnits, mainWorkCenter) { mainWorkCenter = it }
         if (!org004WorkCenter) Text("AST-ORG-SAVE-004: الأصل الحرج يتطلب Work Center.", color = MaterialTheme.colorScheme.error)
+        if (!org008WcActive) Text("AST-ORG-SAVE-008: لا يمكن ربط Work Center غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
         LabeledField("مركز عمل الإنتاج", productionWorkCenter, { productionWorkCenter = it })
-        LabeledField("مركز التكلفة (Cost Center)", costCenter, { costCenter = it })
+        OrgUnitDropdown("مركز التكلفة (Cost Center)", "CostCenter", orgUnits, costCenter) { costCenter = it }
         if (!org006CostCenter) Text("AST-ORG-SAVE-006: الأصل ذو التكلفة التشغيلية يتطلب Cost Center.", color = MaterialTheme.colorScheme.error)
+        if (!org010CcActive) Text("AST-ORG-SAVE-010: لا يمكن ربط Cost Center غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
         if (!org003Location) Text(
             if (isMobile) "AST-ORG-003: الأصل المتنقل يتطلب تحديد مكانه الحالي (الموقع النصّي)."
             else "AST-ORG-SAVE-003: الأصل المركّب يتطلب موقعاً فنياً.",
