@@ -870,6 +870,7 @@ private fun warehouseTypeOption(type: String): String = when (type) {
 internal fun PartFormSheet(
     initial: SparePartEntity?,
     profiles: List<SerialNumberProfileEntity>,
+    warehouses: List<WarehouseEntity> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (SparePartEntity) -> Unit
 ) {
@@ -891,7 +892,20 @@ internal fun PartFormSheet(
         LabeledField("الوحدة (Unit)", unit, { unit = it })
         LabeledField("الكمية المتوفرة", onHand, { onHand = it }, numeric = true)
         LabeledField("الحد الأدنى", minQty, { minQty = it }, numeric = true)
-        LabeledField("الموقع (Location)", location, { location = it })
+        if (warehouses.isEmpty()) {
+            LabeledField("الموقع / المستودع", location, { location = it })
+        } else {
+            val activeWarehouses = warehouses.filter { it.status.equals("Active", ignoreCase = true) }
+            val codes = activeWarehouses.map { it.code }
+            // Keep any legacy/free-text value selectable so editing an old part never loses it.
+            val options = if (location.isNotBlank() && location !in codes) listOf(location) + codes else codes
+            OptionDropdown(
+                label = "المستودع",
+                options = options,
+                selected = location,
+                display = { code -> warehouses.firstOrNull { it.code == code }?.let { "${it.code} — ${it.name}" } ?: code }
+            ) { location = it }
+        }
         LabeledField("آخر سعر", price, { price = it }, numeric = true)
         Text("التتبع الفردي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

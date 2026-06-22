@@ -439,6 +439,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             profiles = serialNumberProfiles,
                             serials = serialNumbers,
                             transactions = transactions,
+                            warehouses = warehouses,
                             canReceive = canManage,
                             canManage = canManage,
                             onOpenSerialNumbers = { moreRoute = MoreRoute.SerialNumbers },
@@ -3345,6 +3346,7 @@ private fun InventoryScreen(
     profiles: List<SerialNumberProfileEntity>,
     serials: List<SerialNumberEntity>,
     transactions: List<InventoryTransactionEntity>,
+    warehouses: List<WarehouseEntity>,
     canReceive: Boolean,
     canManage: Boolean,
     onOpenSerialNumbers: () -> Unit,
@@ -3451,7 +3453,7 @@ private fun InventoryScreen(
     }
 
     if (showForm) {
-        PartFormSheet(initial = editing, profiles = profiles, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+        PartFormSheet(initial = editing, profiles = profiles, warehouses = warehouses, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
