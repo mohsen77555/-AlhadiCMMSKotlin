@@ -19,6 +19,7 @@ import java.util.Locale
 import java.util.TimeZone
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -35,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -416,6 +418,21 @@ internal fun AssetFormSheet(
     var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
     var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
     var warrantyEnd by remember { mutableStateOf(initial?.warrantyEnd ?: "") }
+    var warrantyType by remember { mutableStateOf(initial?.warrantyType ?: "") }
+    var warrantyCategory by remember { mutableStateOf(initial?.warrantyCategory ?: "") }
+    var warrantyTerms by remember { mutableStateOf(initial?.warrantyTerms ?: "") }
+    var coveredServices by remember { mutableStateOf(initial?.coveredServices ?: "") }
+    var excludedServices by remember { mutableStateOf(initial?.excludedServices ?: "") }
+    var warrantyCounterType by remember { mutableStateOf(initial?.warrantyCounterType ?: "") }
+    var warrantyCounterLimit by remember { mutableStateOf((initial?.warrantyCounterLimit ?: 0.0).toString()) }
+    var warrantyClaimRequired by remember { mutableStateOf(initial?.warrantyClaimRequired ?: false) }
+    var warrantyClaimStatus by remember { mutableStateOf(initial?.warrantyClaimStatus ?: "") }
+    var warrantyContact by remember { mutableStateOf(initial?.warrantyContact ?: "") }
+    var warrantyDocument by remember { mutableStateOf(initial?.warrantyDocument ?: "") }
+    var vendorWarranty by remember { mutableStateOf(initial?.vendorWarranty ?: false) }
+    var manufacturerWarranty by remember { mutableStateOf(initial?.manufacturerWarranty ?: false) }
+    var customerWarranty by remember { mutableStateOf(initial?.customerWarranty ?: false) }
+    var warrantyReference by remember { mutableStateOf(initial?.warrantyReference ?: "") }
     var serialNumber by remember { mutableStateOf(initial?.serialNumber ?: "") }
     var assetTag by remember { mutableStateOf(initial?.assetTag ?: "") }
     var supplier by remember { mutableStateOf(initial?.supplier ?: "") }
@@ -744,8 +761,50 @@ internal fun AssetFormSheet(
 
         Text("الضمان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
-        DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
-        DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
+        // AST-WAR-003: warranty dates are locked once set, unless the user can override (admin).
+        val warrantyDatesLocked = initial != null &&
+            (initial.warrantyStart.isNotBlank() || initial.warrantyEnd.isNotBlank()) && !canOverrideSerial
+        if (warrantyDatesLocked) {
+            LabeledField("بداية الضمان", warrantyStart, {}, enabled = false)
+            LabeledField("نهاية الضمان", warrantyEnd, {}, enabled = false)
+            Text("AST-WAR-003: لا يمكن تعديل تواريخ الضمان إلا بصلاحية خاصة.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        } else {
+            DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
+            DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
+        }
+        LabeledField("مرجع/رقم عقد الضمان", warrantyReference, { warrantyReference = it })
+        OptionDropdown("نوع الضمان", listOf("", "Standard", "Extended", "Service Contract", "AMC"), warrantyType, display = ::warrantyTypeLabel) { warrantyType = it }
+        LabeledField("فئة الضمان", warrantyCategory, { warrantyCategory = it })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("ضمان المورّد", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = vendorWarranty, onCheckedChange = { vendorWarranty = it })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("ضمان المُصنّع", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = manufacturerWarranty, onCheckedChange = { manufacturerWarranty = it })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("ضمان العميل", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = customerWarranty, onCheckedChange = { customerWarranty = it })
+        }
+        // AST-WAR-002: coverage by date and/or counter.
+        OptionDropdown("نوع عدّاد الضمان", listOf("", "Hours", "Km", "Cycles", "Production"), warrantyCounterType, display = ::warrantyCounterTypeLabel) { warrantyCounterType = it }
+        if (warrantyCounterType.isNotBlank()) {
+            LabeledField("حد العدّاد", warrantyCounterLimit, { warrantyCounterLimit = it }, numeric = true)
+        }
+        LabeledField("الشروط والأحكام", warrantyTerms, { warrantyTerms = it }, singleLine = false)
+        LabeledField("الخدمات المشمولة", coveredServices, { coveredServices = it }, singleLine = false)
+        LabeledField("الخدمات المستثناة", excludedServices, { excludedServices = it }, singleLine = false)
+        LabeledField("جهة اتصال الضمان", warrantyContact, { warrantyContact = it })
+        // AST-WAR-006: warranty document linked to the asset card.
+        LabeledField("مستند الضمان (مرجع/رابط)", warrantyDocument, { warrantyDocument = it })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("يتطلب مطالبة ضمان", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = warrantyClaimRequired, onCheckedChange = { warrantyClaimRequired = it })
+        }
+        if (warrantyClaimRequired) {
+            OptionDropdown("حالة المطالبة", listOf("", "None", "Submitted", "UnderReview", "Approved", "Rejected"), warrantyClaimStatus, display = ::warrantyClaimStatusLabel) { warrantyClaimStatus = it }
+        }
         if (!tech001Valid) Text("AST-TECH-001: أكمل البيانات الفنية الأساسية للأصل الحرج قبل الحفظ.", color = MaterialTheme.colorScheme.error)
         SaveButton(
             code.isNotBlank() && name.isNotBlank() && linearRangeValid && markerDistancesValid && coordinatesValid &&
@@ -767,8 +826,6 @@ internal fun AssetFormSheet(
                     lastInspectionAt = initial?.lastInspectionAt ?: today,
                     locationId = locationId,
                     warrantyProvider = warrantyProvider.trim(),
-                    warrantyStart = warrantyStart.trim(),
-                    warrantyEnd = warrantyEnd.trim(),
                     parentAssetId = parentAssetId,
                     serialNumber = if (serialLocked) (initial?.serialNumber ?: "") else serialNumber.trim(),
                     assetTag = assetTag.trim(),
@@ -860,7 +917,25 @@ internal fun AssetFormSheet(
                     material = material.trim(),
                     designStandard = designStandard.trim(),
                     technicalSpecGroup = technicalSpecGroup.trim(),
-                    requiresSerialTracking = requiresSerialTracking
+                    requiresSerialTracking = requiresSerialTracking,
+                    warrantyType = warrantyType,
+                    warrantyCategory = warrantyCategory.trim(),
+                    warrantyTerms = warrantyTerms.trim(),
+                    coveredServices = coveredServices.trim(),
+                    excludedServices = excludedServices.trim(),
+                    warrantyCounterType = warrantyCounterType,
+                    warrantyCounterLimit = warrantyCounterLimit.toDoubleOrNull() ?: 0.0,
+                    warrantyClaimRequired = warrantyClaimRequired,
+                    warrantyClaimStatus = if (warrantyClaimRequired) warrantyClaimStatus else "",
+                    warrantyContact = warrantyContact.trim(),
+                    warrantyDocument = warrantyDocument.trim(),
+                    vendorWarranty = vendorWarranty,
+                    manufacturerWarranty = manufacturerWarranty,
+                    customerWarranty = customerWarranty,
+                    warrantyReference = warrantyReference.trim(),
+                    // AST-WAR-003: preserve locked dates when the user cannot override them.
+                    warrantyStart = if (warrantyDatesLocked) (initial?.warrantyStart ?: "") else warrantyStart.trim(),
+                    warrantyEnd = if (warrantyDatesLocked) (initial?.warrantyEnd ?: "") else warrantyEnd.trim()
                 )
             )
         }
@@ -952,6 +1027,33 @@ internal fun WarehouseFormSheet(
             )
         }
     }
+}
+
+private fun warrantyTypeLabel(type: String): String = when (type) {
+    "" -> "غير محدد"
+    "Standard" -> "قياسي"
+    "Extended" -> "ممتد"
+    "Service Contract" -> "عقد خدمة"
+    "AMC" -> "عقد صيانة سنوي"
+    else -> type
+}
+
+private fun warrantyCounterTypeLabel(type: String): String = when (type) {
+    "" -> "بالتاريخ فقط"
+    "Hours" -> "ساعات تشغيل"
+    "Km" -> "كيلومترات"
+    "Cycles" -> "دورات"
+    "Production" -> "إنتاج"
+    else -> type
+}
+
+private fun warrantyClaimStatusLabel(status: String): String = when (status) {
+    "", "None" -> "لا يوجد"
+    "Submitted" -> "مُقدّمة"
+    "UnderReview" -> "قيد المراجعة"
+    "Approved" -> "مقبولة"
+    "Rejected" -> "مرفوضة"
+    else -> status
 }
 
 private fun warehouseTypeOption(type: String): String = when (type) {
@@ -1314,6 +1416,27 @@ internal fun WorkOrderFormSheet(
         LabeledField("العنوان", title, { title = it })
         LabeledField("الوصف", description, { description = it }, singleLine = false)
         AssetDropdown(assets, assetId) { assetId = it }
+        // AST-WAR-001: warn when opening a work order on an asset that is still under warranty.
+        if (selectedAsset?.isUnderWarranty(DateStrings.today()) == true) {
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Verified, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
+                    Column {
+                        Text("AST-WAR-001: هذا الأصل ضمن الضمان", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        Text(
+                            "راجع الضمان قبل تحميل تكلفة داخلية — قد يكون الإصلاح مطالبة ضمان." +
+                                (selectedAsset.warrantyReference.takeIf { it.isNotBlank() }?.let { " (مرجع: $it)" } ?: ""),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
+        }
         if (selectedAsset?.isLinearAsset == true) {
             LinearMaintenancePositionFields(
                 asset = selectedAsset,

@@ -210,7 +210,40 @@ data class AssetEntity(
     val technicalSpecGroup: String = "",
     /** Rule AST-TECH-002: when true the asset must carry a serial number (individual tracking). */
     @ColumnInfo(defaultValue = "0")
-    val requiresSerialTracking: Boolean = false
+    val requiresSerialTracking: Boolean = false,
+    // --- Warranty governance (AST-WAR-*) ---
+    @ColumnInfo(defaultValue = "''")
+    val warrantyType: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val warrantyCategory: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val warrantyTerms: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val coveredServices: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val excludedServices: String = "",
+    /** AST-WAR-002: coverage can be by date, by counter, or both. "" = date-only. */
+    @ColumnInfo(defaultValue = "''")
+    val warrantyCounterType: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val warrantyCounterLimit: Double = 0.0,
+    @ColumnInfo(defaultValue = "0")
+    val warrantyClaimRequired: Boolean = false,
+    @ColumnInfo(defaultValue = "''")
+    val warrantyClaimStatus: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val warrantyContact: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val warrantyDocument: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val vendorWarranty: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val manufacturerWarranty: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val customerWarranty: Boolean = false,
+    /** AST-WAR-007: assets sharing the same warranty reference are covered by one warranty/contract. */
+    @ColumnInfo(defaultValue = "''")
+    val warrantyReference: String = ""
 ) {
     /** Whether the asset is currently covered by warranty on the given date. */
     fun isUnderWarranty(today: String): Boolean =

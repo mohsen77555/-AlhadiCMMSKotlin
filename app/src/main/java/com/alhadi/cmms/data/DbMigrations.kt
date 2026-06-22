@@ -240,7 +240,30 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30)
+    /** Adds warranty governance fields (AST-WAR-*) to assets. */
+    val MIGRATION_30_31 = object : Migration(30, 31) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE assets ADD COLUMN warrantyType TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN warrantyCategory TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN warrantyTerms TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN coveredServices TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN excludedServices TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN warrantyCounterType TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN warrantyCounterLimit REAL NOT NULL DEFAULT 0.0",
+                "ALTER TABLE assets ADD COLUMN warrantyClaimRequired INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE assets ADD COLUMN warrantyClaimStatus TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN warrantyContact TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN warrantyDocument TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE assets ADD COLUMN vendorWarranty INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE assets ADD COLUMN manufacturerWarranty INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE assets ADD COLUMN customerWarranty INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE assets ADD COLUMN warrantyReference TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

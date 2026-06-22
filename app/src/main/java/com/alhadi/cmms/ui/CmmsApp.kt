@@ -1531,7 +1531,9 @@ private fun AssetDetailScreen(
     val locationLabel = asset.locationId?.let { id -> locations.firstOrNull { it.id == id }?.let { "${it.code} • ${it.name}" } } ?: "غير محدد"
     val today = DateStrings.today()
     val underWarranty = asset.isUnderWarranty(today)
-    val hasWarranty = asset.warrantyEnd.isNotBlank()
+    val hasWarranty = asset.warrantyEnd.isNotBlank() || asset.warrantyType.isNotBlank() ||
+        asset.warrantyReference.isNotBlank() || asset.warrantyCounterType.isNotBlank() ||
+        asset.warrantyProvider.isNotBlank()
     val parent = asset.parentAssetId?.let { id -> allAssets.firstOrNull { it.id == id } }
     val children = allAssets.filter { it.parentAssetId == asset.id }
     var showEdit by remember { mutableStateOf(false) }
@@ -1939,9 +1941,34 @@ private fun AssetDetailScreen(
                             Spacer(modifier = Modifier.weight(1f))
                             StatusBadge(if (underWarranty) "ضمن الضمان" else "منتهٍ", statusTone(if (underWarranty) "running" else "stopped"))
                         }
-                        InfoRow("الجهة", asset.warrantyProvider)
-                        InfoRow("من", asset.warrantyStart)
-                        InfoRow("إلى", asset.warrantyEnd)
+                        if (asset.warrantyProvider.isNotBlank()) InfoRow("الجهة", asset.warrantyProvider)
+                        if (asset.warrantyStart.isNotBlank()) InfoRow("من", asset.warrantyStart)
+                        if (asset.warrantyEnd.isNotBlank()) InfoRow("إلى", asset.warrantyEnd)
+                        if (asset.warrantyType.isNotBlank()) InfoRow("النوع", warrantyTypeLabelUi(asset.warrantyType))
+                        if (asset.warrantyCategory.isNotBlank()) InfoRow("الفئة", asset.warrantyCategory)
+                        if (asset.warrantyReference.isNotBlank()) InfoRow("مرجع العقد", asset.warrantyReference)
+                        // AST-WAR-002: counter-based coverage.
+                        if (asset.warrantyCounterType.isNotBlank()) {
+                            InfoRow("عدّاد الضمان", "${warrantyCounterTypeLabelUi(asset.warrantyCounterType)} • حد ${formatLinearNumber(asset.warrantyCounterLimit)}")
+                        }
+                        val warrantyKinds = buildList {
+                            if (asset.vendorWarranty) add("مورّد")
+                            if (asset.manufacturerWarranty) add("مُصنّع")
+                            if (asset.customerWarranty) add("عميل")
+                        }
+                        if (warrantyKinds.isNotEmpty()) InfoRow("نوع الجهة", warrantyKinds.joinToString("، "))
+                        if (asset.coveredServices.isNotBlank()) InfoRow("مشمول", asset.coveredServices)
+                        if (asset.excludedServices.isNotBlank()) InfoRow("مستثنى", asset.excludedServices)
+                        if (asset.warrantyTerms.isNotBlank()) InfoRow("الشروط", asset.warrantyTerms)
+                        if (asset.warrantyContact.isNotBlank()) InfoRow("جهة الاتصال", asset.warrantyContact)
+                        // AST-WAR-006: warranty document linked to the asset card.
+                        if (asset.warrantyDocument.isNotBlank()) InfoRow("مستند الضمان", asset.warrantyDocument)
+                        if (asset.warrantyClaimRequired) InfoRow("حالة المطالبة", warrantyClaimStatusLabelUi(asset.warrantyClaimStatus))
+                        // AST-WAR-007: assets sharing the same warranty reference.
+                        if (asset.warrantyReference.isNotBlank()) {
+                            val shared = allAssets.count { it.id != asset.id && it.warrantyReference.equals(asset.warrantyReference, ignoreCase = true) }
+                            if (shared > 0) InfoRow("أصول أخرى بنفس الضمان", "$shared أصل")
+                        }
                     }
                 }
             }
@@ -4399,6 +4426,31 @@ private fun WarehouseCard(
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
+}
+
+private fun warrantyTypeLabelUi(type: String): String = when (type) {
+    "Standard" -> "قياسي"
+    "Extended" -> "ممتد"
+    "Service Contract" -> "عقد خدمة"
+    "AMC" -> "عقد صيانة سنوي"
+    else -> type
+}
+
+private fun warrantyCounterTypeLabelUi(type: String): String = when (type) {
+    "Hours" -> "ساعات تشغيل"
+    "Km" -> "كيلومترات"
+    "Cycles" -> "دورات"
+    "Production" -> "إنتاج"
+    else -> type
+}
+
+private fun warrantyClaimStatusLabelUi(status: String): String = when (status) {
+    "", "None" -> "لا يوجد"
+    "Submitted" -> "مُقدّمة"
+    "UnderReview" -> "قيد المراجعة"
+    "Approved" -> "مقبولة"
+    "Rejected" -> "مرفوضة"
+    else -> status
 }
 
 private fun warehouseTypeLabel(type: String): String = when (type) {
