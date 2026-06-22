@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -468,6 +469,14 @@ private fun OrgUnitDropdown(
     ) { onChange(it) }
 }
 
+/** AST-ORG-010: marks a field whose value was inherited from the functional location. */
+@Composable
+private fun InheritedCaption(inherited: Boolean) {
+    if (inherited) {
+        Text("موروث من الموقع الفني", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
 @Composable
 internal fun AssetFormSheet(
     initial: AssetEntity?,
@@ -642,6 +651,16 @@ internal fun AssetFormSheet(
         org004WorkCenter && org005Planner && org006CostCenter && org007FlActive &&
         org008WcActive && org009PgActive && org010CcActive
 
+    // AST-ORG-009: when a functional location is chosen, suggest its plant / work center /
+    // cost center / planner group into any blank asset field (inherited defaults).
+    LaunchedEffect(locationId) {
+        val loc = locations.firstOrNull { it.id == locationId } ?: return@LaunchedEffect
+        if (maintenancePlant.isBlank() && loc.plantCode.isNotBlank()) maintenancePlant = loc.plantCode
+        if (mainWorkCenter.isBlank() && loc.workCenterCode.isNotBlank()) mainWorkCenter = loc.workCenterCode
+        if (costCenter.isBlank() && loc.costCenterCode.isNotBlank()) costCenter = loc.costCenterCode
+        if (plannerGroup.isBlank() && loc.plannerGroupCode.isNotBlank()) plannerGroup = loc.plannerGroupCode
+    }
+
     val linearStartValue = linearStartPoint.toDoubleOrNull()
     val linearEndValue = linearEndPoint.toDoubleOrNull()
     val linearRangeValid = !isLinearAsset || (linearStartValue != null && linearEndValue != null && linearEndValue > linearStartValue)
@@ -808,16 +827,20 @@ internal fun AssetFormSheet(
         if (!org001Company) Text("AST-ORG-SAVE-001: الأصل النشط يتطلب Company.", color = MaterialTheme.colorScheme.error)
         LabeledField("الموقع/المنشأة", site, { site = it })
         OrgUnitDropdown("المصنع (Plant)", "Plant", orgUnits, maintenancePlant) { maintenancePlant = it }
+        InheritedCaption(selectedLoc != null && maintenancePlant.isNotBlank() && maintenancePlant.equals(selectedLoc.plantCode, ignoreCase = true))
         if (!org002Plant) Text("AST-ORG-SAVE-002: الأصل النشط يتطلب Plant.", color = MaterialTheme.colorScheme.error)
         LabeledField("مصنع التخطيط", planningPlant, { planningPlant = it })
         OrgUnitDropdown("مجموعة المخططين (Planner Group)", "PlannerGroup", orgUnits, plannerGroup) { plannerGroup = it }
+        InheritedCaption(selectedLoc != null && plannerGroup.isNotBlank() && plannerGroup.equals(selectedLoc.plannerGroupCode, ignoreCase = true))
         if (!org005Planner) Text("AST-ORG-SAVE-005: الأصل الحرج يتطلب Planner Group.", color = MaterialTheme.colorScheme.error)
         if (!org009PgActive) Text("AST-ORG-SAVE-009: لا يمكن ربط Planner Group غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
         OrgUnitDropdown("مركز العمل الرئيسي (Work Center)", "WorkCenter", orgUnits, mainWorkCenter) { mainWorkCenter = it }
+        InheritedCaption(selectedLoc != null && mainWorkCenter.isNotBlank() && mainWorkCenter.equals(selectedLoc.workCenterCode, ignoreCase = true))
         if (!org004WorkCenter) Text("AST-ORG-SAVE-004: الأصل الحرج يتطلب Work Center.", color = MaterialTheme.colorScheme.error)
         if (!org008WcActive) Text("AST-ORG-SAVE-008: لا يمكن ربط Work Center غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
         LabeledField("مركز عمل الإنتاج", productionWorkCenter, { productionWorkCenter = it })
         OrgUnitDropdown("مركز التكلفة (Cost Center)", "CostCenter", orgUnits, costCenter) { costCenter = it }
+        InheritedCaption(selectedLoc != null && costCenter.isNotBlank() && costCenter.equals(selectedLoc.costCenterCode, ignoreCase = true))
         if (!org006CostCenter) Text("AST-ORG-SAVE-006: الأصل ذو التكلفة التشغيلية يتطلب Cost Center.", color = MaterialTheme.colorScheme.error)
         if (!org010CcActive) Text("AST-ORG-SAVE-010: لا يمكن ربط Cost Center غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
         if (!org003Location) Text(
@@ -1082,6 +1105,7 @@ internal fun AssetFormSheet(
 internal fun LocationFormSheet(
     initial: FunctionalLocationEntity?,
     allLocations: List<FunctionalLocationEntity>,
+    orgUnits: List<OrgUnitEntity> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (FunctionalLocationEntity) -> Unit
 ) {
@@ -1090,13 +1114,28 @@ internal fun LocationFormSheet(
     var description by remember { mutableStateOf(initial?.description ?: "") }
     var parentId by remember { mutableStateOf(initial?.parentId) }
     var status by remember { mutableStateOf(initial?.status ?: "Active") }
+    var plantCode by remember { mutableStateOf(initial?.plantCode ?: "") }
+    var workCenterCode by remember { mutableStateOf(initial?.workCenterCode ?: "") }
+    var costCenterCode by remember { mutableStateOf(initial?.costCenterCode ?: "") }
+    var plannerGroupCode by remember { mutableStateOf(initial?.plannerGroupCode ?: "") }
+
+    // FLOC-004: a location cannot become its own ancestor — exclude self and all descendants.
+    val descendantIds = remember(allLocations, initial?.id) { locationDescendantIds(initial?.id, allLocations) }
+    val parentChoices = allLocations.filter { it.id != initial?.id && it.id !in descendantIds }
 
     FormSheet(if (initial == null) "إضافة موقع فني" else "تعديل الموقع الفني", onDismiss) {
         LabeledField("الكود (Code)", code, { code = it })
         LabeledField("الاسم (Name)", name, { name = it })
         LabeledField("الوصف", description, { description = it }, singleLine = false)
-        LocationDropdown("الموقع الأعلى (Parent)", allLocations, parentId, excludeId = initial?.id) { parentId = it }
+        LocationDropdown("الموقع الأعلى (Parent)", parentChoices, parentId, excludeId = initial?.id) { parentId = it }
         OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+
+        Text("الربط التنظيمي (يورَّث للأصول)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        OrgUnitDropdown("المصنع (Plant)", "Plant", orgUnits, plantCode) { plantCode = it }
+        OrgUnitDropdown("مركز العمل (Work Center)", "WorkCenter", orgUnits, workCenterCode) { workCenterCode = it }
+        OrgUnitDropdown("مركز التكلفة (Cost Center)", "CostCenter", orgUnits, costCenterCode) { costCenterCode = it }
+        OrgUnitDropdown("مجموعة التخطيط (Planner Group)", "PlannerGroup", orgUnits, plannerGroupCode) { plannerGroupCode = it }
+
         SaveButton(code.isNotBlank() && name.isNotBlank()) {
             onSave(
                 FunctionalLocationEntity(
@@ -1105,11 +1144,30 @@ internal fun LocationFormSheet(
                     name = name.trim(),
                     parentId = parentId,
                     description = description,
-                    status = status
+                    status = status,
+                    plantCode = plantCode,
+                    workCenterCode = workCenterCode,
+                    costCenterCode = costCenterCode,
+                    plannerGroupCode = plannerGroupCode
                 )
             )
         }
     }
+}
+
+/** Returns the ids of all descendants of [id] within [all] (for hierarchy cycle prevention). */
+private fun locationDescendantIds(id: Long?, all: List<FunctionalLocationEntity>): Set<Long> {
+    if (id == null) return emptySet()
+    val result = mutableSetOf<Long>()
+    val queue = ArrayDeque<Long>()
+    queue.add(id)
+    while (queue.isNotEmpty()) {
+        val current = queue.removeFirst()
+        all.filter { it.parentId == current }.forEach { child ->
+            if (result.add(child.id)) queue.add(child.id)
+        }
+    }
+    return result
 }
 
 // ---------------------------------------------------------------------------

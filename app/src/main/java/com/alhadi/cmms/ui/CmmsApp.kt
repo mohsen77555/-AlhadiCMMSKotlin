@@ -497,6 +497,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             innerPadding = innerPadding,
                             locations = locations,
                             assets = assets,
+                            orgUnits = orgUnits,
                             canManage = canManage,
                             onSave = viewModel::saveFunctionalLocation,
                             onDelete = viewModel::deleteFunctionalLocation
@@ -4603,6 +4604,7 @@ private fun LocationsScreen(
     innerPadding: PaddingValues,
     locations: List<FunctionalLocationEntity>,
     assets: List<AssetEntity>,
+    orgUnits: List<OrgUnitEntity>,
     canManage: Boolean,
     onSave: (FunctionalLocationEntity) -> Unit,
     onDelete: (FunctionalLocationEntity) -> Unit
@@ -4663,15 +4665,27 @@ private fun LocationsScreen(
     }
 
     if (showForm) {
-        LocationFormSheet(initial = editing, allLocations = locations, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+        LocationFormSheet(initial = editing, allLocations = locations, orgUnits = orgUnits, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
     }
     deleteTarget?.let { target ->
-        ConfirmDialog(
-            title = "حذف الموقع الفني",
-            text = "هل تريد حذف ${target.code} - ${target.name}؟",
-            onConfirm = { onDelete(target); deleteTarget = null },
-            onDismiss = { deleteTarget = null }
-        )
+        val linkedAssets = assets.count { it.locationId == target.id }
+        val childLocations = locations.count { it.parentId == target.id }
+        if (linkedAssets > 0 || childLocations > 0) {
+            // FLOC-008: never delete a location that still has assets or child locations — deactivate instead.
+            AlertDialog(
+                onDismissRequest = { deleteTarget = null },
+                confirmButton = { TextButton(onClick = { deleteTarget = null }) { Text("حسناً") } },
+                title = { Text("لا يمكن حذف الموقع الفني") },
+                text = { Text("يرتبط بهذا الموقع $linkedAssets أصل و $childLocations موقع فرعي. انقلها أولاً أو اجعل الموقع \"غير نشط\" بدل حذفه.") }
+            )
+        } else {
+            ConfirmDialog(
+                title = "حذف الموقع الفني",
+                text = "هل تريد حذف ${target.code} - ${target.name}؟",
+                onConfirm = { onDelete(target); deleteTarget = null },
+                onDismiss = { deleteTarget = null }
+            )
+        }
     }
 }
 
