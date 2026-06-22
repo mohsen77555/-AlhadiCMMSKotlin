@@ -27,6 +27,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WarehouseEntity
 import kotlinx.serialization.Serializable
 
 /**
@@ -53,6 +54,7 @@ data class BackupBundle(
     val measuringPoints: List<MeasuringPointEntity> = emptyList(),
     val measurementReadings: List<MeasurementReadingEntity> = emptyList(),
     val functionalLocations: List<FunctionalLocationEntity> = emptyList(),
+    val warehouses: List<WarehouseEntity> = emptyList(),
     val capa: List<CapaEntity> = emptyList(),
     val assetDocuments: List<AssetDocumentEntity> = emptyList(),
     val assetCharacteristics: List<AssetCharacteristicEntity> = emptyList(),
@@ -73,7 +75,7 @@ data class BackupBundle(
         get() = assets.size + workOrders.size + preventiveMaintenance.size + serialNumberProfiles.size +
             serialNumbers.size + serialNumberMovements.size + spareParts.size +
             inventoryTransactions.size + users.size + auditLog.size + measuringPoints.size +
-            measurementReadings.size + functionalLocations.size + capa.size + assetDocuments.size +
+            measurementReadings.size + functionalLocations.size + warehouses.size + capa.size + assetDocuments.size +
             assetCharacteristics.size + assetBomHeaders.size + assetBom.size + assetMovements.size + pmChecklist.size +
             notifications.size + operations.size + confirmations.size + photos.size +
             taskLists.size + taskListOperations.size + permits.size

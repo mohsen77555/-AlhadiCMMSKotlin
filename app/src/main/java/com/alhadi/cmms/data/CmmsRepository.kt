@@ -28,6 +28,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PasswordHasher
 import kotlinx.coroutines.flow.Flow
@@ -58,6 +59,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val photoDao = database.workOrderPhotoDao()
     private val taskListDao = database.taskListDao()
     private val permitDao = database.workPermitDao()
+    private val warehouseDao = database.warehouseDao()
     private val serialService = SerialNumberService(database, ::recordAudit)
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
@@ -74,6 +76,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val measuringPoints: Flow<List<MeasuringPointEntity>> = measurementDao.observePoints()
     val readings: Flow<List<MeasurementReadingEntity>> = measurementDao.observeReadings()
     val functionalLocations: Flow<List<FunctionalLocationEntity>> = locationDao.observeLocations()
+    val warehouses: Flow<List<WarehouseEntity>> = warehouseDao.observeWarehouses()
     val capaActions: Flow<List<CapaEntity>> = capaDao.observeCapa()
     val assetDocuments: Flow<List<AssetDocumentEntity>> = documentDao.observeDocuments()
     val assetCharacteristics: Flow<List<AssetCharacteristicEntity>> = characteristicDao.observeCharacteristics()
@@ -190,6 +193,7 @@ class CmmsRepository(private val database: AppDatabase) {
             measuringPoints = measuringPoints.first(),
             measurementReadings = measurementDao.dumpAllReadings(),
             functionalLocations = functionalLocations.first(),
+            warehouses = warehouseDao.dumpAll(),
             capa = capaActions.first(),
             assetDocuments = assetDocuments.first(),
             assetCharacteristics = assetCharacteristics.first(),
@@ -234,6 +238,7 @@ class CmmsRepository(private val database: AppDatabase) {
             characteristicDao.deleteAll()
             documentDao.deleteAll()
             capaDao.deleteAll()
+            warehouseDao.deleteAll()
             locationDao.deleteAll()
             measurementDao.deleteAllReadings()
             measurementDao.deleteAllPoints()
@@ -248,6 +253,7 @@ class CmmsRepository(private val database: AppDatabase) {
             assetDao.insertAssets(bundle.assets)
             userDao.insertAll(bundle.users)
             locationDao.insertAll(bundle.functionalLocations)
+            warehouseDao.insertAll(bundle.warehouses)
             if (bundle.serialNumberProfiles.isNotEmpty()) serialDao.insertProfiles(bundle.serialNumberProfiles)
             sparePartDao.insertAll(bundle.spareParts)
             workOrderDao.insertWorkOrders(bundle.workOrders)
@@ -506,8 +512,15 @@ class CmmsRepository(private val database: AppDatabase) {
                 WorkPermitEntity(1, 2, "LOTO", "طاقة كهربائية مخزّنة، أجزاء دوّارة", "قفازات عازلة، نظارة واقية", "Approved", "Maintenance Supervisor", DateStrings.daysFromToday(2), "Mohsen Alhadi", today)
             )
 
+            val warehouses = listOf(
+                WarehouseEntity(1, "WH-MAIN", "المستودع الرئيسي", "المبنى الإداري", "Mohsen Alhadi", "", "Main", "Active", "قطع الغيار الرئيسية"),
+                WarehouseEntity(2, "WH-SPARE", "مستودع قطع الغيار", "صالة الطحن", "", "", "Spare", "Active", ""),
+                WarehouseEntity(3, "WH-TOOLS", "مخزن العدد والأدوات", "ورشة الصيانة", "", "", "Tools", "Active", "")
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
+            warehouseDao.insertAll(warehouses)
             capaDao.insertAll(capaActions)
             documentDao.insertAll(documents)
             characteristicDao.insertAll(characteristics)
@@ -955,6 +968,21 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
         locationDao.deleteById(location.id)
         recordAudit("Delete", "Location", "حذف موقع فني: ${location.code}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Warehouses (stores)
+    // ---------------------------------------------------------------------
+
+    suspend fun saveWarehouse(warehouse: WarehouseEntity, actor: String = "System") {
+        val isNew = warehouse.id == 0L
+        warehouseDao.insert(warehouse)
+        recordAudit(if (isNew) "Create" else "Update", "Warehouse", "${if (isNew) "إضافة" else "تعديل"} مستودع: ${warehouse.code}", actor)
+    }
+
+    suspend fun deleteWarehouse(warehouse: WarehouseEntity, actor: String = "System") {
+        warehouseDao.deleteById(warehouse.id)
+        recordAudit("Delete", "Warehouse", "حذف مستودع: ${warehouse.code}", actor)
     }
 
     // ---------------------------------------------------------------------

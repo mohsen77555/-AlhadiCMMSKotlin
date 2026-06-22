@@ -80,6 +80,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.util.DateStrings
 
 // ---------------------------------------------------------------------------
@@ -797,6 +798,68 @@ internal fun LocationFormSheet(
             )
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse form
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun WarehouseFormSheet(
+    initial: WarehouseEntity?,
+    existing: List<WarehouseEntity>,
+    onDismiss: () -> Unit,
+    onSave: (WarehouseEntity) -> Unit
+) {
+    var code by remember { mutableStateOf(initial?.code ?: "") }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var location by remember { mutableStateOf(initial?.location ?: "") }
+    var keeper by remember { mutableStateOf(initial?.keeper ?: "") }
+    var phone by remember { mutableStateOf(initial?.phone ?: "") }
+    var type by remember { mutableStateOf(initial?.type ?: "Main") }
+    var status by remember { mutableStateOf(initial?.status ?: "Active") }
+    var notes by remember { mutableStateOf(initial?.notes ?: "") }
+
+    val trimmedCode = code.trim()
+    val duplicateCode = trimmedCode.isNotBlank() && existing.any {
+        it.id != initial?.id && it.code.equals(trimmedCode, ignoreCase = true)
+    }
+
+    FormSheet(if (initial == null) "إضافة مستودع" else "تعديل المستودع", onDismiss) {
+        LabeledField("كود المستودع", code, { code = it })
+        if (duplicateCode) Text("هذا الكود مستخدم بالفعل.", color = MaterialTheme.colorScheme.error)
+        LabeledField("اسم المستودع", name, { name = it })
+        OptionDropdown("النوع", listOf("Main", "Spare", "Tools", "Consumables", "Scrap"), type, display = ::warehouseTypeOption) { type = it }
+        LabeledField("الموقع الفعلي", location, { location = it })
+        LabeledField("أمين المخزن", keeper, { keeper = it })
+        LabeledField("الهاتف", phone, { phone = it })
+        OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
+        SaveButton(code.isNotBlank() && name.isNotBlank() && !duplicateCode) {
+            onSave(
+                WarehouseEntity(
+                    id = initial?.id ?: 0,
+                    code = trimmedCode,
+                    name = name.trim(),
+                    location = location.trim(),
+                    keeper = keeper.trim(),
+                    phone = phone.trim(),
+                    type = type,
+                    status = status,
+                    notes = notes.trim()
+                )
+            )
+        }
+    }
+}
+
+private fun warehouseTypeOption(type: String): String = when (type) {
+    "Main" -> "رئيسي"
+    "Spare" -> "قطع غيار"
+    "Tools" -> "عدد وأدوات"
+    "Consumables" -> "مواد استهلاكية"
+    "Scrap" -> "خردة/تالف"
+    else -> type
 }
 
 // ---------------------------------------------------------------------------

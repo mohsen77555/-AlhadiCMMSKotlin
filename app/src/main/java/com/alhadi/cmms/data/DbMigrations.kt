@@ -205,7 +205,17 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28)
+    /** Adds the standalone warehouses (stores) master table. */
+    val MIGRATION_28_29 = object : Migration(28, 29) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "CREATE TABLE IF NOT EXISTS warehouses (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, code TEXT NOT NULL, name TEXT NOT NULL, location TEXT NOT NULL DEFAULT '', keeper TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '', type TEXT NOT NULL DEFAULT 'Main', status TEXT NOT NULL DEFAULT 'Active', notes TEXT NOT NULL DEFAULT '')",
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_warehouses_code ON warehouses(code)"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

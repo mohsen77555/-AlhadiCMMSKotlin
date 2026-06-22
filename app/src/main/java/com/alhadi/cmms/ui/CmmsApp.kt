@@ -40,6 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -151,6 +152,7 @@ import com.alhadi.cmms.data.entity.SerialNumberEntity
 import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
 import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
@@ -193,7 +195,7 @@ private enum class BottomTab(val label: String, val icon: ImageVector, val accen
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-private enum class MoreRoute { Notifications, Inventory, SerialNumbers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Capa, Failures }
+private enum class MoreRoute { Notifications, Inventory, SerialNumbers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Warehouses, Capa, Failures }
 
 private data class ScreenMeta(
     val title: String,
@@ -219,6 +221,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
+    val warehouses by viewModel.warehouses.collectAsStateWithLifecycle()
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
     val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
@@ -492,6 +495,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                             onSave = viewModel::saveFunctionalLocation,
                             onDelete = viewModel::deleteFunctionalLocation
                         )
+                        MoreRoute.Warehouses -> WarehousesScreen(
+                            innerPadding = innerPadding,
+                            warehouses = warehouses,
+                            parts = spareParts,
+                            canManage = canManage,
+                            onSave = viewModel::saveWarehouse,
+                            onDelete = viewModel::deleteWarehouse
+                        )
                         MoreRoute.Capa -> CapaScreen(
                             innerPadding = innerPadding,
                             items = capaActions,
@@ -572,6 +583,7 @@ private fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (ta
         MoreRoute.TaskLists -> ScreenMeta("قوالب العمل", "قوالب العمليات للخطط الوقائية", Icons.AutoMirrored.Filled.List, AccentBlue)
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
+        MoreRoute.Warehouses -> ScreenMeta("المستودعات", "المخازن وأمناء العهدة", Icons.Filled.Warehouse, AccentPurple)
         MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
         MoreRoute.Failures -> ScreenMeta("تحليل الأعطال", "MTTR و MTBF وتكرار الأعطال", Icons.Filled.TrendingUp, AccentRed)
     }
@@ -1130,7 +1142,7 @@ private fun MoreGrid(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
-                Spacer(modifier = Modifier.weight(1f))
+                ModuleCard("المستودعات", "المخازن وأمناء العهدة", Icons.Filled.Warehouse, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Warehouses) }
             }
         }
         item {
@@ -4232,6 +4244,113 @@ private fun orderedLocations(all: List<FunctionalLocationEntity>): List<Pair<Fun
     visit(null, 0)
     all.filter { it.id !in placed }.sortedBy { it.code }.forEach { result += it to 0 }
     return result
+}
+
+@Composable
+private fun WarehousesScreen(
+    innerPadding: PaddingValues,
+    warehouses: List<WarehouseEntity>,
+    parts: List<SparePartEntity>,
+    canManage: Boolean,
+    onSave: (WarehouseEntity) -> Unit,
+    onDelete: (WarehouseEntity) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<WarehouseEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<WarehouseEntity?>(null) }
+
+    val partCounts = remember(parts) { parts.groupBy { it.location } }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                SectionHeader("المستودعات والمخازن")
+                Text("سجّل المخازن وأمناء العهدة واربط قطع الغيار بها.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (canManage) {
+                item { AddButton("مستودع جديد") { editing = null; showForm = true } }
+            }
+            if (warehouses.isEmpty()) {
+                item { EmptyState("لا توجد مستودعات", Icons.Filled.Warehouse) }
+            }
+            items(warehouses, key = { it.id }) { warehouse ->
+                WarehouseCard(
+                    warehouse = warehouse,
+                    partCount = (partCounts[warehouse.code]?.size ?: 0) + (partCounts[warehouse.name]?.size ?: 0),
+                    canManage = canManage,
+                    onEdit = { editing = warehouse; showForm = true },
+                    onDelete = { deleteTarget = warehouse }
+                )
+            }
+        }
+    }
+
+    if (showForm) {
+        WarehouseFormSheet(
+            initial = editing,
+            existing = warehouses,
+            onDismiss = { showForm = false },
+            onSave = { onSave(it); showForm = false }
+        )
+    }
+    deleteTarget?.let { target ->
+        ConfirmDialog(
+            title = "حذف المستودع",
+            text = "هل تريد حذف ${target.code} - ${target.name}؟",
+            onConfirm = { onDelete(target); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
+}
+
+@Composable
+private fun WarehouseCard(
+    warehouse: WarehouseEntity,
+    partCount: Int,
+    canManage: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val active = warehouse.status.equals("Active", ignoreCase = true)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconBubble(Icons.Filled.Warehouse, AccentPurple, AccentPurple.copy(alpha = 0.14f), 38)
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(warehouse.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(warehouse.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(if (active) "نشط" else "متوقف", statusTone(if (active) "active" else "neutral"))
+            }
+            if (warehouse.location.isNotBlank()) InfoRow("الموقع", warehouse.location)
+            if (warehouse.keeper.isNotBlank()) InfoRow("أمين المخزن", warehouse.keeper)
+            if (warehouse.phone.isNotBlank()) InfoRow("الهاتف", warehouse.phone)
+            if (warehouse.notes.isNotBlank()) InfoRow("ملاحظات", warehouse.notes)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusBadge(warehouseTypeLabel(warehouse.type), statusTone("info"))
+                StatusBadge("قطع: $partCount", statusTone("neutral"))
+            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
+        }
+    }
+}
+
+private fun warehouseTypeLabel(type: String): String = when (type) {
+    "Main" -> "رئيسي"
+    "Spare" -> "قطع غيار"
+    "Tools" -> "عدد وأدوات"
+    "Consumables" -> "مواد استهلاكية"
+    "Scrap" -> "خردة/تالف"
+    else -> type
 }
 
 @Composable
