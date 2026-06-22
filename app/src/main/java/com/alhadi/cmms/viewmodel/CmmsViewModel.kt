@@ -39,6 +39,7 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PdfExporter
 import com.alhadi.cmms.util.XlsxReader
@@ -141,6 +142,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val warehouses: StateFlow<List<WarehouseEntity>> = repository.warehouses
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val orgUnits: StateFlow<List<OrgUnitEntity>> = repository.orgUnits
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val capaActions: StateFlow<List<CapaEntity>> = repository.capaActions
@@ -344,6 +348,9 @@ class CmmsViewModel(private val repository: CmmsRepository) : ViewModel() {
 
     fun saveWarehouse(warehouse: WarehouseEntity) = launchAction("تم حفظ المستودع") { repository.saveWarehouse(warehouse, actor()) }
     fun deleteWarehouse(warehouse: WarehouseEntity) = launchAction("تم حذف المستودع") { repository.deleteWarehouse(warehouse, actor()) }
+
+    fun saveOrgUnit(unit: OrgUnitEntity) = launchAction("تم حفظ الوحدة التنظيمية") { repository.saveOrgUnit(unit, actor()) }
+    fun deleteOrgUnit(unit: OrgUnitEntity) = launchAction("تم حذف الوحدة التنظيمية") { repository.deleteOrgUnit(unit, actor()) }
 
     // ----- Asset documents -----
     fun saveAssetDocument(doc: AssetDocumentEntity) = launchAction("تم حفظ المستند") { repository.saveAssetDocument(doc, actor()) }

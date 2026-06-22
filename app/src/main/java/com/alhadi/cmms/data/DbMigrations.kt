@@ -284,7 +284,17 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33)
+    /** Adds the generic organizational-units master table (Company/Plant/Work Center/Cost Center/Planner Group/Department). */
+    val MIGRATION_33_34 = object : Migration(33, 34) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "CREATE TABLE IF NOT EXISTS org_units (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, type TEXT NOT NULL DEFAULT 'WorkCenter', code TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Active', parentId INTEGER, notes TEXT NOT NULL DEFAULT '')",
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_org_units_type_code ON org_units(type, code)"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

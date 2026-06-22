@@ -28,6 +28,7 @@ import com.alhadi.cmms.data.dao.WorkOrderOperationDao
 import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
 import com.alhadi.cmms.data.dao.WorkPermitDao
 import com.alhadi.cmms.data.dao.WarehouseDao
+import com.alhadi.cmms.data.dao.OrgUnitDao
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
@@ -56,6 +57,7 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 
 @Database(
     entities = [
@@ -86,9 +88,10 @@ import com.alhadi.cmms.data.entity.WarehouseEntity
         TaskListEntity::class,
         TaskListOperationEntity::class,
         WorkPermitEntity::class,
-        WarehouseEntity::class
+        WarehouseEntity::class,
+        OrgUnitEntity::class
     ],
-    version = 33,
+    version = 34,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -116,6 +119,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskListDao(): TaskListDao
     abstract fun workPermitDao(): WorkPermitDao
     abstract fun warehouseDao(): WarehouseDao
+    abstract fun orgUnitDao(): OrgUnitDao
 
     companion object {
         @Volatile

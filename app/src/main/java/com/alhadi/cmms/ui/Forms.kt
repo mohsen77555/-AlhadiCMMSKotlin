@@ -83,6 +83,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 
 // ---------------------------------------------------------------------------
@@ -1161,6 +1162,69 @@ private fun warehouseTypeOption(type: String): String = when (type) {
     "Tools" -> "عدد وأدوات"
     "Consumables" -> "مواد استهلاكية"
     "Scrap" -> "خردة/تالف"
+    else -> type
+}
+
+// ---------------------------------------------------------------------------
+// Organizational unit form
+// ---------------------------------------------------------------------------
+
+@Composable
+internal fun OrgUnitFormSheet(
+    initial: OrgUnitEntity?,
+    existing: List<OrgUnitEntity>,
+    onDismiss: () -> Unit,
+    onSave: (OrgUnitEntity) -> Unit
+) {
+    var type by remember { mutableStateOf(initial?.type ?: "WorkCenter") }
+    var code by remember { mutableStateOf(initial?.code ?: "") }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var status by remember { mutableStateOf(initial?.status ?: "Active") }
+    var parentId by remember { mutableStateOf(initial?.parentId) }
+    var notes by remember { mutableStateOf(initial?.notes ?: "") }
+
+    val trimmedCode = code.trim()
+    val duplicate = trimmedCode.isNotBlank() && existing.any {
+        it.id != initial?.id && it.type == type && it.code.equals(trimmedCode, ignoreCase = true)
+    }
+    val parentOptions = listOf("") + existing.filter { it.id != initial?.id }.map { it.id.toString() }
+
+    FormSheet(if (initial == null) "إضافة وحدة تنظيمية" else "تعديل الوحدة التنظيمية", onDismiss) {
+        OptionDropdown("النوع", listOf("Company", "Plant", "Department", "WorkCenter", "PlannerGroup", "CostCenter"), type, display = ::orgUnitTypeOption) { type = it }
+        LabeledField("الكود", code, { code = it })
+        if (duplicate) Text("هذا الكود مستخدم لنفس النوع.", color = MaterialTheme.colorScheme.error)
+        LabeledField("الاسم", name, { name = it })
+        OptionDropdown(
+            label = "الوحدة الأعلى (اختياري)",
+            options = parentOptions,
+            selected = parentId?.toString() ?: "",
+            display = { idStr -> if (idStr.isBlank()) "بدون" else existing.firstOrNull { it.id.toString() == idStr }?.let { "${it.code} • ${it.name}" } ?: idStr }
+        ) { parentId = it.toLongOrNull() }
+        OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
+        SaveButton(code.isNotBlank() && name.isNotBlank() && !duplicate) {
+            onSave(
+                OrgUnitEntity(
+                    id = initial?.id ?: 0,
+                    type = type,
+                    code = trimmedCode,
+                    name = name.trim(),
+                    status = status,
+                    parentId = parentId,
+                    notes = notes.trim()
+                )
+            )
+        }
+    }
+}
+
+private fun orgUnitTypeOption(type: String): String = when (type) {
+    "Company" -> "شركة"
+    "Plant" -> "مصنع / موقع"
+    "Department" -> "قسم"
+    "WorkCenter" -> "مركز عمل"
+    "PlannerGroup" -> "مجموعة تخطيط"
+    "CostCenter" -> "مركز تكلفة"
     else -> type
 }
 

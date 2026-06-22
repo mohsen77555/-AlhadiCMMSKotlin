@@ -29,6 +29,7 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PasswordHasher
 import kotlinx.coroutines.flow.Flow
@@ -60,6 +61,7 @@ class CmmsRepository(private val database: AppDatabase) {
     private val taskListDao = database.taskListDao()
     private val permitDao = database.workPermitDao()
     private val warehouseDao = database.warehouseDao()
+    private val orgUnitDao = database.orgUnitDao()
     private val serialService = SerialNumberService(database, ::recordAudit)
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
@@ -77,6 +79,7 @@ class CmmsRepository(private val database: AppDatabase) {
     val readings: Flow<List<MeasurementReadingEntity>> = measurementDao.observeReadings()
     val functionalLocations: Flow<List<FunctionalLocationEntity>> = locationDao.observeLocations()
     val warehouses: Flow<List<WarehouseEntity>> = warehouseDao.observeWarehouses()
+    val orgUnits: Flow<List<OrgUnitEntity>> = orgUnitDao.observeOrgUnits()
     val capaActions: Flow<List<CapaEntity>> = capaDao.observeCapa()
     val assetDocuments: Flow<List<AssetDocumentEntity>> = documentDao.observeDocuments()
     val assetCharacteristics: Flow<List<AssetCharacteristicEntity>> = characteristicDao.observeCharacteristics()
@@ -194,6 +197,7 @@ class CmmsRepository(private val database: AppDatabase) {
             measurementReadings = measurementDao.dumpAllReadings(),
             functionalLocations = functionalLocations.first(),
             warehouses = warehouseDao.dumpAll(),
+            orgUnits = orgUnitDao.dumpAll(),
             capa = capaActions.first(),
             assetDocuments = assetDocuments.first(),
             assetCharacteristics = assetCharacteristics.first(),
@@ -239,6 +243,7 @@ class CmmsRepository(private val database: AppDatabase) {
             documentDao.deleteAll()
             capaDao.deleteAll()
             warehouseDao.deleteAll()
+            orgUnitDao.deleteAll()
             locationDao.deleteAll()
             measurementDao.deleteAllReadings()
             measurementDao.deleteAllPoints()
@@ -254,6 +259,7 @@ class CmmsRepository(private val database: AppDatabase) {
             userDao.insertAll(bundle.users)
             locationDao.insertAll(bundle.functionalLocations)
             warehouseDao.insertAll(bundle.warehouses)
+            orgUnitDao.insertAll(bundle.orgUnits)
             if (bundle.serialNumberProfiles.isNotEmpty()) serialDao.insertProfiles(bundle.serialNumberProfiles)
             sparePartDao.insertAll(bundle.spareParts)
             workOrderDao.insertWorkOrders(bundle.workOrders)
@@ -518,9 +524,20 @@ class CmmsRepository(private val database: AppDatabase) {
                 WarehouseEntity(3, "WH-TOOLS", "مخزن العدد والأدوات", "ورشة الصيانة", "", "", "Tools", "Active", "")
             )
 
+            val orgUnits = listOf(
+                OrgUnitEntity(1, "Company", "ALHADI", "مجموعة الهادي", "Active", null, ""),
+                OrgUnitEntity(2, "Plant", "PLANT-01", "مصنع الطحن الرئيسي", "Active", 1, ""),
+                OrgUnitEntity(3, "WorkCenter", "WC-MECH", "مركز العمل الميكانيكي", "Active", 2, ""),
+                OrgUnitEntity(4, "WorkCenter", "WC-ELEC", "مركز العمل الكهربائي", "Active", 2, ""),
+                OrgUnitEntity(5, "CostCenter", "CC-1000", "مركز تكلفة الصيانة", "Active", 2, ""),
+                OrgUnitEntity(6, "PlannerGroup", "PG-01", "مجموعة تخطيط الصيانة", "Active", 2, ""),
+                OrgUnitEntity(7, "Department", "DEP-MNT", "إدارة الصيانة", "Active", 1, "")
+            )
+
             measurementDao.insertPoints(measuringPoints)
             locationDao.insertAll(locations)
             warehouseDao.insertAll(warehouses)
+            orgUnitDao.insertAll(orgUnits)
             capaDao.insertAll(capaActions)
             documentDao.insertAll(documents)
             characteristicDao.insertAll(characteristics)
@@ -999,6 +1016,21 @@ class CmmsRepository(private val database: AppDatabase) {
     suspend fun deleteWarehouse(warehouse: WarehouseEntity, actor: String = "System") {
         warehouseDao.deleteById(warehouse.id)
         recordAudit("Delete", "Warehouse", "حذف مستودع: ${warehouse.code}", actor)
+    }
+
+    // ---------------------------------------------------------------------
+    // Organizational units (Company / Plant / Work Center / Cost Center / Planner Group / Department)
+    // ---------------------------------------------------------------------
+
+    suspend fun saveOrgUnit(unit: OrgUnitEntity, actor: String = "System") {
+        val isNew = unit.id == 0L
+        orgUnitDao.insert(unit)
+        recordAudit(if (isNew) "Create" else "Update", "OrgUnit", "${if (isNew) "إضافة" else "تعديل"} وحدة تنظيمية: ${unit.type}/${unit.code}", actor)
+    }
+
+    suspend fun deleteOrgUnit(unit: OrgUnitEntity, actor: String = "System") {
+        orgUnitDao.deleteById(unit.id)
+        recordAudit("Delete", "OrgUnit", "حذف وحدة تنظيمية: ${unit.type}/${unit.code}", actor)
     }
 
     // ---------------------------------------------------------------------
