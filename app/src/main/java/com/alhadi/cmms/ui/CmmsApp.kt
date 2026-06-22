@@ -1240,7 +1240,7 @@ private fun AssetsScreen(
     defaultAssignee: String,
     onSave: (AssetEntity) -> Unit,
     onDelete: (AssetEntity) -> Unit,
-    onChangeStatus: (AssetEntity, String) -> Unit,
+    onChangeStatus: (AssetEntity, String, String) -> Unit,
     onSaveWorkOrder: (WorkOrderEntity) -> Unit,
     onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit,
     onSaveDocument: (AssetDocumentEntity) -> Unit,
@@ -1373,7 +1373,7 @@ private fun AssetsScreen(
             if (query.isBlank() && assets.isNotEmpty()) {
                 item {
                     val running = assets.count { it.status == "Running" }
-                    val stopped = assets.count { it.status == "Stopped" || it.status == "Retired" }
+                    val stopped = assets.count { it.status == "Stopped" || it.status == "Retired" || it.status == "Disposed" }
                     val warning = assets.count { it.status == "Warning" || it.status == "Under Maintenance" }
                     val other = assets.size - running - stopped - warning
                     val seg = listOf(
@@ -1506,7 +1506,7 @@ private fun AssetDetailScreen(
     onBack: () -> Unit,
     onOpenAsset: (Long) -> Unit,
     onSaveAsset: (AssetEntity) -> Unit,
-    onChangeStatus: (AssetEntity, String) -> Unit,
+    onChangeStatus: (AssetEntity, String, String) -> Unit,
     onSaveWorkOrder: (WorkOrderEntity) -> Unit,
     onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit,
     onSaveDocument: (AssetDocumentEntity) -> Unit,
@@ -1540,8 +1540,8 @@ private fun AssetDetailScreen(
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
     var showMoveForm by remember { mutableStateOf(false) }
-    val lifecycle = listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired")
-    val retired = asset.status.equals("Retired", ignoreCase = true)
+    val lifecycle = listOf("Draft", "Active", "Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired", "Disposed")
+    val retired = asset.status.equals("Retired", ignoreCase = true) || asset.status.equals("Disposed", ignoreCase = true)
     val hasOrganization = listOf(
         asset.company,
         asset.site,
@@ -1997,7 +1997,7 @@ private fun AssetDetailScreen(
             item {
                 if (retired) {
                     Text(
-                        "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه.",
+                        "الأصل ${if (asset.status.equals("Disposed", ignoreCase = true)) "مُستبعَد" else "متقاعد"} — لا يمكن إنشاء أوامر عمل جديدة عليه (AST: Create Work Order).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -2237,7 +2237,8 @@ private fun AssetDetailScreen(
         StatusPickerDialog(
             current = asset.status,
             options = lifecycle,
-            onPick = { onChangeStatus(asset, it); showStatus = false },
+            isAdmin = isAdmin,
+            onPick = { status, reason -> onChangeStatus(asset, status, reason); showStatus = false },
             onDismiss = { showStatus = false }
         )
     }

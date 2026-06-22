@@ -811,9 +811,10 @@ class CmmsRepository(private val database: AppDatabase) {
         }
     }
 
-    suspend fun changeAssetStatus(asset: AssetEntity, status: String, actor: String = "System") {
+    suspend fun changeAssetStatus(asset: AssetEntity, status: String, reason: String = "", actor: String = "System") {
         assetDao.insertAsset(asset.copy(status = status))
-        recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status", actor)
+        val reasonSuffix = if (reason.isNotBlank()) " — السبب: $reason" else ""
+        recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status$reasonSuffix", actor)
     }
 
     // ---------------------------------------------------------------------

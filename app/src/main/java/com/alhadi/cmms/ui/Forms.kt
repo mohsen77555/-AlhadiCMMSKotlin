@@ -111,28 +111,69 @@ internal fun ConfirmDialog(
 internal fun StatusPickerDialog(
     current: String,
     options: List<String>,
-    onPick: (String) -> Unit,
+    isAdmin: Boolean = false,
+    onPick: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("تغيير حالة الأصل", fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                options.forEach { opt ->
-                    TextButton(onClick = { onPick(opt) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            (if (opt == current) "• " else "") + opt,
-                            modifier = Modifier.fillMaxWidth(),
-                            fontWeight = if (opt == current) FontWeight.Bold else FontWeight.Normal
-                        )
+    // States that require a reason (Change Status rule) and those that need approval (Retire/Dispose).
+    val reasonStates = setOf("Stopped", "Retired", "Disposed")
+    val approvalStates = setOf("Retired", "Disposed")
+    var selected by remember { mutableStateOf<String?>(null) }
+    var reason by remember { mutableStateOf("") }
+
+    val target = selected
+    if (target == null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("تغيير حالة الأصل", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    options.forEach { opt ->
+                        val needsApproval = opt in approvalStates
+                        val blocked = needsApproval && !isAdmin
+                        TextButton(onClick = { if (!blocked) selected = opt }, enabled = !blocked, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                (if (opt == current) "• " else "") + opt +
+                                    (if (needsApproval) " (يتطلب اعتماد)" else ""),
+                                modifier = Modifier.fillMaxWidth(),
+                                fontWeight = if (opt == current) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                    if (!isAdmin) {
+                        Text("الإيقاف النهائي/الاستبعاد (تقاعد/استبعاد) يتطلب صلاحية اعتماد.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } }
-    )
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } }
+        )
+    } else {
+        val needsReason = target in reasonStates
+        AlertDialog(
+            onDismissRequest = { selected = null },
+            title = { Text("تأكيد: $target", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (target in approvalStates) {
+                        Text("هذا الإجراء يتطلب اعتماداً وسبباً.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (needsReason) {
+                        LabeledField("السبب", reason, { reason = it }, singleLine = false)
+                    } else {
+                        Text("تأكيد تغيير الحالة إلى $target؟")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { onPick(target, reason.trim()) },
+                    enabled = !needsReason || reason.isNotBlank()
+                ) { Text("تأكيد") }
+            },
+            dismissButton = { TextButton(onClick = { selected = null }) { Text("رجوع") } }
+        )
+    }
 }
 
 @Composable
@@ -653,7 +694,7 @@ internal fun AssetFormSheet(
         LabeledField("سنة الصنع", constructionYear, { constructionYear = it }, numeric = true)
         LabeledField("شهر الصنع", constructionMonth, { constructionMonth = it }, numeric = true)
         DateField("تاريخ بدء التشغيل", startupDate) { startupDate = it }
-        OptionDropdown("الحالة", listOf("Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired"), status) { status = it }
+        OptionDropdown("الحالة", listOf("Draft", "Active", "Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired", "Disposed"), status) { status = it }
         OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
         if (!tech004Valid) Text("AST-TECH-004: الموديل مطلوب لوجود قطع غيار مرتبطة بالموديل.", color = MaterialTheme.colorScheme.error)
 
@@ -806,12 +847,8 @@ internal fun AssetFormSheet(
             OptionDropdown("حالة المطالبة", listOf("", "None", "Submitted", "UnderReview", "Approved", "Rejected"), warrantyClaimStatus, display = ::warrantyClaimStatusLabel) { warrantyClaimStatus = it }
         }
         if (!tech001Valid) Text("AST-TECH-001: أكمل البيانات الفنية الأساسية للأصل الحرج قبل الحفظ.", color = MaterialTheme.colorScheme.error)
-        SaveButton(
-            code.isNotBlank() && name.isNotBlank() && linearRangeValid && markerDistancesValid && coordinatesValid &&
-                tech001Valid && tech002Valid && tech004Valid
-        ) {
-            val today = DateStrings.today()
-            onSave(
+        val today = DateStrings.today()
+        val buildAsset: (String) -> AssetEntity = { statusValue ->
                 AssetEntity(
                     id = initial?.id ?: 0,
                     code = code.trim(),
@@ -820,7 +857,7 @@ internal fun AssetFormSheet(
                     location = location,
                     manufacturer = manufacturer,
                     model = model,
-                    status = status,
+                    status = statusValue,
                     criticality = criticality,
                     installedAt = initial?.installedAt ?: today,
                     lastInspectionAt = initial?.lastInspectionAt ?: today,
@@ -937,7 +974,19 @@ internal fun AssetFormSheet(
                     warrantyStart = if (warrantyDatesLocked) (initial?.warrantyStart ?: "") else warrantyStart.trim(),
                     warrantyEnd = if (warrantyDatesLocked) (initial?.warrantyEnd ?: "") else warrantyEnd.trim()
                 )
-            )
+        }
+        // Save Draft: allow persisting an incomplete asset as a draft (skips mandatory rules).
+        OutlinedButton(
+            onClick = { onSave(buildAsset("Draft")) },
+            enabled = code.isNotBlank() && name.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("حفظ كمسودة") }
+        // Activate / Save: only after mandatory data (technical rules) is complete.
+        SaveButton(
+            code.isNotBlank() && name.isNotBlank() && linearRangeValid && markerDistancesValid && coordinatesValid &&
+                tech001Valid && tech002Valid && tech004Valid
+        ) {
+            onSave(buildAsset(if (status.equals("Draft", ignoreCase = true)) "Active" else status))
         }
     }
 }

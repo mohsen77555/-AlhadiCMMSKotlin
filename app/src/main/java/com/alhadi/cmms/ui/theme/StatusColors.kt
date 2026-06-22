@@ -15,7 +15,7 @@ fun statusTone(status: String): StatusTone {
             StatusTone(StatusInfo, StatusInfoContainer)
         "warning", "in progress", "scheduled", "pending", "due" ->
             StatusTone(StatusWarning, StatusWarningContainer)
-        "stopped", "overdue", "failed", "critical" ->
+        "stopped", "overdue", "failed", "critical", "retired", "disposed" ->
             StatusTone(StatusStopped, StatusStoppedContainer)
         "open", "new" ->
             StatusTone(StatusInfo, StatusInfoContainer)
