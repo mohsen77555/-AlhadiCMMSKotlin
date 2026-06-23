@@ -295,7 +295,7 @@ internal fun WorkOrderMaterialsSection(
                         }
                     }
                 }
-                if (canManage && workOrder.status != "Closed") {
+                if (canManage && workOrderStatus != "Closed") {
                     OutlinedButton(onClick = { onIssueMaterial() }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))

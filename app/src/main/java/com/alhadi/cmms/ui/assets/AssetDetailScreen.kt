@@ -427,7 +427,7 @@ internal fun AssetDetailScreen(
         }
 
         assetSubAssetsSection(parent, children, onOpenAsset)
-        assetWorkOrdersSection(asset, workOrders, onUpdateWorkOrderStatus)
+        assetWorkOrdersSection(asset, workOrders, canManage, onUpdateWorkOrderStatus)
         assetPmSection(pmItems)
         item {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

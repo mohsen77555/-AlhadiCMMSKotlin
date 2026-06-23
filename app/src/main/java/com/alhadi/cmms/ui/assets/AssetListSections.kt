@@ -190,6 +190,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 internal fun LazyListScope.assetWorkOrdersSection(
     asset: AssetEntity,
     workOrders: List<WorkOrderEntity>,
+    canManage: Boolean,
     onUpdateWorkOrderStatus: (WorkOrderEntity, String) -> Unit
 ) {
         item { SectionHeader("أوامر العمل المرتبطة (${workOrders.size})") }
