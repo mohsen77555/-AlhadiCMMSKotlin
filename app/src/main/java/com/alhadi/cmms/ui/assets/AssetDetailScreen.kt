@@ -248,7 +248,6 @@ internal fun AssetDetailScreen(
     val directCharacteristics = resolvedCharacteristics.filterNot { it.inherited }
     val inheritedCharacteristics = resolvedCharacteristics.filter { it.inherited }
     val characteristicGroups = resolvedCharacteristics.groupBy { it.resolvedClassName }
-    val hasLinearData = asset.isLinearAsset
 
     LazyColumn(
         modifier = Modifier
@@ -300,41 +299,7 @@ internal fun AssetDetailScreen(
             }
         }
 
-        if (hasLinearData) {
-            item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            SectionHeader("البيانات الخطية")
-                            Spacer(modifier = Modifier.weight(1f))
-                            StatusBadge("${formatLinearNumber(asset.linearLength())} ${asset.linearUnit}", statusTone("info"))
-                        }
-                        InfoRow("النطاق", linearRangeLabel(asset))
-                        if (asset.linearRouteCode.isNotBlank()) InfoRow("رمز المسار / الخط", asset.linearRouteCode)
-                        if (asset.linearReferencePattern.isNotBlank()) InfoRow("نمط المرجع", asset.linearReferencePattern)
-                        InfoRow("الاتجاه", linearDirectionLabel(asset.linearDirection))
-                        if (asset.linearStartMarker.isNotBlank()) {
-                            InfoRow("علامة البداية", "${asset.linearStartMarker} • ${formatLinearNumber(asset.linearStartMarkerDistance)} ${asset.linearMarkerUnit}")
-                        }
-                        if (asset.linearEndMarker.isNotBlank()) {
-                            InfoRow("علامة النهاية", "${asset.linearEndMarker} • ${formatLinearNumber(asset.linearEndMarkerDistance)} ${asset.linearMarkerUnit}")
-                        }
-                        if (asset.linearHorizontalOffset != 0.0) InfoRow("الإزاحة الأفقية", "${formatLinearNumber(asset.linearHorizontalOffset)} ${asset.linearOffsetUnit}")
-                        if (asset.linearVerticalOffset != 0.0) InfoRow("الإزاحة الرأسية", "${formatLinearNumber(asset.linearVerticalOffset)} ${asset.linearOffsetUnit}")
-                        if (asset.linearStartLatitude != null && asset.linearStartLongitude != null) {
-                            InfoRow("إحداثيات البداية", "${formatLinearNumber(asset.linearStartLatitude)}، ${formatLinearNumber(asset.linearStartLongitude)}")
-                        }
-                        if (asset.linearEndLatitude != null && asset.linearEndLongitude != null) {
-                            InfoRow("إحداثيات النهاية", "${formatLinearNumber(asset.linearEndLatitude)}، ${formatLinearNumber(asset.linearEndLongitude)}")
-                        }
-                        if (asset.networkObjectCode.isNotBlank()) InfoRow("كائن الشبكة", asset.networkObjectCode)
-                        if (asset.networkObjectType.isNotBlank()) InfoRow("نوع كائن الشبكة", networkObjectTypeLabel(asset.networkObjectType))
-                        if (asset.networkRelation.isNotBlank()) InfoRow("العلاقة", networkRelationLabel(asset.networkRelation))
-                        if (asset.networkAttributes.isNotBlank()) InfoRow("سمات الشبكة", asset.networkAttributes)
-                    }
-                }
-            }
-        }
+        assetLinearCard(asset)
 
         item {
             AssetSerialSection(
