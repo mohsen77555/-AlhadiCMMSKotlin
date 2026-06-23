@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.alhadi.cmms.data.dao.AssetBomDao
+import com.alhadi.cmms.data.dao.AssetBomHeaderDao
 import com.alhadi.cmms.data.dao.AssetCharacteristicDao
 import com.alhadi.cmms.data.dao.AssetDao
 import com.alhadi.cmms.data.dao.AssetDocumentDao
@@ -16,6 +17,7 @@ import com.alhadi.cmms.data.dao.InventoryTransactionDao
 import com.alhadi.cmms.data.dao.MaintenanceNotificationDao
 import com.alhadi.cmms.data.dao.MeasurementDao
 import com.alhadi.cmms.data.dao.PmChecklistDao
+import com.alhadi.cmms.data.dao.SerialNumberDao
 import com.alhadi.cmms.data.dao.PreventiveMaintenanceDao
 import com.alhadi.cmms.data.dao.SparePartDao
 import com.alhadi.cmms.data.dao.TaskListDao
@@ -25,6 +27,9 @@ import com.alhadi.cmms.data.dao.WorkOrderDao
 import com.alhadi.cmms.data.dao.WorkOrderOperationDao
 import com.alhadi.cmms.data.dao.WorkOrderPhotoDao
 import com.alhadi.cmms.data.dao.WorkPermitDao
+import com.alhadi.cmms.data.dao.WarehouseDao
+import com.alhadi.cmms.data.dao.OrgUnitDao
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -39,6 +44,9 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -48,12 +56,17 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 
 @Database(
     entities = [
         AssetEntity::class,
         WorkOrderEntity::class,
         PreventiveMaintenanceEntity::class,
+        SerialNumberProfileEntity::class,
+        SerialNumberEntity::class,
+        SerialNumberMovementEntity::class,
         SparePartEntity::class,
         InventoryTransactionEntity::class,
         UserEntity::class,
@@ -64,6 +77,7 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         CapaEntity::class,
         AssetDocumentEntity::class,
         AssetCharacteristicEntity::class,
+        AssetBomHeaderEntity::class,
         AssetBomItemEntity::class,
         AssetMovementEntity::class,
         PmChecklistItemEntity::class,
@@ -73,9 +87,11 @@ import com.alhadi.cmms.data.entity.WorkPermitEntity
         WorkOrderPhotoEntity::class,
         TaskListEntity::class,
         TaskListOperationEntity::class,
-        WorkPermitEntity::class
+        WorkPermitEntity::class,
+        WarehouseEntity::class,
+        OrgUnitEntity::class
     ],
-    version = 24,
+    version = 36,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -83,6 +99,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workOrderDao(): WorkOrderDao
     abstract fun preventiveMaintenanceDao(): PreventiveMaintenanceDao
     abstract fun sparePartDao(): SparePartDao
+    abstract fun serialNumberDao(): SerialNumberDao
     abstract fun inventoryTransactionDao(): InventoryTransactionDao
     abstract fun userDao(): UserDao
     abstract fun auditLogDao(): AuditLogDao
@@ -91,6 +108,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun capaDao(): CapaDao
     abstract fun assetDocumentDao(): AssetDocumentDao
     abstract fun assetCharacteristicDao(): AssetCharacteristicDao
+    abstract fun assetBomHeaderDao(): AssetBomHeaderDao
     abstract fun assetBomDao(): AssetBomDao
     abstract fun assetMovementDao(): AssetMovementDao
     abstract fun pmChecklistDao(): PmChecklistDao
@@ -100,6 +118,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun workOrderPhotoDao(): WorkOrderPhotoDao
     abstract fun taskListDao(): TaskListDao
     abstract fun workPermitDao(): WorkPermitDao
+    abstract fun warehouseDao(): WarehouseDao
+    abstract fun orgUnitDao(): OrgUnitDao
 
     companion object {
         @Volatile

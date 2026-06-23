@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -34,5 +35,15 @@ data class MaintenanceNotificationEntity(
     val reportedAt: String,
     val requiredEnd: String = "",
     val status: String,
-    val linkedOrderId: Long? = null
-)
+    val linkedOrderId: Long? = null,
+    val linearStartPoint: Double? = null,
+    val linearEndPoint: Double? = null,
+    @ColumnInfo(defaultValue = "''")
+    val linearMarker: String = "",
+    val linearHorizontalOffset: Double? = null,
+    val linearVerticalOffset: Double? = null
+) {
+    fun hasLinearReference(): Boolean =
+        linearStartPoint != null || linearEndPoint != null || linearMarker.isNotBlank() ||
+            linearHorizontalOffset != null || linearVerticalOffset != null
+}

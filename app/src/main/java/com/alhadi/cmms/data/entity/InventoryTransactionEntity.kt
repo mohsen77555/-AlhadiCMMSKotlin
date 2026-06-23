@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -20,5 +21,11 @@ data class InventoryTransactionEntity(
     val quantity: Int,
     val createdAt: String,
     val createdBy: String,
-    val note: String
+    val note: String,
+    @ColumnInfo(defaultValue = "''")
+    val serialNumbers: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val stockType: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val storageLocation: String = ""
 )

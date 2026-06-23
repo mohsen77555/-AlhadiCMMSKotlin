@@ -60,6 +60,9 @@ object PdfExporter {
         pager.kv("تاريخ الإنشاء", order.createdAt)
         pager.kv("تاريخ الاستحقاق", order.dueAt)
         pager.kv("الاعتماد", arabicApproval(order.approvalStatus))
+        if (asset?.isLinearAsset == true && order.hasLinearReference()) {
+            pager.kv("الموقع الخطي", linearPositionText(order, asset))
+        }
 
         if (order.description.isNotBlank()) {
             pager.heading("الوصف")
@@ -109,6 +112,20 @@ object PdfExporter {
     }
 
     private fun money(value: Double): String = "%,.2f ر.س".format(value)
+
+    private fun linearPositionText(order: WorkOrderEntity, asset: AssetEntity): String {
+        val parts = mutableListOf<String>()
+        if (order.linearStartPoint != null && order.linearEndPoint != null) {
+            parts += "${linearNumber(order.linearStartPoint)} – ${linearNumber(order.linearEndPoint)} ${asset.linearUnit}"
+        }
+        if (order.linearMarker.isNotBlank()) parts += "العلامة: ${order.linearMarker}"
+        if (order.linearHorizontalOffset != null) parts += "إزاحة أفقية ${linearNumber(order.linearHorizontalOffset)} ${asset.linearOffsetUnit}"
+        if (order.linearVerticalOffset != null) parts += "إزاحة رأسية ${linearNumber(order.linearVerticalOffset)} ${asset.linearOffsetUnit}"
+        return parts.joinToString(" • ").ifBlank { "غير محدد" }
+    }
+
+    private fun linearNumber(value: Double): String =
+        "%.3f".format(java.util.Locale.US, value).trimEnd('0').trimEnd('.')
 
     private fun arabicStatus(status: String): String = when (status) {
         "Open" -> "مفتوح"; "In Progress" -> "قيد التنفيذ"

@@ -1,5 +1,6 @@
 package com.alhadi.cmms.data
 
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -14,6 +15,9 @@ import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -23,6 +27,8 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import kotlinx.serialization.Serializable
 
 /**
@@ -39,6 +45,9 @@ data class BackupBundle(
     val assets: List<AssetEntity> = emptyList(),
     val workOrders: List<WorkOrderEntity> = emptyList(),
     val preventiveMaintenance: List<PreventiveMaintenanceEntity> = emptyList(),
+    val serialNumberProfiles: List<SerialNumberProfileEntity> = emptyList(),
+    val serialNumbers: List<SerialNumberEntity> = emptyList(),
+    val serialNumberMovements: List<SerialNumberMovementEntity> = emptyList(),
     val spareParts: List<SparePartEntity> = emptyList(),
     val inventoryTransactions: List<InventoryTransactionEntity> = emptyList(),
     val users: List<UserEntity> = emptyList(),
@@ -46,9 +55,12 @@ data class BackupBundle(
     val measuringPoints: List<MeasuringPointEntity> = emptyList(),
     val measurementReadings: List<MeasurementReadingEntity> = emptyList(),
     val functionalLocations: List<FunctionalLocationEntity> = emptyList(),
+    val warehouses: List<WarehouseEntity> = emptyList(),
+    val orgUnits: List<OrgUnitEntity> = emptyList(),
     val capa: List<CapaEntity> = emptyList(),
     val assetDocuments: List<AssetDocumentEntity> = emptyList(),
     val assetCharacteristics: List<AssetCharacteristicEntity> = emptyList(),
+    val assetBomHeaders: List<AssetBomHeaderEntity> = emptyList(),
     val assetBom: List<AssetBomItemEntity> = emptyList(),
     val assetMovements: List<AssetMovementEntity> = emptyList(),
     val pmChecklist: List<PmChecklistItemEntity> = emptyList(),
@@ -62,14 +74,15 @@ data class BackupBundle(
 ) {
     /** Total number of records across all tables — handy for a restore summary. */
     val totalRecords: Int
-        get() = assets.size + workOrders.size + preventiveMaintenance.size + spareParts.size +
+        get() = assets.size + workOrders.size + preventiveMaintenance.size + serialNumberProfiles.size +
+            serialNumbers.size + serialNumberMovements.size + spareParts.size +
             inventoryTransactions.size + users.size + auditLog.size + measuringPoints.size +
-            measurementReadings.size + functionalLocations.size + capa.size + assetDocuments.size +
-            assetCharacteristics.size + assetBom.size + assetMovements.size + pmChecklist.size +
+            measurementReadings.size + functionalLocations.size + warehouses.size + orgUnits.size + capa.size + assetDocuments.size +
+            assetCharacteristics.size + assetBomHeaders.size + assetBom.size + assetMovements.size + pmChecklist.size +
             notifications.size + operations.size + confirmations.size + photos.size +
             taskLists.size + taskListOperations.size + permits.size
 
     companion object {
-        const val CURRENT_FORMAT_VERSION = 1
+        const val CURRENT_FORMAT_VERSION = 3
     }
 }

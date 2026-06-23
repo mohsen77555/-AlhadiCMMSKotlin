@@ -1,0 +1,177 @@
+name: App3 Backend Stage 1
+
+on:
+  push:
+    branches: ["App3"]
+    paths:
+      - ".github/workflows/app3-assets-stage3.yml"
+      - "scripts/app3_backend_stage1.py"
+      - "scripts/app3_backend_stage1_fix.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout App3
+        uses: actions/checkout@v4
+        with:
+          ref: App3
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Generate, test and publish backend foundation
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/app3_backend_stage1.py > backend-generate.log 2>&1
+          generate_status=$?
+          if [ "$generate_status" -eq 0 ]; then
+            python3 scripts/app3_backend_stage1_fix.py >> backend-generate.log 2>&1
+            generate_status=$?
+          fi
+
+          test_status=99
+          smoke_status=99
+          if [ "$generate_status" -eq 0 ]; then
+            gradle -p backend --no-daemon clean test installDist distZip > backend-build.log 2>&1
+            test_status=$?
+          else
+            echo "Backend build was not started because generation failed." > backend-build.log
+          fi
+
+          if [ "$generate_status" -eq 0 ] && [ "$test_status" -eq 0 ]; then
+            docker run -d --name alhadi-backend-postgres \
+              -e POSTGRES_DB=alhadi_cmms \
+              -e POSTGRES_USER=alhadi \
+              -e POSTGRES_PASSWORD=ci-database-password \
+              -p 54329:5432 postgres:16-alpine > backend-postgres.id
+
+            for attempt in $(seq 1 40); do
+              if docker exec alhadi-backend-postgres pg_isready -U alhadi -d alhadi_cmms >/dev/null 2>&1; then
+                break
+              fi
+              sleep 1
+            done
+
+            export APP_ENV=test
+            export PORT=18080
+            export DB_URL=jdbc:postgresql://127.0.0.1:54329/alhadi_cmms
+            export DB_USER=alhadi
+            export DB_PASSWORD=ci-database-password
+            export JWT_SECRET=ci-jwt-secret-that-is-longer-than-thirty-two-characters
+            export ORGANIZATION_CODE=DEFAULT
+            export ORGANIZATION_NAME="Alhadi Test"
+            export BOOTSTRAP_ADMIN_NAME="CI Administrator"
+            export BOOTSTRAP_ADMIN_USERNAME=ci-admin
+            export BOOTSTRAP_ADMIN_PASSWORD=CI-Strong-Password-1234
+            export CORS_HOSTS=localhost:18080
+
+            backend/build/install/alhadi-cmms-backend/bin/alhadi-cmms-backend > backend-server.log 2>&1 &
+            server_pid=$!
+            echo "$server_pid" > backend-server.pid
+
+            ready=0
+            for attempt in $(seq 1 45); do
+              if curl -fsS http://127.0.0.1:18080/health/ready > backend-health.json; then
+                ready=1
+                break
+              fi
+              sleep 1
+            done
+
+            if [ "$ready" -eq 1 ]; then
+              curl -fsS -X POST http://127.0.0.1:18080/api/v1/auth/login \
+                -H "Content-Type: application/json" \
+                -d '{"username":"ci-admin","password":"CI-Strong-Password-1234","organizationCode":"DEFAULT"}' \
+                > backend-login.json
+
+              python3 - <<'PY' > backend-smoke.log 2>&1
+          import json
+          from pathlib import Path
+
+          health = json.loads(Path("backend-health.json").read_text())
+          login = json.loads(Path("backend-login.json").read_text())
+          assert health["status"] == "UP", health
+          assert login["accessToken"], login
+          assert login["refreshToken"], login
+          assert login["user"]["role"] == "Admin", login
+          assert login["user"]["username"] == "ci-admin", login
+          print("Backend readiness and authentication smoke tests passed.")
+          PY
+              smoke_status=$?
+            else
+              echo "Backend readiness endpoint did not become available." > backend-smoke.log
+              smoke_status=1
+            fi
+
+            kill "$server_pid" >/dev/null 2>&1 || true
+            docker rm -f alhadi-backend-postgres >/dev/null 2>&1 || true
+          else
+            echo "Backend smoke test was not started because the build failed." > backend-smoke.log
+          fi
+
+          cat backend-generate.log
+          tail -n 220 backend-build.log
+          cat backend-smoke.log
+          cat backend-server.log 2>/dev/null || true
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ "$generate_status" -ne 0 ] || [ "$test_status" -ne 0 ] || [ "$smoke_status" -ne 0 ]; then
+            {
+              echo "Backend stage 1 diagnostics"
+              echo "generate_status=$generate_status"
+              echo "test_status=$test_status"
+              echo "smoke_status=$smoke_status"
+              echo
+              echo "--- generation ---"
+              tail -n 160 backend-generate.log
+              echo
+              echo "--- build and tests ---"
+              tail -n 280 backend-build.log
+              echo
+              echo "--- smoke test ---"
+              cat backend-smoke.log
+              echo
+              echo "--- server ---"
+              tail -n 220 backend-server.log 2>/dev/null || true
+            } > backend-stage1-status.txt
+            git add backend-stage1-status.txt
+            git commit -m "chore(app3): record backend stage 1 diagnostics [skip ci]" || true
+            git push origin HEAD:App3
+            exit 1
+          fi
+
+          rm -f backend-generate.log backend-build.log backend-smoke.log backend-server.log \
+            backend-health.json backend-login.json backend-postgres.id backend-server.pid
+          git rm -f backend-stage1-status.txt 2>/dev/null || true
+          git add backend docker-compose.backend.yml .env.backend.example
+          if git diff --cached --quiet; then
+            echo "No backend changes to commit"
+            exit 1
+          fi
+          git commit -m "feat(backend): add secure API foundation"
+          git push origin HEAD:App3
+
+      - name: Upload backend distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: App3-backend-stage1
+          path: backend/build/distributions/*
+          if-no-files-found: error

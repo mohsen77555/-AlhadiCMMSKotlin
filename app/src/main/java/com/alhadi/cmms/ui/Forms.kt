@@ -1,5 +1,6 @@
 package com.alhadi.cmms.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +19,12 @@ import java.util.Locale
 import java.util.TimeZone
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,12 +36,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +57,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alhadi.cmms.data.MovementType
+import com.alhadi.cmms.data.SerialInstallRequest
+import com.alhadi.cmms.data.SerialMasterRequest
+import com.alhadi.cmms.data.SerialTransferRequest
+import com.alhadi.cmms.data.SerializedIssueRequest
+import com.alhadi.cmms.data.SerializedReceiptRequest
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
@@ -62,6 +73,8 @@ import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
@@ -70,6 +83,8 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 
 // ---------------------------------------------------------------------------
@@ -98,43 +113,86 @@ internal fun ConfirmDialog(
 internal fun StatusPickerDialog(
     current: String,
     options: List<String>,
-    onPick: (String) -> Unit,
+    isAdmin: Boolean = false,
+    onPick: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("تغيير حالة الأصل", fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                options.forEach { opt ->
-                    TextButton(onClick = { onPick(opt) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            (if (opt == current) "• " else "") + opt,
-                            modifier = Modifier.fillMaxWidth(),
-                            fontWeight = if (opt == current) FontWeight.Bold else FontWeight.Normal
-                        )
+    // States that require a reason (Change Status rule) and those that need approval (Retire/Dispose).
+    val reasonStates = setOf("Stopped", "Retired", "Disposed")
+    val approvalStates = setOf("Retired", "Disposed")
+    var selected by remember { mutableStateOf<String?>(null) }
+    var reason by remember { mutableStateOf("") }
+
+    val target = selected
+    if (target == null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("تغيير حالة الأصل", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    options.forEach { opt ->
+                        val needsApproval = opt in approvalStates
+                        val blocked = needsApproval && !isAdmin
+                        TextButton(onClick = { if (!blocked) selected = opt }, enabled = !blocked, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                (if (opt == current) "• " else "") + opt +
+                                    (if (needsApproval) " (يتطلب اعتماد)" else ""),
+                                modifier = Modifier.fillMaxWidth(),
+                                fontWeight = if (opt == current) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                    if (!isAdmin) {
+                        Text("الإيقاف النهائي/الاستبعاد (تقاعد/استبعاد) يتطلب صلاحية اعتماد.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } }
-    )
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } }
+        )
+    } else {
+        val needsReason = target in reasonStates
+        AlertDialog(
+            onDismissRequest = { selected = null },
+            title = { Text("تأكيد: $target", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (target in approvalStates) {
+                        Text("هذا الإجراء يتطلب اعتماداً وسبباً.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (needsReason) {
+                        LabeledField("السبب", reason, { reason = it }, singleLine = false)
+                    } else {
+                        Text("تأكيد تغيير الحالة إلى $target؟")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { onPick(target, reason.trim()) },
+                    enabled = !needsReason || reason.isNotBlank()
+                ) { Text("تأكيد") }
+            },
+            dismissButton = { TextButton(onClick = { selected = null }) { Text("رجوع") } }
+        )
+    }
 }
 
 @Composable
-private fun LabeledField(
+internal fun LabeledField(
     label: String,
     value: String,
     onChange: (String) -> Unit,
     numeric: Boolean = false,
-    singleLine: Boolean = true
+    singleLine: Boolean = true,
+    enabled: Boolean = true
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
         singleLine = singleLine,
+        enabled = enabled,
         keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
         modifier = Modifier.fillMaxWidth()
     )
@@ -143,7 +201,7 @@ private fun LabeledField(
 /** A read-only date field (YYYY-MM-DD) backed by a Material date picker instead of manual typing. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateField(label: String, value: String, onChange: (String) -> Unit) {
+internal fun DateField(label: String, value: String, onChange: (String) -> Unit) {
     var showPicker by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
@@ -175,16 +233,16 @@ private fun DateField(label: String, value: String, onChange: (String) -> Unit) 
     }
 }
 
-private fun dateFormatterUtc() =
+internal fun dateFormatterUtc() =
     SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
 
-private fun parseDateMillis(date: String): Long? =
+internal fun parseDateMillis(date: String): Long? =
     runCatching { dateFormatterUtc().parse(date)?.time }.getOrNull()
 
-private fun formatDateMillis(millis: Long): String = dateFormatterUtc().format(Date(millis))
+internal fun formatDateMillis(millis: Long): String = dateFormatterUtc().format(Date(millis))
 
 @Composable
-private fun OptionDropdown(
+internal fun OptionDropdown(
     label: String,
     options: List<String>,
     selected: String,
@@ -209,7 +267,7 @@ private fun OptionDropdown(
 }
 
 @Composable
-private fun AssetDropdown(assets: List<AssetEntity>, selectedId: Long, onSelect: (Long) -> Unit) {
+internal fun AssetDropdown(assets: List<AssetEntity>, selectedId: Long, onSelect: (Long) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val selected = assets.firstOrNull { it.id == selectedId }
     Column {
@@ -235,7 +293,7 @@ private fun AssetDropdown(assets: List<AssetEntity>, selectedId: Long, onSelect:
 
 /** Optional functional-location picker (with a "none" option). */
 @Composable
-private fun LocationDropdown(
+internal fun LocationDropdown(
     label: String,
     locations: List<FunctionalLocationEntity>,
     selectedId: Long?,
@@ -269,7 +327,7 @@ private fun LocationDropdown(
 
 /** Optional asset picker (with a "none" option). */
 @Composable
-private fun AssetDropdownOptional(
+internal fun AssetDropdownOptional(
     assets: List<AssetEntity>,
     selectedId: Long?,
     onSelect: (Long?) -> Unit,
@@ -320,7 +378,7 @@ internal fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composabl
 }
 
 @Composable
-private fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
+internal fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -333,1069 +391,84 @@ private fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Asset form
-// ---------------------------------------------------------------------------
 
 @Composable
-internal fun AssetFormSheet(
-    initial: AssetEntity?,
-    onDismiss: () -> Unit,
-    onSave: (AssetEntity) -> Unit,
-    locations: List<FunctionalLocationEntity> = emptyList(),
-    allAssets: List<AssetEntity> = emptyList()
-) {
-    var code by remember { mutableStateOf(initial?.code ?: "") }
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var group by remember { mutableStateOf(initial?.groupName ?: "") }
-    var location by remember { mutableStateOf(initial?.location ?: "") }
-    var manufacturer by remember { mutableStateOf(initial?.manufacturer ?: "") }
-    var model by remember { mutableStateOf(initial?.model ?: "") }
-    var status by remember { mutableStateOf(initial?.status ?: "Running") }
-    var criticality by remember { mutableStateOf(initial?.criticality ?: "Medium") }
-    var locationId by remember { mutableStateOf(initial?.locationId) }
-    var parentAssetId by remember { mutableStateOf(initial?.parentAssetId) }
-    var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
-    var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
-    var warrantyEnd by remember { mutableStateOf(initial?.warrantyEnd ?: "") }
-    var serialNumber by remember { mutableStateOf(initial?.serialNumber ?: "") }
-    var assetTag by remember { mutableStateOf(initial?.assetTag ?: "") }
-    var supplier by remember { mutableStateOf(initial?.supplier ?: "") }
-    var purchaseOrder by remember { mutableStateOf(initial?.purchaseOrder ?: "") }
-    var purchaseCost by remember { mutableStateOf((initial?.purchaseCost ?: 0.0).toString()) }
-    var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
-    var assetType by remember { mutableStateOf(initial?.assetType ?: "Equipment") }
-    var assetCategory by remember { mutableStateOf(initial?.assetCategory ?: "") }
-    var equipmentCategory by remember { mutableStateOf(initial?.equipmentCategory ?: "") }
-    var objectType by remember { mutableStateOf(initial?.objectType ?: "") }
-    var assetClass by remember { mutableStateOf(initial?.assetClass ?: "") }
-    var assetSubclass by remember { mutableStateOf(initial?.assetSubclass ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var longDescription by remember { mutableStateOf(initial?.longDescription ?: "") }
-    var alternativeLabel by remember { mutableStateOf(initial?.alternativeLabel ?: "") }
-    var externalAssetCode by remember { mutableStateOf(initial?.externalAssetCode ?: "") }
-    var legacyAssetCode by remember { mutableStateOf(initial?.legacyAssetCode ?: "") }
-    var barcode by remember { mutableStateOf(initial?.barcode ?: "") }
-    var qrCode by remember { mutableStateOf(initial?.qrCode ?: "") }
-    var companyId by remember { mutableStateOf(initial?.companyId ?: "") }
-    var siteId by remember { mutableStateOf(initial?.siteId ?: "") }
-    var plantId by remember { mutableStateOf(initial?.plantId ?: "") }
-    var maintenancePlantId by remember { mutableStateOf(initial?.maintenancePlantId ?: "") }
-    var planningPlantId by remember { mutableStateOf(initial?.planningPlantId ?: "") }
-    var workCenterId by remember { mutableStateOf(initial?.workCenterId ?: "") }
-    var plannerGroupId by remember { mutableStateOf(initial?.plannerGroupId ?: "") }
-    var costCenterId by remember { mutableStateOf(initial?.costCenterId ?: "") }
-    var departmentId by remember { mutableStateOf(initial?.departmentId ?: "") }
-    var responsiblePersonId by remember { mutableStateOf(initial?.responsiblePersonId ?: "") }
-    var constructionType by remember { mutableStateOf(initial?.constructionType ?: "") }
-    var commissioningAt by remember { mutableStateOf(initial?.commissioningAt ?: "") }
-    var financialAssetRef by remember { mutableStateOf(initial?.financialAssetRef ?: "") }
-    var notes by remember { mutableStateOf(initial?.notes ?: "") }
-    var partners by remember { mutableStateOf(initial?.partners ?: "") }
-    var safetyCritical by remember { mutableStateOf(initial?.safetyCritical == true) }
-    var riskLevel by remember { mutableStateOf(initial?.riskLevel ?: "") }
-    var requiredPermits by remember { mutableStateOf(initial?.requiredPermits ?: "") }
-    var safetyInstructions by remember { mutableStateOf(initial?.safetyInstructions ?: "") }
-    var ppeRequired by remember { mutableStateOf(initial?.ppeRequired ?: "") }
-    var isolationRequired by remember { mutableStateOf(initial?.isolationRequired == true) }
-    var complianceRequirements by remember { mutableStateOf(initial?.complianceRequirements ?: "") }
-    var financialStatus by remember { mutableStateOf(initial?.financialStatus ?: "") }
-    var bookValue by remember { mutableStateOf((initial?.bookValue ?: 0.0).toString()) }
-    var capitalizationAt by remember { mutableStateOf(initial?.capitalizationAt ?: "") }
-    var linearStartPoint by remember { mutableStateOf(initial?.linearStartPoint ?: "") }
-    var linearEndPoint by remember { mutableStateOf(initial?.linearEndPoint ?: "") }
-    var linearLength by remember { mutableStateOf((initial?.linearLength ?: 0.0).toString()) }
-    var linearUnit by remember { mutableStateOf(initial?.linearUnit ?: "") }
-    var linearRoute by remember { mutableStateOf(initial?.linearRoute ?: "") }
-
-    FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
-        LabeledField("الكود (Code)", code, { code = it })
-        LabeledField("الاسم (Name)", name, { name = it })
-        OptionDropdown("نوع الأصل", listOf("Equipment", "Functional Location", "Linear Asset", "Tool Asset", "Safety Asset", "Utility Asset", "Production Asset", "Mobile Asset", "Serialized Component", "Refurbishable Component"), assetType) { assetType = it }
-        LabeledField("فئة الأصل", assetCategory, { assetCategory = it })
-        LabeledField("فئة المعدة", equipmentCategory, { equipmentCategory = it })
-        LabeledField("نوع الكائن الفني", objectType, { objectType = it })
-        LabeledField("تصنيف الأصل", assetClass, { assetClass = it })
-        LabeledField("التصنيف الفرعي", assetSubclass, { assetSubclass = it })
-        LabeledField("الوصف", description, { description = it })
-        LabeledField("الوصف التفصيلي", longDescription, { longDescription = it })
-        LabeledField("تسمية بديلة", alternativeLabel, { alternativeLabel = it })
-        LabeledField("كود الأصل الخارجي", externalAssetCode, { externalAssetCode = it })
-        LabeledField("كود الأصل القديم", legacyAssetCode, { legacyAssetCode = it })
-        LabeledField("Barcode", barcode, { barcode = it })
-        LabeledField("QR Code", qrCode, { qrCode = it })
-        LabeledField("المجموعة (Group)", group, { group = it })
-        LabeledField("الموقع النصّي (Location)", location, { location = it })
-        if (locations.isNotEmpty()) {
-            LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
-        }
-        if (allAssets.isNotEmpty()) {
-            AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
-        }
-        LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
-        LabeledField("الموديل (Model)", model, { model = it })
-        LabeledField("نوع البناء / Construction Type", constructionType, { constructionType = it })
-        OptionDropdown("الحالة", listOf("Draft", "Active", "Running", "Standby", "Under Maintenance", "Breakdown", "Stopped", "Out of Service", "In Storage", "Sent to Vendor", "Refurbishment", "Retired", "Disposed", "Inactive"), status) { status = it }
-        OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
-        Text("التنظيم والمسؤولية", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        LabeledField("الشركة", companyId, { companyId = it })
-        LabeledField("الموقع العام", siteId, { siteId = it })
-        LabeledField("المصنع / الموقع التشغيلي", plantId, { plantId = it })
-        LabeledField("موقع الصيانة", maintenancePlantId, { maintenancePlantId = it })
-        LabeledField("موقع التخطيط", planningPlantId, { planningPlantId = it })
-        LabeledField("مركز العمل", workCenterId, { workCenterId = it })
-        LabeledField("مجموعة التخطيط", plannerGroupId, { plannerGroupId = it })
-        LabeledField("مركز التكلفة", costCenterId, { costCenterId = it })
-        LabeledField("الإدارة المالكة", departmentId, { departmentId = it })
-        LabeledField("المسؤول", responsiblePersonId, { responsiblePersonId = it })
-        LabeledField("الشركاء والمسؤولون", partners, { partners = it })
-        Text("الهوية والمعلومات المالية (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        LabeledField("الرقم التسلسلي (Serial)", serialNumber, { serialNumber = it })
-        LabeledField("وسم الأصل (Asset Tag)", assetTag, { assetTag = it })
-        LabeledField("المورّد (Supplier)", supplier, { supplier = it })
-        LabeledField("أمر الشراء (PO)", purchaseOrder, { purchaseOrder = it })
-        LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
-        DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
-        DateField("تاريخ التشغيل / Commissioning", commissioningAt) { commissioningAt = it }
-        LabeledField("مرجع الأصل المالي", financialAssetRef, { financialAssetRef = it })
-        LabeledField("الحالة المالية", financialStatus, { financialStatus = it })
-        LabeledField("القيمة الدفترية", bookValue, { bookValue = it }, numeric = true)
-        DateField("تاريخ الرسملة", capitalizationAt) { capitalizationAt = it }
-        Text("الضمان (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
-        DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
-        DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
-        Text("السلامة والامتثال", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        OptionDropdown("حرج للسلامة", listOf("No", "Yes"), if (safetyCritical) "Yes" else "No") { safetyCritical = it == "Yes" }
-        LabeledField("مستوى الخطر", riskLevel, { riskLevel = it })
-        LabeledField("التصاريح المطلوبة", requiredPermits, { requiredPermits = it })
-        LabeledField("تعليمات السلامة", safetyInstructions, { safetyInstructions = it })
-        LabeledField("معدات الوقاية PPE", ppeRequired, { ppeRequired = it })
-        OptionDropdown("يتطلب عزل", listOf("No", "Yes"), if (isolationRequired) "Yes" else "No") { isolationRequired = it == "Yes" }
-        LabeledField("متطلبات الامتثال", complianceRequirements, { complianceRequirements = it })
-        Text("بيانات الأصل الخطي (إن وجدت)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        LabeledField("نقطة البداية", linearStartPoint, { linearStartPoint = it })
-        LabeledField("نقطة النهاية", linearEndPoint, { linearEndPoint = it })
-        LabeledField("الطول", linearLength, { linearLength = it }, numeric = true)
-        LabeledField("وحدة الطول", linearUnit, { linearUnit = it })
-        LabeledField("المسار", linearRoute, { linearRoute = it })
-        LabeledField("ملاحظات", notes, { notes = it })
-        SaveButton(code.isNotBlank() && name.isNotBlank() && assetType.isNotBlank() && assetCategory.isNotBlank()) {
-            val today = DateStrings.today()
-            onSave(
-                AssetEntity(
-                    id = initial?.id ?: 0,
-                    code = code.trim(),
-                    name = name.trim(),
-                    groupName = group.ifBlank { "General" },
-                    location = location,
-                    manufacturer = manufacturer,
-                    model = model,
-                    status = status,
-                    criticality = criticality,
-                    installedAt = initial?.installedAt ?: today,
-                    lastInspectionAt = initial?.lastInspectionAt ?: today,
-                    locationId = locationId,
-                    warrantyProvider = warrantyProvider.trim(),
-                    warrantyStart = warrantyStart.trim(),
-                    warrantyEnd = warrantyEnd.trim(),
-                    parentAssetId = parentAssetId,
-                    serialNumber = serialNumber.trim(),
-                    assetTag = assetTag.trim(),
-                    supplier = supplier.trim(),
-                    purchaseOrder = purchaseOrder.trim(),
-                    purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
-                    acquiredAt = acquiredAt.trim(),
-                    assetType = assetType,
-                    assetCategory = assetCategory.trim(),
-                    equipmentCategory = equipmentCategory.trim(),
-                    objectType = objectType.trim(),
-                    assetClass = assetClass.trim(),
-                    assetSubclass = assetSubclass.trim(),
-                    description = description.trim(),
-                    longDescription = longDescription.trim(),
-                    alternativeLabel = alternativeLabel.trim(),
-                    externalAssetCode = externalAssetCode.trim(),
-                    legacyAssetCode = legacyAssetCode.trim(),
-                    barcode = barcode.trim(),
-                    qrCode = qrCode.trim(),
-                    companyId = companyId.trim(),
-                    siteId = siteId.trim(),
-                    plantId = plantId.trim(),
-                    maintenancePlantId = maintenancePlantId.trim(),
-                    planningPlantId = planningPlantId.trim(),
-                    workCenterId = workCenterId.trim(),
-                    plannerGroupId = plannerGroupId.trim(),
-                    costCenterId = costCenterId.trim(),
-                    departmentId = departmentId.trim(),
-                    responsiblePersonId = responsiblePersonId.trim(),
-                    constructionType = constructionType.trim(),
-                    commissioningAt = commissioningAt.trim(),
-                    financialAssetRef = financialAssetRef.trim(),
-                    notes = notes.trim(),
-                    partners = partners.trim(),
-                    safetyCritical = safetyCritical,
-                    riskLevel = riskLevel.trim(),
-                    requiredPermits = requiredPermits.trim(),
-                    safetyInstructions = safetyInstructions.trim(),
-                    ppeRequired = ppeRequired.trim(),
-                    isolationRequired = isolationRequired,
-                    complianceRequirements = complianceRequirements.trim(),
-                    financialStatus = financialStatus.trim(),
-                    bookValue = bookValue.toDoubleOrNull() ?: 0.0,
-                    capitalizationAt = capitalizationAt.trim(),
-                    linearStartPoint = linearStartPoint.trim(),
-                    linearEndPoint = linearEndPoint.trim(),
-                    linearLength = linearLength.toDoubleOrNull() ?: 0.0,
-                    linearUnit = linearUnit.trim(),
-                    linearRoute = linearRoute.trim()
-                )
-            )
-        }
-    }
-}
-
-@Composable
-internal fun LocationFormSheet(
-    initial: FunctionalLocationEntity?,
-    allLocations: List<FunctionalLocationEntity>,
-    onDismiss: () -> Unit,
-    onSave: (FunctionalLocationEntity) -> Unit
-) {
-    var code by remember { mutableStateOf(initial?.code ?: "") }
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var parentId by remember { mutableStateOf(initial?.parentId) }
-    var status by remember { mutableStateOf(initial?.status ?: "Active") }
-
-    FormSheet(if (initial == null) "إضافة موقع فني" else "تعديل الموقع الفني", onDismiss) {
-        LabeledField("الكود (Code)", code, { code = it })
-        LabeledField("الاسم (Name)", name, { name = it })
-        LabeledField("الوصف", description, { description = it }, singleLine = false)
-        LocationDropdown("الموقع الأعلى (Parent)", allLocations, parentId, excludeId = initial?.id) { parentId = it }
-        OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
-        SaveButton(code.isNotBlank() && name.isNotBlank()) {
-            onSave(
-                FunctionalLocationEntity(
-                    id = initial?.id ?: 0,
-                    code = code.trim(),
-                    name = name.trim(),
-                    parentId = parentId,
-                    description = description,
-                    status = status
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Spare part form
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun PartFormSheet(initial: SparePartEntity?, onDismiss: () -> Unit, onSave: (SparePartEntity) -> Unit) {
-    var partNumber by remember { mutableStateOf(initial?.partNumber ?: "") }
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var group by remember { mutableStateOf(initial?.equipmentGroup ?: "") }
-    var unit by remember { mutableStateOf(initial?.unit ?: "pcs") }
-    var onHand by remember { mutableStateOf((initial?.onHandQty ?: 0).toString()) }
-    var minQty by remember { mutableStateOf((initial?.minQty ?: 0).toString()) }
-    var location by remember { mutableStateOf(initial?.location ?: "") }
-    var price by remember { mutableStateOf((initial?.lastPrice ?: 0.0).toString()) }
-
-    FormSheet(if (initial == null) "إضافة قطعة غيار" else "تعديل القطعة", onDismiss) {
-        LabeledField("رقم القطعة (Part No.)", partNumber, { partNumber = it })
-        LabeledField("الاسم (Name)", name, { name = it })
-        LabeledField("مجموعة المعدة", group, { group = it })
-        LabeledField("الوحدة (Unit)", unit, { unit = it })
-        LabeledField("الكمية المتوفرة", onHand, { onHand = it }, numeric = true)
-        LabeledField("الحد الأدنى", minQty, { minQty = it }, numeric = true)
-        LabeledField("الموقع (Location)", location, { location = it })
-        LabeledField("آخر سعر", price, { price = it }, numeric = true)
-        SaveButton(partNumber.isNotBlank() && name.isNotBlank()) {
-            onSave(
-                SparePartEntity(
-                    id = initial?.id ?: 0,
-                    partNumber = partNumber.trim(),
-                    name = name.trim(),
-                    equipmentGroup = group.ifBlank { "General" },
-                    unit = unit.ifBlank { "pcs" },
-                    onHandQty = onHand.toIntOrNull() ?: 0,
-                    minQty = minQty.toIntOrNull() ?: 0,
-                    location = location,
-                    lastPrice = price.toDoubleOrNull() ?: 0.0
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Work order form (create + edit)
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun WorkOrderFormSheet(
-    initial: WorkOrderEntity?,
-    assets: List<AssetEntity>,
-    defaultAssignee: String,
-    onDismiss: () -> Unit,
-    onSave: (WorkOrderEntity) -> Unit
-) {
-    var title by remember { mutableStateOf(initial?.title ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var assetId by remember { mutableStateOf(initial?.assetId ?: assets.firstOrNull()?.id ?: 0L) }
-    var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
-    var status by remember { mutableStateOf(initial?.status ?: "Open") }
-    var assignedTo by remember { mutableStateOf(initial?.assignedTo ?: defaultAssignee) }
-    var cost by remember { mutableStateOf((initial?.estimatedCost ?: 0.0).toString()) }
-    var dueDays by remember { mutableStateOf("3") }
-    var isFailure by remember { mutableStateOf(initial?.isFailure ?: false) }
-    var downtime by remember { mutableStateOf((initial?.downtimeHours ?: 0.0).toString()) }
-    var laborHours by remember { mutableStateOf((initial?.laborHours ?: 0.0).toString()) }
-    var laborRate by remember { mutableStateOf((initial?.laborRate ?: 0.0).toString()) }
-    var partsCost by remember { mutableStateOf((initial?.partsCost ?: 0.0).toString()) }
-    var requiresPermit by remember { mutableStateOf(initial?.requiresPermit ?: false) }
-
-    FormSheet(if (initial == null) "إنشاء أمر عمل" else "تعديل أمر العمل", onDismiss) {
-        LabeledField("العنوان", title, { title = it })
-        LabeledField("الوصف", description, { description = it }, singleLine = false)
-        AssetDropdown(assets, assetId) { assetId = it }
-        OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
-        OptionDropdown("الحالة", listOf("Open", "In Progress", "Technically Completed", "Closed"), status) { status = it }
-        LabeledField("المسؤول", assignedTo, { assignedTo = it })
-        LabeledField("التكلفة التقديرية", cost, { cost = it }, numeric = true)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.weight(1f)) { LabeledField("ساعات العمالة", laborHours, { laborHours = it }, numeric = true) }
-            Box(modifier = Modifier.weight(1f)) { LabeledField("أجر الساعة", laborRate, { laborRate = it }, numeric = true) }
-        }
-        LabeledField("تكلفة قطع الغيار", partsCost, { partsCost = it }, numeric = true)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("عطل (Breakdown)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = isFailure, onCheckedChange = { isFailure = it })
-        }
-        if (isFailure) {
-            LabeledField("مدة التوقف (ساعات)", downtime, { downtime = it }, numeric = true)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("يتطلّب تصريح عمل (خطر)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = requiresPermit, onCheckedChange = { requiresPermit = it })
-        }
-        if (initial == null) {
-            LabeledField("الاستحقاق خلال (أيام)", dueDays, { dueDays = it }, numeric = true)
-        }
-        SaveButton(title.isNotBlank() && assetId != 0L) {
-            val today = DateStrings.today()
-            val due = initial?.dueAt ?: DateStrings.daysFromToday(dueDays.toIntOrNull() ?: 3)
-            onSave(
-                WorkOrderEntity(
-                    id = initial?.id ?: 0,
-                    assetId = assetId,
-                    title = title.trim(),
-                    description = description,
-                    priority = priority,
-                    status = status,
-                    assignedTo = assignedTo.ifBlank { defaultAssignee },
-                    createdAt = initial?.createdAt ?: today,
-                    dueAt = due,
-                    estimatedCost = cost.toDoubleOrNull() ?: 0.0,
-                    closeNotes = initial?.closeNotes ?: "",
-                    isFailure = isFailure,
-                    downtimeHours = if (isFailure) downtime.toDoubleOrNull() ?: 0.0 else 0.0,
-                    laborHours = laborHours.toDoubleOrNull() ?: 0.0,
-                    laborRate = laborRate.toDoubleOrNull() ?: 0.0,
-                    partsCost = partsCost.toDoubleOrNull() ?: 0.0,
-                    approvalStatus = initial?.approvalStatus ?: "NotRequired",
-                    approvedBy = initial?.approvedBy ?: "",
-                    requiresPermit = requiresPermit
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Work permit form (تصريح عمل)
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun PermitFormSheet(
-    orderId: Long,
-    onDismiss: () -> Unit,
-    onSave: (WorkPermitEntity) -> Unit
-) {
-    var type by remember { mutableStateOf("LOTO") }
-    var hazards by remember { mutableStateOf("") }
-    var ppe by remember { mutableStateOf("") }
-    var validDays by remember { mutableStateOf("1") }
-
-    FormSheet("إصدار تصريح عمل", onDismiss) {
-        OptionDropdown("نوع التصريح", listOf("LOTO", "Hot Work", "Confined Space", "Electrical", "Working at Height", "General"), type) { type = it }
-        LabeledField("المخاطر", hazards, { hazards = it }, singleLine = false)
-        LabeledField("معدات الوقاية المطلوبة", ppe, { ppe = it }, singleLine = false)
-        LabeledField("صلاحية التصريح (أيام)", validDays, { validDays = it }, numeric = true)
-        SaveButton(true) {
-            onSave(
-                WorkPermitEntity(
-                    id = 0,
-                    orderId = orderId,
-                    type = type,
-                    hazards = hazards.trim(),
-                    ppe = ppe.trim(),
-                    status = "Pending",
-                    approvedBy = "",
-                    validUntil = DateStrings.daysFromToday(validDays.toIntOrNull() ?: 1),
-                    createdBy = "",
-                    createdAt = ""
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Preventive maintenance form
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun PmFormSheet(
-    initial: PreventiveMaintenanceEntity?,
-    assets: List<AssetEntity>,
-    taskLists: List<TaskListEntity>,
-    onDismiss: () -> Unit,
-    onSave: (PreventiveMaintenanceEntity) -> Unit
-) {
-    var title by remember { mutableStateOf(initial?.title ?: "") }
-    var assetId by remember { mutableStateOf(initial?.assetId ?: assets.firstOrNull()?.id ?: 0L) }
-    var frequency by remember { mutableStateOf((initial?.frequencyDays ?: 30).toString()) }
-    var duration by remember { mutableStateOf((initial?.estimatedDurationMinutes ?: 60).toString()) }
-    var taskListId by remember { mutableStateOf(initial?.taskListId) }
-
-    FormSheet(if (initial == null) "إضافة صيانة دورية" else "تعديل الصيانة الدورية", onDismiss) {
-        LabeledField("عنوان المهمة", title, { title = it })
-        AssetDropdown(assets, assetId) { assetId = it }
-        LabeledField("التكرار (أيام)", frequency, { frequency = it }, numeric = true)
-        LabeledField("المدة المقدرة (دقائق)", duration, { duration = it }, numeric = true)
-        if (taskLists.isNotEmpty()) {
-            TaskListDropdown(taskLists, taskListId) { taskListId = it }
-        }
-        SaveButton(title.isNotBlank() && assetId != 0L) {
-            val today = DateStrings.today()
-            val freq = frequency.toIntOrNull() ?: 30
-            onSave(
-                PreventiveMaintenanceEntity(
-                    id = initial?.id ?: 0,
-                    assetId = assetId,
-                    title = title.trim(),
-                    frequencyDays = freq,
-                    lastDoneAt = initial?.lastDoneAt ?: today,
-                    nextDueAt = initial?.nextDueAt ?: DateStrings.daysFromToday(freq),
-                    status = initial?.status ?: "Scheduled",
-                    estimatedDurationMinutes = duration.toIntOrNull() ?: 60,
-                    taskListId = taskListId
-                )
-            )
-        }
-    }
-}
-
-@Composable
-private fun TaskListDropdown(taskLists: List<TaskListEntity>, selectedId: Long?, onSelect: (Long?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    val selected = taskLists.firstOrNull { it.id == selectedId }
-    Column {
-        Text("قالب العمل (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(selected?.name ?: "بدون", modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
-                taskLists.forEach { tl ->
-                    DropdownMenuItem(text = { Text(tl.name) }, onClick = { onSelect(tl.id); open = false })
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Task list forms (قوالب العمل)
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun TaskListFormSheet(
-    initial: TaskListEntity?,
-    onDismiss: () -> Unit,
-    onSave: (TaskListEntity) -> Unit
-) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var workCenter by remember { mutableStateOf(initial?.defaultWorkCenter ?: "Mechanical") }
-
-    FormSheet(if (initial == null) "قالب عمل جديد" else "تعديل القالب", onDismiss) {
-        LabeledField("اسم القالب", name, { name = it })
-        LabeledField("الوصف", description, { description = it }, singleLine = false)
-        OptionDropdown("مركز العمل الافتراضي", listOf("Mechanical", "Electrical", "Instrumentation", "Civil", "External"), workCenter) { workCenter = it }
-        SaveButton(name.isNotBlank()) {
-            onSave(
-                TaskListEntity(
-                    id = initial?.id ?: 0,
-                    name = name.trim(),
-                    description = description.trim(),
-                    defaultWorkCenter = workCenter
-                )
-            )
-        }
-    }
-}
-
-@Composable
-internal fun TaskListOperationFormSheet(
-    taskListId: Long,
-    defaultWorkCenter: String,
-    nextNumber: String,
-    onDismiss: () -> Unit,
-    onSave: (TaskListOperationEntity) -> Unit
-) {
-    var operationNumber by remember { mutableStateOf(nextNumber) }
-    var description by remember { mutableStateOf("") }
-    var workCenter by remember { mutableStateOf(defaultWorkCenter.ifBlank { "Mechanical" }) }
-    var plannedHours by remember { mutableStateOf("1") }
-
-    FormSheet("إضافة عملية للقالب", onDismiss) {
-        LabeledField("رقم العملية", operationNumber, { operationNumber = it })
-        LabeledField("الوصف", description, { description = it }, singleLine = false)
-        OptionDropdown("مركز العمل", listOf("Mechanical", "Electrical", "Instrumentation", "Civil", "External"), workCenter) { workCenter = it }
-        LabeledField("الساعات المخططة", plannedHours, { plannedHours = it }, numeric = true)
-        SaveButton(description.isNotBlank()) {
-            onSave(
-                TaskListOperationEntity(
-                    id = 0,
-                    taskListId = taskListId,
-                    operationNumber = operationNumber.trim().ifBlank { nextNumber },
-                    description = description.trim(),
-                    workCenter = workCenter,
-                    plannedHours = plannedHours.toDoubleOrNull() ?: 0.0
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// User form
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Measuring point form + reading dialog
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun MeterFormSheet(
-    initial: MeasuringPointEntity?,
-    assets: List<AssetEntity>,
-    onDismiss: () -> Unit,
-    onSave: (MeasuringPointEntity) -> Unit
-) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var unit by remember { mutableStateOf(initial?.unit ?: "") }
-    var assetId by remember { mutableStateOf(initial?.assetId ?: assets.firstOrNull()?.id ?: 0L) }
-    var isCounter by remember { mutableStateOf(initial?.isCounter ?: false) }
-    var limit by remember { mutableStateOf(initial?.upperLimit?.toString() ?: "") }
-
-    FormSheet(if (initial == null) "إضافة نقطة قياس" else "تعديل نقطة القياس", onDismiss) {
-        LabeledField("اسم النقطة", name, { name = it })
-        LabeledField("الوحدة (hr / °C / mm/s ...)", unit, { unit = it })
-        AssetDropdown(assets, assetId) { assetId = it }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("عداد تراكمي", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = isCounter, onCheckedChange = { isCounter = it })
-        }
-        LabeledField("الحد الأعلى للتنبيه (اختياري)", limit, { limit = it }, numeric = true)
-        SaveButton(name.isNotBlank() && unit.isNotBlank() && assetId != 0L) {
-            val today = DateStrings.today()
-            onSave(
-                MeasuringPointEntity(
-                    id = initial?.id ?: 0,
-                    assetId = assetId,
-                    name = name.trim(),
-                    unit = unit.trim(),
-                    isCounter = isCounter,
-                    upperLimit = limit.toDoubleOrNull(),
-                    lastReading = initial?.lastReading ?: 0.0,
-                    lastReadingAt = initial?.lastReadingAt ?: today
-                )
-            )
-        }
-    }
-}
-
-@Composable
-internal fun ReadingDialog(point: MeasuringPointEntity, onSubmit: (Double, String) -> Unit, onDismiss: () -> Unit) {
-    var value by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("تسجيل قراءة — ${point.name}", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("آخر قراءة: ${point.lastReading} ${point.unit}", style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { value = it },
-                    label = { Text("القراءة (${point.unit})") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("ملاحظة (اختياري)") }, modifier = Modifier.fillMaxWidth())
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = value.toDoubleOrNull() != null,
-                onClick = { value.toDoubleOrNull()?.let { onSubmit(it, note) } }
-            ) { Text("تسجيل") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
-    )
-}
-
-// ---------------------------------------------------------------------------
-// Asset BOM form
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun PartDropdown(parts: List<SparePartEntity>, selectedId: Long, onSelect: (Long) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    val selected = parts.firstOrNull { it.id == selectedId }
-    Column {
-        Text("القطعة", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    selected?.let { "${it.partNumber} • ${it.name}" } ?: "اختر قطعة",
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                parts.forEach { part ->
-                    DropdownMenuItem(text = { Text("${part.partNumber} • ${part.name}") }, onClick = { onSelect(part.id); open = false })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun BomFormSheet(
-    initial: AssetBomItemEntity?,
-    assetId: Long,
-    parts: List<SparePartEntity>,
-    onDismiss: () -> Unit,
-    onSave: (AssetBomItemEntity) -> Unit
-) {
-    var partId by remember { mutableStateOf(initial?.partId ?: parts.firstOrNull()?.id ?: 0L) }
-    var quantity by remember { mutableStateOf((initial?.quantity ?: 1).toString()) }
-
-    FormSheet(if (initial == null) "إضافة بند مكوّنات" else "تعديل البند", onDismiss) {
-        PartDropdown(parts, partId) { partId = it }
-        LabeledField("الكمية", quantity, { quantity = it }, numeric = true)
-        SaveButton(partId != 0L && (quantity.toIntOrNull() ?: 0) > 0) {
-            onSave(
-                AssetBomItemEntity(
-                    id = initial?.id ?: 0,
-                    assetId = assetId,
-                    partId = partId,
-                    quantity = quantity.toIntOrNull() ?: 1
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Asset characteristic form
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun CharacteristicFormSheet(
-    initial: AssetCharacteristicEntity?,
-    assetId: Long,
-    onDismiss: () -> Unit,
-    onSave: (AssetCharacteristicEntity) -> Unit
-) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var value by remember { mutableStateOf(initial?.value ?: "") }
-    var unit by remember { mutableStateOf(initial?.unit ?: "") }
-
-    FormSheet(if (initial == null) "إضافة خاصية" else "تعديل الخاصية", onDismiss) {
-        LabeledField("اسم الخاصية", name, { name = it })
-        LabeledField("القيمة", value, { value = it })
-        LabeledField("الوحدة (اختياري)", unit, { unit = it })
-        SaveButton(name.isNotBlank() && value.isNotBlank()) {
-            onSave(
-                AssetCharacteristicEntity(
-                    id = initial?.id ?: 0,
-                    assetId = assetId,
-                    name = name.trim(),
-                    value = value.trim(),
-                    unit = unit.trim()
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Asset document form
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun DocumentFormSheet(
-    initial: AssetDocumentEntity?,
-    assetId: Long,
-    onDismiss: () -> Unit,
-    onSave: (AssetDocumentEntity) -> Unit
-) {
-    var type by remember { mutableStateOf(initial?.type ?: "Manual") }
-    var title by remember { mutableStateOf(initial?.title ?: "") }
-    var reference by remember { mutableStateOf(initial?.reference ?: "") }
-
-    FormSheet(if (initial == null) "إضافة مستند" else "تعديل المستند", onDismiss) {
-        OptionDropdown("النوع", listOf("Manual", "Drawing", "Certificate", "Image", "Report", "Other"), type) { type = it }
-        LabeledField("العنوان", title, { title = it })
-        LabeledField("المرجع (رابط/مسار/ملاحظة)", reference, { reference = it }, singleLine = false)
-        SaveButton(title.isNotBlank()) {
-            onSave(
-                AssetDocumentEntity(
-                    id = initial?.id ?: 0,
-                    assetId = assetId,
-                    type = type,
-                    title = title.trim(),
-                    reference = reference.trim(),
-                    uploadedBy = initial?.uploadedBy ?: "",
-                    uploadedAt = initial?.uploadedAt ?: ""
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// PM checklist item form
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun ChecklistItemFormSheet(
-    pmId: Long,
-    nextOrder: Int,
-    onDismiss: () -> Unit,
-    onSave: (PmChecklistItemEntity) -> Unit
-) {
-    var text by remember { mutableStateOf("") }
-
-    FormSheet("إضافة بند فحص", onDismiss) {
-        LabeledField("نص البند", text, { text = it }, singleLine = false)
-        SaveButton(text.isNotBlank()) {
-            onSave(
-                PmChecklistItemEntity(
-                    id = 0,
-                    pmId = pmId,
-                    text = text.trim(),
-                    result = "",
-                    note = "",
-                    orderIndex = nextOrder
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Asset movement form (install / transfer / dismantle / retire)
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun MovementFormSheet(
+internal fun LinearMaintenancePositionFields(
     asset: AssetEntity,
-    locations: List<FunctionalLocationEntity>,
-    onDismiss: () -> Unit,
-    onSave: (type: String, locId: Long?, locName: String, notes: String) -> Unit
+    startPoint: String,
+    onStartPointChange: (String) -> Unit,
+    endPoint: String,
+    onEndPointChange: (String) -> Unit,
+    marker: String,
+    onMarkerChange: (String) -> Unit,
+    horizontalOffset: String,
+    onHorizontalOffsetChange: (String) -> Unit,
+    verticalOffset: String,
+    onVerticalOffsetChange: (String) -> Unit
 ) {
-    var type by remember { mutableStateOf(MovementType.INSTALL) }
-    var locId by remember { mutableStateOf<Long?>(asset.locationId) }
-    var notes by remember { mutableStateOf("") }
-    val needsLocation = type == MovementType.INSTALL || type == MovementType.TRANSFER
-
-    FormSheet("حركة الأصل: ${asset.code}", onDismiss) {
-        OptionDropdown(
-            "نوع الحركة",
-            MovementType.all,
-            type,
-            display = { MovementType.label(it) },
-            onSelect = { type = it }
-        )
-        if (needsLocation) {
-            LocationDropdown("الموقع الوجهة", locations, locId, onSelect = { locId = it })
+    Text("الموقع على الأصل الخطي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text(
+        "النطاق المتاح: ${linearRangeLabel(asset)}",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.weight(1f)) {
+            LabeledField("نقطة البداية (${asset.linearUnit})", startPoint, onStartPointChange, numeric = true)
         }
-        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
-        SaveButton(!needsLocation || locId != null) {
-            val name = locations.firstOrNull { it.id == locId }?.name ?: ""
-            onSave(type, if (needsLocation) locId else null, if (needsLocation) name else "", notes.trim())
+        Box(modifier = Modifier.weight(1f)) {
+            LabeledField("نقطة النهاية (${asset.linearUnit})", endPoint, onEndPointChange, numeric = true)
         }
+    }
+    LabeledField("العلامة المرجعية (اختياري)", marker, onMarkerChange)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.weight(1f)) {
+            LabeledField("إزاحة أفقية (${asset.linearOffsetUnit})", horizontalOffset, onHorizontalOffsetChange, numeric = true)
+        }
+        Box(modifier = Modifier.weight(1f)) {
+            LabeledField("إزاحة رأسية (${asset.linearOffsetUnit})", verticalOffset, onVerticalOffsetChange, numeric = true)
+        }
+    }
+    if (!optionalLinearRangeValid(asset, startPoint, endPoint)) {
+        Text("يجب أن يكون النطاق داخل حدود الأصل وأن تكون النهاية أكبر من أو مساوية للبداية.", color = MaterialTheme.colorScheme.error)
     }
 }
 
-// ---------------------------------------------------------------------------
-// Operation confirmation form (تأكيد)
-// ---------------------------------------------------------------------------
-
+/**
+ * Dropdown sourced from organizational-unit master records of a given [type].
+ * Stores the unit code. Falls back to a free-text field when no master records of the
+ * type exist yet, and keeps any legacy non-matching value selectable (backward compatible).
+ */
 @Composable
-internal fun ConfirmationFormSheet(
-    operation: WorkOrderOperationEntity,
-    isFailureOrder: Boolean,
-    onDismiss: () -> Unit,
-    onSave: (WorkOrderConfirmationEntity) -> Unit
+internal fun OrgUnitDropdown(
+    label: String,
+    type: String,
+    orgUnits: List<OrgUnitEntity>,
+    value: String,
+    onChange: (String) -> Unit
 ) {
-    val remaining = (operation.plannedHours - operation.actualHours).let { if (it > 0) it else operation.plannedHours }
-    var actualWork by remember { mutableStateOf(remaining.toString()) }
-    var activityText by remember { mutableStateOf("") }
-    var damageFound by remember { mutableStateOf("") }
-    var causeFound by remember { mutableStateOf("") }
-    var actionTaken by remember { mutableStateOf("") }
-    var downtime by remember { mutableStateOf("0") }
-    var finalConfirmation by remember { mutableStateOf(true) }
-
-    FormSheet("تأكيد العملية ${operation.operationNumber}", onDismiss) {
-        LabeledField("الساعات الفعلية", actualWork, { actualWork = it }, numeric = true)
-        LabeledField("وصف العمل المنفذ", activityText, { activityText = it }, singleLine = false)
-        if (isFailureOrder) {
-            LabeledField("العطل المكتشف", damageFound, { damageFound = it })
-            LabeledField("السبب", causeFound, { causeFound = it })
-            LabeledField("زمن التوقف (ساعات)", downtime, { downtime = it }, numeric = true)
-        }
-        LabeledField("الإجراء المتخذ", actionTaken, { actionTaken = it }, singleLine = false)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("تأكيد نهائي (يُغلق العملية)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = finalConfirmation, onCheckedChange = { finalConfirmation = it })
-        }
-        SaveButton(actualWork.toDoubleOrNull() != null) {
-            onSave(
-                WorkOrderConfirmationEntity(
-                    id = 0,
-                    orderId = operation.orderId,
-                    operationId = operation.id,
-                    technician = "",
-                    workDate = "",
-                    actualWork = actualWork.toDoubleOrNull() ?: 0.0,
-                    activityText = activityText.trim(),
-                    damageFound = damageFound.trim(),
-                    causeFound = causeFound.trim(),
-                    actionTaken = actionTaken.trim(),
-                    downtime = downtime.toDoubleOrNull() ?: 0.0,
-                    finalConfirmation = finalConfirmation,
-                    createdAt = ""
-                )
-            )
-        }
+    val ofType = orgUnits.filter { it.type == type }
+    if (ofType.isEmpty()) {
+        LabeledField(label, value, onChange)
+        return
     }
+    val codes = ofType.map { it.code }
+    val legacy = if (value.isNotBlank() && value !in codes) listOf(value) else emptyList()
+    OptionDropdown(
+        label = label,
+        options = listOf("") + legacy + codes,
+        selected = value,
+        display = { code ->
+            if (code.isBlank()) "—"
+            else ofType.firstOrNull { it.code == code }?.let { "${it.code} • ${it.name}" + if (!it.isActive) " (غير نشط)" else "" } ?: code
+        }
+    ) { onChange(it) }
 }
 
-// ---------------------------------------------------------------------------
-// Work order operation form (عملية)
-// ---------------------------------------------------------------------------
-
+/** AST-ORG-010: marks a field whose value was inherited from the functional location. */
 @Composable
-internal fun OperationFormSheet(
-    orderId: Long,
-    nextNumber: String,
-    onDismiss: () -> Unit,
-    onSave: (WorkOrderOperationEntity) -> Unit
-) {
-    var operationNumber by remember { mutableStateOf(nextNumber) }
-    var description by remember { mutableStateOf("") }
-    var workCenter by remember { mutableStateOf("Mechanical") }
-    var plannedHours by remember { mutableStateOf("1") }
-
-    FormSheet("إضافة عملية", onDismiss) {
-        LabeledField("رقم العملية", operationNumber, { operationNumber = it })
-        LabeledField("الوصف", description, { description = it }, singleLine = false)
-        OptionDropdown("مركز العمل", listOf("Mechanical", "Electrical", "Instrumentation", "Civil", "External"), workCenter) { workCenter = it }
-        LabeledField("الساعات المخططة", plannedHours, { plannedHours = it }, numeric = true)
-        SaveButton(description.isNotBlank()) {
-            onSave(
-                WorkOrderOperationEntity(
-                    id = 0,
-                    orderId = orderId,
-                    operationNumber = operationNumber.trim().ifBlank { nextNumber },
-                    description = description.trim(),
-                    workCenter = workCenter,
-                    plannedHours = plannedHours.toDoubleOrNull() ?: 0.0,
-                    actualHours = 0.0,
-                    requiresConfirmation = true,
-                    status = "Open"
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Maintenance notification form (بلاغ)
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun NotificationFormSheet(
-    initial: MaintenanceNotificationEntity?,
-    assets: List<AssetEntity>,
-    onDismiss: () -> Unit,
-    onSave: (MaintenanceNotificationEntity) -> Unit
-) {
-    var type by remember { mutableStateOf(initial?.type ?: "Corrective") }
-    var title by remember { mutableStateOf(initial?.title ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var assetId by remember { mutableStateOf(initial?.assetId) }
-    var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
-    var damageCode by remember { mutableStateOf(initial?.damageCode ?: "") }
-    var causeCode by remember { mutableStateOf(initial?.causeCode ?: "") }
-    var requiredEnd by remember { mutableStateOf(initial?.requiredEnd ?: "") }
-
-    FormSheet(if (initial == null) "بلاغ صيانة جديد" else "تعديل البلاغ", onDismiss) {
-        OptionDropdown("النوع", listOf("Corrective", "Breakdown", "Inspection", "Request"), type) { type = it }
-        LabeledField("العنوان", title, { title = it })
-        LabeledField("وصف المشكلة", description, { description = it }, singleLine = false)
-        AssetDropdownOptional(assets, assetId, onSelect = { assetId = it })
-        OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
-        LabeledField("كود الضرر (اختياري)", damageCode, { damageCode = it })
-        LabeledField("كود السبب (اختياري)", causeCode, { causeCode = it })
-        DateField("مطلوب الإنجاز قبل", requiredEnd) { requiredEnd = it }
-        SaveButton(title.isNotBlank()) {
-            onSave(
-                MaintenanceNotificationEntity(
-                    id = initial?.id ?: 0,
-                    number = initial?.number ?: "",
-                    type = type,
-                    title = title.trim(),
-                    description = description,
-                    assetId = assetId,
-                    priority = priority,
-                    damageCode = damageCode.trim(),
-                    causeCode = causeCode.trim(),
-                    reportedBy = initial?.reportedBy ?: "",
-                    reportedAt = initial?.reportedAt ?: "",
-                    requiredEnd = requiredEnd.trim(),
-                    status = initial?.status ?: "New",
-                    linkedOrderId = initial?.linkedOrderId
-                )
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// CAPA form
-// ---------------------------------------------------------------------------
-
-@Composable
-internal fun CapaFormSheet(
-    initial: CapaEntity?,
-    assets: List<AssetEntity>,
-    defaultAssignee: String,
-    onDismiss: () -> Unit,
-    onSave: (CapaEntity) -> Unit
-) {
-    var title by remember { mutableStateOf(initial?.title ?: "") }
-    var type by remember { mutableStateOf(initial?.type ?: "Corrective") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var assetId by remember { mutableStateOf(initial?.assetId) }
-    var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
-    var status by remember { mutableStateOf(initial?.status ?: "Open") }
-    var assignedTo by remember { mutableStateOf(initial?.assignedTo ?: defaultAssignee) }
-    var dueDays by remember { mutableStateOf("7") }
-
-    FormSheet(if (initial == null) "إجراء تصحيحي/وقائي جديد" else "تعديل الإجراء", onDismiss) {
-        LabeledField("العنوان", title, { title = it })
-        OptionDropdown("النوع", listOf("Corrective", "Preventive"), type) { type = it }
-        LabeledField("الوصف", description, { description = it }, singleLine = false)
-        AssetDropdownOptional(assets, assetId, onSelect = { assetId = it })
-        OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
-        OptionDropdown("الحالة", listOf("Open", "In Progress", "Closed"), status) { status = it }
-        LabeledField("المسؤول", assignedTo, { assignedTo = it })
-        if (initial == null) {
-            LabeledField("الاستحقاق خلال (أيام)", dueDays, { dueDays = it }, numeric = true)
-        }
-        SaveButton(title.isNotBlank()) {
-            val today = DateStrings.today()
-            val due = initial?.dueAt ?: DateStrings.daysFromToday(dueDays.toIntOrNull() ?: 7)
-            onSave(
-                CapaEntity(
-                    id = initial?.id ?: 0,
-                    code = initial?.code ?: "",
-                    title = title.trim(),
-                    type = type,
-                    description = description,
-                    assetId = assetId,
-                    priority = priority,
-                    status = status,
-                    assignedTo = assignedTo.ifBlank { defaultAssignee },
-                    dueAt = due,
-                    createdAt = initial?.createdAt ?: today
-                )
-            )
-        }
-    }
-}
-
-@Composable
-internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: (UserEntity) -> Unit) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var username by remember { mutableStateOf(initial?.username ?: "") }
-    var role by remember { mutableStateOf(initial?.role ?: "Technician") }
-    // Never pre-fill the stored (hashed) password. Blank means "keep current" when editing.
-    var password by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
-    var active by remember { mutableStateOf(initial?.isActive ?: true) }
-
-    FormSheet(if (initial == null) "إضافة مستخدم" else "تعديل المستخدم", onDismiss) {
-        LabeledField("الاسم", name, { name = it })
-        LabeledField("اسم المستخدم", username, { username = it })
-        OptionDropdown("الدور", listOf("Admin", "Supervisor", "Technician"), role) { role = it }
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text(if (initial == null) "كلمة المرور" else "كلمة مرور جديدة (اتركها فارغة للإبقاء)") },
-            singleLine = true,
-            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(onClick = { showPassword = !showPassword }) {
-                    Icon(if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = "إظهار/إخفاء")
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("مفعّل", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = active, onCheckedChange = { active = it })
-        }
-        SaveButton(name.isNotBlank() && username.isNotBlank()) {
-            onSave(
-                UserEntity(
-                    id = initial?.id ?: 0,
-                    name = name.trim(),
-                    username = username.trim(),
-                    role = role,
-                    isActive = active,
-                    // Blank is resolved by the repository (kept on edit, defaulted on create).
-                    password = password
-                )
-            )
-        }
+internal fun InheritedCaption(inherited: Boolean) {
+    if (inherited) {
+        Text("موروث من الموقع الفني", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
     }
 }

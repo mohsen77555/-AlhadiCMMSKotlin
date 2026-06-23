@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -21,5 +22,8 @@ data class SparePartEntity(
     val onHandQty: Int,
     val minQty: Int,
     val location: String,
-    val lastPrice: Double
+    val lastPrice: Double,
+    @ColumnInfo(defaultValue = "0")
+    val serializationActive: Boolean = false,
+    val serialProfileId: Long? = null
 )
