@@ -225,7 +225,6 @@ internal fun WorkOrderCard(
     var showAddOp by remember { mutableStateOf(false) }
     var showAddPermit by remember { mutableStateOf(false) }
     var confirmTarget by remember { mutableStateOf<WorkOrderOperationEntity?>(null) }
-    val confirmedOps = operations.count { it.status == "Confirmed" }
     val hasValidPermit = permits.any { it.isValidOn(today) }
     val permitBlocked = workOrder.requiresPermit && !hasValidPermit
     val hasEvidence = photos.isNotEmpty()
@@ -265,103 +264,25 @@ internal fun WorkOrderCard(
                 InfoRow("الموقع الخطي", linearMaintenancePositionLabel(asset, workOrder.linearStartPoint, workOrder.linearEndPoint, workOrder.linearMarker, workOrder.linearHorizontalOffset, workOrder.linearVerticalOffset))
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().clickable { showOperations = !showOperations },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentBlue)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("العمليات ($confirmedOps/${operations.size} مؤكدة)", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                Icon(if (showOperations) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null)
-            }
-            if (showOperations) {
-                if (operations.isEmpty()) {
-                    Text("لا توجد عمليات. أضِف خطوات التنفيذ.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                operations.forEach { op ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            LtrText(op.operationNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(op.description, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            StatusBadge(
-                                when (op.status) { "Confirmed" -> "مؤكد"; "In Progress" -> "جارٍ"; else -> "مفتوح" },
-                                statusTone(when (op.status) { "Confirmed" -> "running"; "In Progress" -> "scheduled"; else -> "info" })
-                            )
-                        }
-                        Text(
-                            "مركز العمل: ${op.workCenter.ifBlank { "—" }} • مخطط ${op.plannedHours}س" + if (op.actualHours > 0) " • فعلي ${op.actualHours}س" else "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        confirmations.filter { it.operationId == op.id }.forEach { c ->
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp), tint = AccentGreen)
-                                Text(
-                                    "${c.technician} • ${c.workDate} • ${c.actualWork}س" + if (c.finalConfirmation) " • نهائي" else "",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            if (c.actionTaken.isNotBlank()) {
-                                Text("الإجراء: ${c.actionTaken}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        if (canManage && op.status != "Confirmed") {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                if (op.status == "Open") {
-                                    OutlinedButton(onClick = { onSetOperationStatus(op, "In Progress") }, modifier = Modifier.weight(1f)) { Text("بدء", style = MaterialTheme.typography.labelMedium) }
-                                }
-                                Button(onClick = { confirmTarget = op }, modifier = Modifier.weight(1f)) { Text("تأكيد", style = MaterialTheme.typography.labelMedium) }
-                                IconButton(onClick = { onDeleteOperation(op) }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
-                    }
-                }
-                if (canManage) {
-                    OutlinedButton(onClick = { showAddOp = true }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("إضافة عملية")
-                    }
-                }
-            }
+            WorkOrderOperationsSection(
+                operations = operations,
+                confirmations = confirmations,
+                canManage = canManage,
+                expanded = showOperations,
+                onToggleExpand = { showOperations = !showOperations },
+                onSetOperationStatus = onSetOperationStatus,
+                onDeleteOperation = onDeleteOperation,
+                onConfirm = { confirmTarget = it },
+                onAddOperation = { showAddOp = true }
+            )
 
-            run {
-                val materialsCost = materials.sumOf { (partMap[it.partId]?.lastPrice ?: 0.0) * it.quantity }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentPurple)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("المواد المستهلكة (${materials.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                    if (materialsCost > 0) Text(money(materialsCost), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = AccentPurple)
-                }
-                materials.forEach { tx ->
-                    val p = partMap[tx.partId]
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("×${tx.quantity}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = AccentPurple)
-                        Column(modifier = Modifier.weight(1f)) {
-                            LtrText(p?.partNumber ?: "Part #${tx.partId}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                            Text(p?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                if (canManage && workOrder.status != "Closed") {
-                    OutlinedButton(onClick = { showMaterialPicker = true }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("صرف قطعة للأمر")
-                    }
-                }
-            }
+            WorkOrderMaterialsSection(
+                materials = materials,
+                partMap = partMap,
+                canManage = canManage,
+                workOrderStatus = workOrder.status,
+                onIssueMaterial = { showMaterialPicker = true }
+            )
 
             if (canManage && (pending || rejected)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -374,141 +295,38 @@ internal fun WorkOrderCard(
                 }
             }
             if (workOrder.status != "Closed") {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentTeal)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("أدلة التنفيذ (${photos.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                    if (canManage) {
-                        TextButton(onClick = {
-                            val file = ImageStore.createCaptureFile(context, workOrder.id)
-                            pendingPhotoPath = file.absolutePath
-                            cameraLauncher.launch(ImageStore.uriFor(context, file))
-                        }) {
-                            Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text("التقاط صورة")
-                        }
-                    }
-                }
-                if (photos.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        photos.forEach { photo ->
-                            Box {
-                                val bmp = remember(photo.path) { ImageStore.decode(photo.path) }
-                                if (bmp != null) {
-                                    Image(
-                                        bitmap = bmp,
-                                        contentDescription = "دليل تنفيذ",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp))
-                                    )
-                                } else {
-                                    Box(modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Filled.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                                if (canManage) {
-                                    Box(
-                                        modifier = Modifier.align(Alignment.TopEnd).size(22.dp).background(MaterialTheme.colorScheme.error, CircleShape).clickable { onDeletePhoto(photo) },
-                                        contentAlignment = Alignment.Center
-                                    ) { Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = Color.White, modifier = Modifier.size(14.dp)) }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Text("لا توجد صور بعد — التقط صورة دليل بالكاميرا قبل الإغلاق.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                WorkOrderEvidenceSection(
+                    photos = photos,
+                    canManage = canManage,
+                    onCapture = {
+                        val file = ImageStore.createCaptureFile(context, workOrder.id)
+                        pendingPhotoPath = file.absolutePath
+                        cameraLauncher.launch(ImageStore.uriFor(context, file))
+                    },
+                    onDeletePhoto = onDeletePhoto
+                )
             }
 
             if (workOrder.status != "Closed" && (workOrder.requiresPermit || permits.isNotEmpty())) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.HealthAndSafety, contentDescription = null, modifier = Modifier.size(18.dp), tint = if (permitBlocked) AccentRed else AccentGreen)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("تصاريح العمل (${permits.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                    if (canManage) {
-                        TextButton(onClick = { showAddPermit = true }) {
-                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text("إصدار تصريح")
-                        }
-                    }
-                }
-                permits.forEach { permit ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(permitTypeLabel(permit.type), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            val valid = permit.isValidOn(today)
-                            StatusBadge(
-                                when {
-                                    permit.status == "Approved" && valid -> "ساري"
-                                    permit.status == "Approved" -> "منتهٍ"
-                                    permit.status == "Rejected" -> "مرفوض"
-                                    else -> "بانتظار الاعتماد"
-                                },
-                                statusTone(if (permit.status == "Approved" && valid) "running" else if (permit.status == "Rejected") "stopped" else "overdue")
-                            )
-                        }
-                        if (permit.hazards.isNotBlank()) Text("المخاطر: ${permit.hazards}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (permit.ppe.isNotBlank()) Text("الوقاية: ${permit.ppe}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (permit.validUntil.isNotBlank()) Text("صالح حتى: ${permit.validUntil}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (canManage) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                if (permit.status == "Pending") {
-                                    Button(onClick = { onSetPermitStatus(permit, true) }, modifier = Modifier.weight(1f)) { Text("اعتماد", style = MaterialTheme.typography.labelMedium) }
-                                    OutlinedButton(onClick = { onSetPermitStatus(permit, false) }, modifier = Modifier.weight(1f)) { Text("رفض", style = MaterialTheme.typography.labelMedium) }
-                                }
-                                IconButton(onClick = { onDeletePermit(permit) }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
-                    }
-                }
-                if (permitBlocked) {
-                    Text("هذا العمل خطر — يلزم تصريح عمل ساري قبل البدء.", style = MaterialTheme.typography.bodySmall, color = AccentRed, fontWeight = FontWeight.Bold)
-                }
+                WorkOrderPermitsSection(
+                    permits = permits,
+                    requiresPermit = workOrder.requiresPermit,
+                    canManage = canManage,
+                    onAddPermit = { showAddPermit = true },
+                    onSetPermitStatus = onSetPermitStatus,
+                    onDeletePermit = onDeletePermit
+                )
             }
 
-            if (blocked) {
-                Text(
-                    if (pending) "يتطلّب اعتماد المشرف قبل البدء/الإغلاق." else "أمر العمل مرفوض — لا يمكن تنفيذه.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            } else {
-                val allConfirmed = operations.isNotEmpty() && operations.none { it.requiresConfirmation && it.status != "Confirmed" }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    when (workOrder.status) {
-                        "Open" -> {
-                            Button(onClick = { onUpdateStatus(workOrder, "In Progress") }, enabled = !permitBlocked, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
-                        }
-                        "In Progress" -> {
-                            Button(onClick = { onUpdateStatus(workOrder, "Technically Completed") }, enabled = allConfirmed, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
-                        }
-                        "Technically Completed" -> {
-                            Button(onClick = { onUpdateStatus(workOrder, "Closed") }, enabled = hasEvidence, modifier = Modifier.fillMaxWidth()) { Text("إغلاق نهائي") }
-                        }
-                    }
-                }
-                if (workOrder.status == "In Progress" && !allConfirmed) {
-                    Text("الإكمال الفني يتطلّب تأكيد كل العمليات المطلوبة.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
-                }
-                if (workOrder.status == "Technically Completed" && !hasEvidence) {
-                    Text("الإغلاق النهائي يتطلّب التقاط صورة دليل تنفيذ بالكاميرا.", style = MaterialTheme.typography.bodySmall, color = AccentOrange, fontWeight = FontWeight.Bold)
-                }
-            }
+            WorkOrderStatusActions(
+                workOrder = workOrder,
+                operations = operations,
+                blocked = blocked,
+                pending = pending,
+                permitBlocked = permitBlocked,
+                hasEvidence = hasEvidence,
+                onUpdateStatus = onUpdateStatus
+            )
             OutlinedButton(onClick = { onExportPdf(workOrder) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
