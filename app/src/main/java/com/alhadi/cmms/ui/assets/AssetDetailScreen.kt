@@ -233,9 +233,6 @@ internal fun AssetDetailScreen(
     val locationLabel = asset.locationId?.let { id -> locations.firstOrNull { it.id == id }?.let { "${it.code} • ${it.name}" } } ?: "غير محدد"
     val today = DateStrings.today()
     val underWarranty = asset.isUnderWarranty(today)
-    val hasWarranty = asset.warrantyEnd.isNotBlank() || asset.warrantyType.isNotBlank() ||
-        asset.warrantyReference.isNotBlank() || asset.warrantyCounterType.isNotBlank() ||
-        asset.warrantyProvider.isNotBlank()
     val parent = asset.parentAssetId?.let { id -> allAssets.firstOrNull { it.id == id } }
     val children = allAssets.filter { it.parentAssetId == asset.id }
     var showEdit by remember { mutableStateOf(false) }
@@ -244,19 +241,6 @@ internal fun AssetDetailScreen(
     var showMoveForm by remember { mutableStateOf(false) }
     val lifecycle = listOf("Draft", "Active", "Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired", "Disposed")
     val retired = asset.status.equals("Retired", ignoreCase = true) || asset.status.equals("Disposed", ignoreCase = true)
-    val hasOrganization = listOf(
-        asset.company,
-        asset.site,
-        asset.maintenancePlant,
-        asset.planningPlant,
-        asset.plannerGroup,
-        asset.mainWorkCenter,
-        asset.productionWorkCenter,
-        asset.costCenter,
-        asset.responsiblePerson
-    ).any { it.isNotBlank() }
-    val hasPartner = listOf(asset.partnerName, asset.partnerRole, asset.partnerPhone, asset.partnerEmail).any { it.isNotBlank() }
-    val hasAddress = listOf(asset.addressLine, asset.city, asset.country).any { it.isNotBlank() }
     val constructionDate = listOf(asset.constructionYear, asset.constructionMonth)
         .filter { it.isNotBlank() }
         .joinToString(" / ")
@@ -361,42 +345,7 @@ internal fun AssetDetailScreen(
             )
         }
 
-        if (hasOrganization) {
-            item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader("التنظيم والمسؤولية")
-                        if (asset.company.isNotBlank()) InfoRow("الشركة", asset.company)
-                        if (asset.site.isNotBlank()) InfoRow("الموقع/المنشأة", asset.site)
-                        if (asset.maintenancePlant.isNotBlank()) InfoRow("مصنع الصيانة", asset.maintenancePlant)
-                        if (asset.planningPlant.isNotBlank()) InfoRow("مصنع التخطيط", asset.planningPlant)
-                        if (asset.plannerGroup.isNotBlank()) InfoRow("مجموعة المخططين", asset.plannerGroup)
-                        if (asset.mainWorkCenter.isNotBlank()) InfoRow("مركز العمل الرئيسي", asset.mainWorkCenter)
-                        if (asset.productionWorkCenter.isNotBlank()) InfoRow("مركز عمل الإنتاج", asset.productionWorkCenter)
-                        if (asset.costCenter.isNotBlank()) InfoRow("مركز التكلفة", asset.costCenter)
-                        if (asset.responsiblePerson.isNotBlank()) InfoRow("الشخص المسؤول", asset.responsiblePerson)
-                        if (asset.orgOverrideReason.isNotBlank()) InfoRow("سبب تجاوز الموروث", asset.orgOverrideReason)
-                    }
-                }
-            }
-        }
-
-        if (hasPartner || hasAddress) {
-            item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader("جهة الاتصال والعنوان")
-                        if (asset.partnerName.isNotBlank()) InfoRow("الجهة أو الشخص", asset.partnerName)
-                        if (asset.partnerRole.isNotBlank()) InfoRow("الصفة", assetPartnerRoleLabel(asset.partnerRole))
-                        if (asset.partnerPhone.isNotBlank()) InfoRow("الهاتف", asset.partnerPhone)
-                        if (asset.partnerEmail.isNotBlank()) InfoRow("البريد الإلكتروني", asset.partnerEmail)
-                        if (asset.addressLine.isNotBlank()) InfoRow("العنوان", asset.addressLine)
-                        if (asset.city.isNotBlank()) InfoRow("المدينة", asset.city)
-                        if (asset.country.isNotBlank()) InfoRow("الدولة", asset.country)
-                    }
-                }
-            }
-        }
+        assetOrgContactCards(asset)
 
         assetGovernanceCards(asset, allAssets, workOrders)
 
@@ -516,47 +465,7 @@ internal fun AssetDetailScreen(
             }
         }
 
-        if (hasWarranty) {
-            item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            SectionHeader("الضمان")
-                            Spacer(modifier = Modifier.weight(1f))
-                            StatusBadge(if (underWarranty) "ضمن الضمان" else "منتهٍ", statusTone(if (underWarranty) "running" else "stopped"))
-                        }
-                        if (asset.warrantyProvider.isNotBlank()) InfoRow("الجهة", asset.warrantyProvider)
-                        if (asset.warrantyStart.isNotBlank()) InfoRow("من", asset.warrantyStart)
-                        if (asset.warrantyEnd.isNotBlank()) InfoRow("إلى", asset.warrantyEnd)
-                        if (asset.warrantyType.isNotBlank()) InfoRow("النوع", warrantyTypeLabelUi(asset.warrantyType))
-                        if (asset.warrantyCategory.isNotBlank()) InfoRow("الفئة", asset.warrantyCategory)
-                        if (asset.warrantyReference.isNotBlank()) InfoRow("مرجع العقد", asset.warrantyReference)
-                        // AST-WAR-002: counter-based coverage.
-                        if (asset.warrantyCounterType.isNotBlank()) {
-                            InfoRow("عدّاد الضمان", "${warrantyCounterTypeLabelUi(asset.warrantyCounterType)} • حد ${formatLinearNumber(asset.warrantyCounterLimit)}")
-                        }
-                        val warrantyKinds = buildList {
-                            if (asset.vendorWarranty) add("مورّد")
-                            if (asset.manufacturerWarranty) add("مُصنّع")
-                            if (asset.customerWarranty) add("عميل")
-                        }
-                        if (warrantyKinds.isNotEmpty()) InfoRow("نوع الجهة", warrantyKinds.joinToString("، "))
-                        if (asset.coveredServices.isNotBlank()) InfoRow("مشمول", asset.coveredServices)
-                        if (asset.excludedServices.isNotBlank()) InfoRow("مستثنى", asset.excludedServices)
-                        if (asset.warrantyTerms.isNotBlank()) InfoRow("الشروط", asset.warrantyTerms)
-                        if (asset.warrantyContact.isNotBlank()) InfoRow("جهة الاتصال", asset.warrantyContact)
-                        // AST-WAR-006: warranty document linked to the asset card.
-                        if (asset.warrantyDocument.isNotBlank()) InfoRow("مستند الضمان", asset.warrantyDocument)
-                        if (asset.warrantyClaimRequired) InfoRow("حالة المطالبة", warrantyClaimStatusLabelUi(asset.warrantyClaimStatus))
-                        // AST-WAR-007: assets sharing the same warranty reference.
-                        if (asset.warrantyReference.isNotBlank()) {
-                            val shared = allAssets.count { it.id != asset.id && it.warrantyReference.equals(asset.warrantyReference, ignoreCase = true) }
-                            if (shared > 0) InfoRow("أصول أخرى بنفس الضمان", "$shared أصل")
-                        }
-                    }
-                }
-            }
-        }
+        assetWarrantyCard(asset, allAssets, underWarranty)
 
         if (canManage) {
             item {
