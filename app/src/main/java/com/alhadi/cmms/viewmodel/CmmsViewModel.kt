@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.alhadi.cmms.data.CmmsRepository
+import com.alhadi.cmms.data.* // repository CRUD methods are now extension functions in this package
 import com.alhadi.cmms.data.SerialInstallRequest
 import com.alhadi.cmms.data.SerialMasterRequest
 import com.alhadi.cmms.data.SerialTransferRequest
