@@ -213,19 +213,12 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val assets by viewModel.assets.collectAsStateWithLifecycle()
     val workOrders by viewModel.workOrders.collectAsStateWithLifecycle()
     val preventiveMaintenance by viewModel.preventiveMaintenance.collectAsStateWithLifecycle()
-    val serialNumberProfiles by viewModel.serialNumberProfiles.collectAsStateWithLifecycle()
     val serialNumbers by viewModel.serialNumbers.collectAsStateWithLifecycle()
     val serialNumberMovements by viewModel.serialNumberMovements.collectAsStateWithLifecycle()
     val spareParts by viewModel.spareParts.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
-    val users by viewModel.users.collectAsStateWithLifecycle()
-    val auditLog by viewModel.auditLog.collectAsStateWithLifecycle()
-    val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
-    val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
-    val warehouses by viewModel.warehouses.collectAsStateWithLifecycle()
     val orgUnits by viewModel.orgUnits.collectAsStateWithLifecycle()
-    val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val assetDocuments by viewModel.assetDocuments.collectAsStateWithLifecycle()
     val assetCharacteristics by viewModel.assetCharacteristics.collectAsStateWithLifecycle()
     val assetBomHeaders by viewModel.assetBomHeaders.collectAsStateWithLifecycle()
@@ -238,7 +231,6 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
     val workPermits by viewModel.workPermits.collectAsStateWithLifecycle()
     val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
-    val taskListOperations by viewModel.taskListOperations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -417,163 +409,20 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onMove = viewModel::performAssetMovement
                     )
 
-                    BottomTab.More -> when (moreRoute) {
-                        null -> MoreGrid(
-                            innerPadding = innerPadding,
-                            isAdmin = isAdmin,
-                            canManage = canManage,
-                            onOpen = { moreRoute = it },
-                            onImportBundled = { viewModel.importBundledKit(appContext) },
-                            onPickExcel = { excelPicker.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream", "*/*")) },
-                            onLogout = viewModel::logout
-                        )
-                        MoreRoute.Notifications -> NotificationsScreen(
-                            innerPadding = innerPadding,
-                            notifications = notifications,
-                            assets = assets,
-                            assetMap = assetMap,
-                            canManage = canManage,
-                            onSave = viewModel::saveNotification,
-                            onSetStatus = viewModel::setNotificationStatus,
-                            onCreateOrder = viewModel::createOrderFromNotification,
-                            onDelete = viewModel::deleteNotification
-                        )
-                        MoreRoute.Inventory -> InventoryScreen(
-                            innerPadding = innerPadding,
-                            parts = spareParts,
-                            profiles = serialNumberProfiles,
-                            serials = serialNumbers,
-                            transactions = transactions,
-                            warehouses = warehouses,
-                            canReceive = canManage,
-                            canManage = canManage,
-                            onOpenSerialNumbers = { moreRoute = MoreRoute.SerialNumbers },
-                            onIssue = viewModel::issuePart,
-                            onReceive = viewModel::receivePart,
-                            onSave = viewModel::savePart,
-                            onDelete = viewModel::deletePart
-                        )
-                        MoreRoute.SerialNumbers -> SerialNumbersScreen(
-                            innerPadding = innerPadding,
-                            profiles = serialNumberProfiles,
-                            serials = serialNumbers,
-                            movements = serialNumberMovements,
-                            parts = spareParts,
-                            assets = assets,
-                            workOrders = workOrders,
-                            canManage = canManage,
-                            onSaveProfile = viewModel::saveSerialProfile,
-                            onDeleteProfile = viewModel::deleteSerialProfile,
-                            onCreateMaster = viewModel::createSerialMaster,
-                            onReceive = viewModel::receiveSerializedPart,
-                            onIssue = viewModel::issueSerializedPart,
-                            onTransfer = viewModel::transferSerialNumber,
-                            onInstall = viewModel::installSerialNumber,
-                            onDismantle = viewModel::dismantleSerialNumber,
-                            onReconcile = viewModel::reconcileSerializedStock,
-                            onDeleteSerial = viewModel::deleteSerialNumber
-                        )
-                        MoreRoute.Reports -> ReportsScreen(
-                            innerPadding = innerPadding,
-                            stats = stats,
-                            assets = assets,
-                            workOrders = workOrders,
-                            parts = spareParts,
-                            pmItems = preventiveMaintenance
-                        )
-                        MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
-                        MoreRoute.Meters -> MetersScreen(
-                            innerPadding = innerPadding,
-                            points = measuringPoints,
-                            readings = readings,
-                            assetMap = assetMap,
-                            assets = assets,
-                            canManage = canManage,
-                            onSavePoint = viewModel::saveMeasuringPoint,
-                            onDeletePoint = viewModel::deleteMeasuringPoint,
-                            onAddReading = viewModel::addReading
-                        )
-                        MoreRoute.Locations -> LocationsScreen(
-                            innerPadding = innerPadding,
-                            locations = locations,
-                            assets = assets,
-                            orgUnits = orgUnits,
-                            canManage = canManage,
-                            onSave = viewModel::saveFunctionalLocation,
-                            onDelete = viewModel::deleteFunctionalLocation
-                        )
-                        MoreRoute.Warehouses -> WarehousesScreen(
-                            innerPadding = innerPadding,
-                            warehouses = warehouses,
-                            parts = spareParts,
-                            canManage = canManage,
-                            onSave = viewModel::saveWarehouse,
-                            onDelete = viewModel::deleteWarehouse
-                        )
-                        MoreRoute.OrgUnits -> OrgUnitsScreen(
-                            innerPadding = innerPadding,
-                            units = orgUnits,
-                            assets = assets,
-                            canManage = canManage,
-                            onSave = viewModel::saveOrgUnit,
-                            onDelete = viewModel::deleteOrgUnit
-                        )
-                        MoreRoute.Capa -> CapaScreen(
-                            innerPadding = innerPadding,
-                            items = capaActions,
-                            assets = assets,
-                            assetMap = assetMap,
-                            canManage = canManage,
-                            defaultAssignee = actorName,
-                            onSave = viewModel::saveCapa,
-                            onUpdateStatus = viewModel::updateCapaStatus,
-                            onDelete = viewModel::deleteCapa
-                        )
-                        MoreRoute.Failures -> FailureAnalysisScreen(
-                            innerPadding = innerPadding,
-                            workOrders = workOrders,
-                            assetMap = assetMap
-                        )
-                        MoreRoute.Admin -> AdminScreen(
-                            innerPadding = innerPadding,
-                            users = users,
-                            currentUser = currentUser,
-                            onAddTechnician = viewModel::addTechnician,
-                            onResetSampleData = viewModel::resetSampleData,
-                            onExportBackup = { backupExportLauncher.launch("alhadi-cmms-backup-${DateStrings.today()}.json") },
-                            onImportBackup = { backupImportLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                            onRunReminders = { Reminders.runNow(appContext) },
-                            onSave = viewModel::saveUser,
-                            onSetActive = viewModel::setUserActive,
-                            onDelete = viewModel::deleteUser
-                        )
-                        MoreRoute.PreventiveMaintenance -> PreventiveMaintenanceScreen(
-                            innerPadding = innerPadding,
-                            pmItems = preventiveMaintenance,
-                            assets = assets,
-                            assetMap = assetMap,
-                            canManage = canManage,
-                            checklist = pmChecklist,
-                            taskLists = taskLists,
-                            onSave = viewModel::savePreventiveMaintenance,
-                            onDelete = viewModel::deletePreventiveMaintenance,
-                            onDone = viewModel::markPreventiveMaintenanceDone,
-                            onSaveChecklistItem = viewModel::saveChecklistItem,
-                            onSetChecklistResult = viewModel::setChecklistResult,
-                            onDeleteChecklistItem = viewModel::deleteChecklistItem,
-                            onGenerateOrder = viewModel::generateWorkOrderFromPm
-                        )
-                        MoreRoute.TaskLists -> TaskListsScreen(
-                            innerPadding = innerPadding,
-                            taskLists = taskLists,
-                            operations = taskListOperations,
-                            canManage = canManage,
-                            onSaveTaskList = viewModel::saveTaskList,
-                            onDeleteTaskList = viewModel::deleteTaskList,
-                            onSaveOperation = viewModel::saveTaskListOperation,
-                            onDeleteOperation = viewModel::deleteTaskListOperation
-                        )
-                    }
+                    BottomTab.More -> MoreRouteContent(
+                        route = moreRoute,
+                        innerPadding = innerPadding,
+                        viewModel = viewModel,
+                        isAdmin = isAdmin,
+                        canManage = canManage,
+                        actorName = actorName,
+                        onNavigate = { moreRoute = it },
+                        onImportBundled = { viewModel.importBundledKit(appContext) },
+                        onPickExcel = { excelPicker.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream", "*/*")) },
+                        onExportBackup = { backupExportLauncher.launch("alhadi-cmms-backup-${DateStrings.today()}.json") },
+                        onImportBackup = { backupImportLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                        onRunReminders = { Reminders.runNow(appContext) }
+                    )
                 }
             }
         }
