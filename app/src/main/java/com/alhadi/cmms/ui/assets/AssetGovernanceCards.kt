@@ -569,3 +569,94 @@ internal fun LazyListScope.assetWorkOrdersSection(
         }
 
 }
+
+
+/** assetSubAssetsSection (asset detail list section). */
+internal fun LazyListScope.assetSubAssetsSection(
+    parent: AssetEntity?,
+    children: List<AssetEntity>,
+    onOpenAsset: (Long) -> Unit
+) {
+        if (parent != null || children.isNotEmpty()) {
+            item { SectionHeader("الأصول الفرعية (${children.size})") }
+            items(children, key = { "ch-${it.id}" }) { child ->
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenAsset(child.id) },
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconBubble(Icons.Filled.PrecisionManufacturing, AccentGreen, AccentGreen.copy(alpha = 0.14f), 36)
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(child.code, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            LtrText(child.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        StatusBadge(child.status, statusTone(child.status))
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (children.isEmpty()) {
+                item { EmptyState("لا توجد أصول فرعية") }
+            }
+        }
+
+}
+
+/** assetPmSection (asset detail list section). */
+internal fun LazyListScope.assetPmSection(
+    pmItems: List<PreventiveMaintenanceEntity>
+) {
+        item { SectionHeader("الصيانة الدورية المرتبطة (${pmItems.size})") }
+        if (pmItems.isEmpty()) {
+            item { EmptyState("لا توجد مهام صيانة لهذا الأصل") }
+        }
+        items(pmItems, key = { "pm-${it.id}" }) { pm ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(pm.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        StatusBadge(if (DateStrings.isDueOrOverdue(pm.nextDueAt)) "مستحقة" else "مجدولة", statusTone(if (DateStrings.isDueOrOverdue(pm.nextDueAt)) "overdue" else "scheduled"))
+                    }
+                    Text("التنفيذ القادم: ${pm.nextDueAt} • كل ${pm.frequencyDays} يوم", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+}
+
+/** assetMovementsSection (asset detail list section). */
+internal fun LazyListScope.assetMovementsSection(
+    movements: List<AssetMovementEntity>
+) {
+        item { SectionHeader("سجل الحركات (${movements.size})") }
+        if (movements.isEmpty()) {
+            item { EmptyState("لا توجد حركات تركيب/نقل مسجّلة", Icons.Filled.SwapHoriz) }
+        }
+        items(movements, key = { "mv-${it.id}" }) { mv ->
+            val tone = when (mv.eventType) {
+                MovementType.INSTALL -> AccentGreen
+                MovementType.TRANSFER -> AccentBlue
+                MovementType.DISMANTLE -> AccentOrange
+                else -> MaterialTheme.colorScheme.error
+            }
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.SwapHoriz, tone, tone.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(MovementType.label(mv.eventType), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                        val route = when {
+                            mv.fromLocationName.isNotBlank() && mv.toLocationName.isNotBlank() -> "${mv.fromLocationName} ← ${mv.toLocationName}"
+                            mv.toLocationName.isNotBlank() -> "إلى ${mv.toLocationName}"
+                            mv.fromLocationName.isNotBlank() -> "من ${mv.fromLocationName}"
+                            else -> ""
+                        }
+                        if (route.isNotBlank()) LtrText(route, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (mv.notes.isNotBlank()) Text(mv.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${mv.performedBy} • ${mv.occurredAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+}
