@@ -451,50 +451,7 @@ internal fun AssetDetailScreen(
             }
         }
 
-        item { SectionHeader("أوامر العمل المرتبطة (${workOrders.size})") }
-        if (workOrders.isEmpty()) {
-            item { EmptyState("لا توجد أوامر عمل لهذا الأصل") }
-        } else {
-            item {
-                val seg = listOf(
-                    ChartSegment("مفتوح", workOrders.count { it.status == "Open" }, AccentBlue),
-                    ChartSegment("قيد التنفيذ", workOrders.count { it.status == "In Progress" }, AccentOrange),
-                    ChartSegment("مكتمل فنياً", workOrders.count { it.status == "Technically Completed" }, AccentTeal),
-                    ChartSegment("مغلق", workOrders.count { it.status == "Closed" }, AccentGreen)
-                )
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        DonutChart(segments = seg, centerValue = workOrders.size.toString(), centerLabel = "أمر")
-                        ChartLegend(seg, modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-        items(workOrders, key = { "wo-${it.id}" }) { wo ->
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(wo.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                        StatusBadge(workOrderStatusLabel(wo.status), statusTone(wo.status))
-                    }
-                    Text("الاستحقاق: ${wo.dueAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (asset.isLinearAsset && wo.hasLinearReference()) {
-                        InfoRow("الموقع الخطي", linearMaintenancePositionLabel(asset, wo.linearStartPoint, wo.linearEndPoint, wo.linearMarker, wo.linearHorizontalOffset, wo.linearVerticalOffset))
-                    }
-                    if (wo.approvalStatus == "Pending") {
-                        StatusBadge("بانتظار الاعتماد", statusTone("overdue"))
-                    }
-                    if (canManage && wo.status != "Closed" && !wo.isBlockedByApproval()) {
-                        when (wo.status) {
-                            "Open" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "In Progress") }, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
-                            "In Progress" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "Technically Completed") }, modifier = Modifier.fillMaxWidth()) { Text("إكمال فني") }
-                            "Technically Completed" -> Button(onClick = { onUpdateWorkOrderStatus(wo, "Closed") }, modifier = Modifier.fillMaxWidth()) { Text("إغلاق نهائي") }
-                        }
-                    }
-                }
-            }
-        }
-
+        assetWorkOrdersSection(asset, workOrders, onUpdateWorkOrderStatus)
         item { SectionHeader("الصيانة الدورية المرتبطة (${pmItems.size})") }
         if (pmItems.isEmpty()) {
             item { EmptyState("لا توجد مهام صيانة لهذا الأصل") }
