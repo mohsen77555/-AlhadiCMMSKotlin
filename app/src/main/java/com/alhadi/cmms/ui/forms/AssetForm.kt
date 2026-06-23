@@ -91,44 +91,6 @@ import com.alhadi.cmms.util.DateStrings
 // Asset form
 // ---------------------------------------------------------------------------
 
-/**
- * Dropdown sourced from organizational-unit master records of a given [type].
- * Stores the unit code. Falls back to a free-text field when no master records of the
- * type exist yet, and keeps any legacy non-matching value selectable (backward compatible).
- */
-@Composable
-internal fun OrgUnitDropdown(
-    label: String,
-    type: String,
-    orgUnits: List<OrgUnitEntity>,
-    value: String,
-    onChange: (String) -> Unit
-) {
-    val ofType = orgUnits.filter { it.type == type }
-    if (ofType.isEmpty()) {
-        LabeledField(label, value, onChange)
-        return
-    }
-    val codes = ofType.map { it.code }
-    val legacy = if (value.isNotBlank() && value !in codes) listOf(value) else emptyList()
-    OptionDropdown(
-        label = label,
-        options = listOf("") + legacy + codes,
-        selected = value,
-        display = { code ->
-            if (code.isBlank()) "—"
-            else ofType.firstOrNull { it.code == code }?.let { "${it.code} • ${it.name}" + if (!it.isActive) " (غير نشط)" else "" } ?: code
-        }
-    ) { onChange(it) }
-}
-
-/** AST-ORG-010: marks a field whose value was inherited from the functional location. */
-@Composable
-internal fun InheritedCaption(inherited: Boolean) {
-    if (inherited) {
-        Text("موروث من الموقع الفني", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-    }
-}
 
 @Composable
 internal fun AssetFormSheet(
@@ -768,74 +730,5 @@ internal fun AssetFormSheet(
             onSave(buildAsset(if (status.equals("Draft", ignoreCase = true)) "Active" else status))
         }
     }
-}
-
-@Composable
-internal fun LocationFormSheet(
-    initial: FunctionalLocationEntity?,
-    allLocations: List<FunctionalLocationEntity>,
-    orgUnits: List<OrgUnitEntity> = emptyList(),
-    onDismiss: () -> Unit,
-    onSave: (FunctionalLocationEntity) -> Unit
-) {
-    var code by remember { mutableStateOf(initial?.code ?: "") }
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var parentId by remember { mutableStateOf(initial?.parentId) }
-    var status by remember { mutableStateOf(initial?.status ?: "Active") }
-    var plantCode by remember { mutableStateOf(initial?.plantCode ?: "") }
-    var workCenterCode by remember { mutableStateOf(initial?.workCenterCode ?: "") }
-    var costCenterCode by remember { mutableStateOf(initial?.costCenterCode ?: "") }
-    var plannerGroupCode by remember { mutableStateOf(initial?.plannerGroupCode ?: "") }
-
-    // FLOC-004: a location cannot become its own ancestor — exclude self and all descendants.
-    val descendantIds = remember(allLocations, initial?.id) { locationDescendantIds(initial?.id, allLocations) }
-    val parentChoices = allLocations.filter { it.id != initial?.id && it.id !in descendantIds }
-
-    FormSheet(if (initial == null) "إضافة موقع فني" else "تعديل الموقع الفني", onDismiss) {
-        LabeledField("الكود (Code)", code, { code = it })
-        LabeledField("الاسم (Name)", name, { name = it })
-        LabeledField("الوصف", description, { description = it }, singleLine = false)
-        LocationDropdown("الموقع الأعلى (Parent)", parentChoices, parentId, excludeId = initial?.id) { parentId = it }
-        OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
-
-        Text("الربط التنظيمي (يورَّث للأصول)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        OrgUnitDropdown("المصنع (Plant)", "Plant", orgUnits, plantCode) { plantCode = it }
-        OrgUnitDropdown("مركز العمل (Work Center)", "WorkCenter", orgUnits, workCenterCode) { workCenterCode = it }
-        OrgUnitDropdown("مركز التكلفة (Cost Center)", "CostCenter", orgUnits, costCenterCode) { costCenterCode = it }
-        OrgUnitDropdown("مجموعة التخطيط (Planner Group)", "PlannerGroup", orgUnits, plannerGroupCode) { plannerGroupCode = it }
-
-        SaveButton(code.isNotBlank() && name.isNotBlank()) {
-            onSave(
-                FunctionalLocationEntity(
-                    id = initial?.id ?: 0,
-                    code = code.trim(),
-                    name = name.trim(),
-                    parentId = parentId,
-                    description = description,
-                    status = status,
-                    plantCode = plantCode,
-                    workCenterCode = workCenterCode,
-                    costCenterCode = costCenterCode,
-                    plannerGroupCode = plannerGroupCode
-                )
-            )
-        }
-    }
-}
-
-/** Returns the ids of all descendants of [id] within [all] (for hierarchy cycle prevention). */
-internal fun locationDescendantIds(id: Long?, all: List<FunctionalLocationEntity>): Set<Long> {
-    if (id == null) return emptySet()
-    val result = mutableSetOf<Long>()
-    val queue = ArrayDeque<Long>()
-    queue.add(id)
-    while (queue.isNotEmpty()) {
-        val current = queue.removeFirst()
-        all.filter { it.parentId == current }.forEach { child ->
-            if (result.add(child.id)) queue.add(child.id)
-        }
-    }
-    return result
 }
 

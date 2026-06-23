@@ -434,3 +434,41 @@ internal fun LinearMaintenancePositionFields(
     }
 }
 
+/**
+ * Dropdown sourced from organizational-unit master records of a given [type].
+ * Stores the unit code. Falls back to a free-text field when no master records of the
+ * type exist yet, and keeps any legacy non-matching value selectable (backward compatible).
+ */
+@Composable
+internal fun OrgUnitDropdown(
+    label: String,
+    type: String,
+    orgUnits: List<OrgUnitEntity>,
+    value: String,
+    onChange: (String) -> Unit
+) {
+    val ofType = orgUnits.filter { it.type == type }
+    if (ofType.isEmpty()) {
+        LabeledField(label, value, onChange)
+        return
+    }
+    val codes = ofType.map { it.code }
+    val legacy = if (value.isNotBlank() && value !in codes) listOf(value) else emptyList()
+    OptionDropdown(
+        label = label,
+        options = listOf("") + legacy + codes,
+        selected = value,
+        display = { code ->
+            if (code.isBlank()) "—"
+            else ofType.firstOrNull { it.code == code }?.let { "${it.code} • ${it.name}" + if (!it.isActive) " (غير نشط)" else "" } ?: code
+        }
+    ) { onChange(it) }
+}
+
+/** AST-ORG-010: marks a field whose value was inherited from the functional location. */
+@Composable
+internal fun InheritedCaption(inherited: Boolean) {
+    if (inherited) {
+        Text("موروث من الموقع الفني", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+    }
+}
