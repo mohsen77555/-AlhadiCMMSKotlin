@@ -273,31 +273,7 @@ internal fun AssetDetailScreen(
             }
         }
 
-        item {
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SectionHeader("المعلومات الأساسية")
-                    if (asset.description.isNotBlank()) InfoRow("الوصف", asset.description)
-                    InfoRow("فئة الأصل", assetCategoryLabel(asset.category))
-                    if (asset.objectType.isNotBlank()) InfoRow("نوع الأصل", asset.objectType)
-                    if (asset.constructionType.isNotBlank()) InfoRow("نوع الإنشاء", asset.constructionType)
-                    InfoRow("المجموعة", asset.groupName)
-                    InfoRow("الموقع", asset.location.ifBlank { "غير محدد" })
-                    InfoRow("الموقع الفني", locationLabel)
-                    InfoRow("الأصل الأب", parent?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
-                    InfoRow("الشركة/الموديل", listOf(asset.manufacturer, asset.model).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { "غير محدد" })
-                    if (asset.serialNumber.isNotBlank()) InfoRow("الرقم التسلسلي", asset.serialNumber)
-                    if (asset.assetTag.isNotBlank()) InfoRow("وسم الأصل", asset.assetTag)
-                    if (asset.assetNumber.isNotBlank()) InfoRow("رقم الأصل المالي", asset.assetNumber)
-                    InfoRow("الأهمية", asset.criticality)
-                    InfoRow("نوع التركيب", if (asset.mobility.equals("Mobile", ignoreCase = true)) "متنقّل" else "ثابت / مركّب")
-                    if (constructionDate.isNotBlank()) InfoRow("سنة / شهر الصنع", constructionDate)
-                    InfoRow("تاريخ التركيب", asset.installedAt)
-                    if (asset.startupDate.isNotBlank()) InfoRow("تاريخ بدء التشغيل", asset.startupDate)
-                    InfoRow("آخر فحص", asset.lastInspectionAt)
-                }
-            }
-        }
+        assetBasicInfoCard(asset, parent, locationLabel, constructionDate)
 
         assetLinearCard(asset)
 
