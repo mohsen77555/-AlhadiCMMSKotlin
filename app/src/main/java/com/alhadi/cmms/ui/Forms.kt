@@ -241,12 +241,6 @@ internal fun parseDateMillis(date: String): Long? =
 
 internal fun formatDateMillis(millis: Long): String = dateFormatterUtc().format(Date(millis))
 
-@Composable
-internal fun OptionDropdown(
-    label: String,
-    options: List<String>,
-    selected: String,
-    display: (String) -> String = { it },
     onSelect: (String) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
@@ -266,98 +260,10 @@ internal fun OptionDropdown(
     }
 }
 
-@Composable
-internal fun AssetDropdown(assets: List<AssetEntity>, selectedId: Long, onSelect: (Long) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    val selected = assets.firstOrNull { it.id == selectedId }
-    Column {
-        Text("الأصل", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    selected?.let { "${it.code} • ${it.name}" } ?: "اختر أصلاً",
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                assets.forEach { asset ->
-                    DropdownMenuItem(text = { Text("${asset.code} • ${asset.name}") }, onClick = { onSelect(asset.id); open = false })
-                }
-            }
-        }
-    }
-}
 
 /** Optional functional-location picker (with a "none" option). */
-@Composable
-internal fun LocationDropdown(
-    label: String,
-    locations: List<FunctionalLocationEntity>,
-    selectedId: Long?,
-    excludeId: Long? = null,
-    onSelect: (Long?) -> Unit
-) {
-    var open by remember { mutableStateOf(false) }
-    val selected = locations.firstOrNull { it.id == selectedId }
-    val options = locations.filter { it.id != excludeId }
-    Column {
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    selected?.let { "${it.code} • ${it.name}" } ?: "بدون",
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
-                options.forEach { loc ->
-                    DropdownMenuItem(text = { Text("${loc.code} • ${loc.name}") }, onClick = { onSelect(loc.id); open = false })
-                }
-            }
-        }
-    }
-}
 
 /** Optional asset picker (with a "none" option). */
-@Composable
-internal fun AssetDropdownOptional(
-    assets: List<AssetEntity>,
-    selectedId: Long?,
-    onSelect: (Long?) -> Unit,
-    label: String = "الأصل (اختياري)",
-    excludeId: Long? = null
-) {
-    var open by remember { mutableStateOf(false) }
-    val options = assets.filter { it.id != excludeId }
-    val selected = assets.firstOrNull { it.id == selectedId }
-    Column {
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    selected?.let { "${it.code} • ${it.name}" } ?: "بدون",
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                DropdownMenuItem(text = { Text("بدون") }, onClick = { onSelect(null); open = false })
-                options.forEach { asset ->
-                    DropdownMenuItem(text = { Text("${asset.code} • ${asset.name}") }, onClick = { onSelect(asset.id); open = false })
-                }
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -392,78 +298,11 @@ internal fun SaveButton(enabled: Boolean, onClick: () -> Unit) {
 }
 
 
-@Composable
-internal fun LinearMaintenancePositionFields(
-    asset: AssetEntity,
-    startPoint: String,
-    onStartPointChange: (String) -> Unit,
-    endPoint: String,
-    onEndPointChange: (String) -> Unit,
-    marker: String,
-    onMarkerChange: (String) -> Unit,
-    horizontalOffset: String,
-    onHorizontalOffsetChange: (String) -> Unit,
-    verticalOffset: String,
-    onVerticalOffsetChange: (String) -> Unit
-) {
-    Text("الموقع على الأصل الخطي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    Text(
-        "النطاق المتاح: ${linearRangeLabel(asset)}",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        Box(modifier = Modifier.weight(1f)) {
-            LabeledField("نقطة البداية (${asset.linearUnit})", startPoint, onStartPointChange, numeric = true)
-        }
-        Box(modifier = Modifier.weight(1f)) {
-            LabeledField("نقطة النهاية (${asset.linearUnit})", endPoint, onEndPointChange, numeric = true)
-        }
-    }
-    LabeledField("العلامة المرجعية (اختياري)", marker, onMarkerChange)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        Box(modifier = Modifier.weight(1f)) {
-            LabeledField("إزاحة أفقية (${asset.linearOffsetUnit})", horizontalOffset, onHorizontalOffsetChange, numeric = true)
-        }
-        Box(modifier = Modifier.weight(1f)) {
-            LabeledField("إزاحة رأسية (${asset.linearOffsetUnit})", verticalOffset, onVerticalOffsetChange, numeric = true)
-        }
-    }
-    if (!optionalLinearRangeValid(asset, startPoint, endPoint)) {
-        Text("يجب أن يكون النطاق داخل حدود الأصل وأن تكون النهاية أكبر من أو مساوية للبداية.", color = MaterialTheme.colorScheme.error)
-    }
-}
-
 /**
  * Dropdown sourced from organizational-unit master records of a given [type].
  * Stores the unit code. Falls back to a free-text field when no master records of the
  * type exist yet, and keeps any legacy non-matching value selectable (backward compatible).
  */
-@Composable
-internal fun OrgUnitDropdown(
-    label: String,
-    type: String,
-    orgUnits: List<OrgUnitEntity>,
-    value: String,
-    onChange: (String) -> Unit
-) {
-    val ofType = orgUnits.filter { it.type == type }
-    if (ofType.isEmpty()) {
-        LabeledField(label, value, onChange)
-        return
-    }
-    val codes = ofType.map { it.code }
-    val legacy = if (value.isNotBlank() && value !in codes) listOf(value) else emptyList()
-    OptionDropdown(
-        label = label,
-        options = listOf("") + legacy + codes,
-        selected = value,
-        display = { code ->
-            if (code.isBlank()) "—"
-            else ofType.firstOrNull { it.code == code }?.let { "${it.code} • ${it.name}" + if (!it.isActive) " (غير نشط)" else "" } ?: code
-        }
-    ) { onChange(it) }
-}
 
 /** AST-ORG-010: marks a field whose value was inherited from the functional location. */
 @Composable
