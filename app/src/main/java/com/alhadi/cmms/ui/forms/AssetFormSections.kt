@@ -94,7 +94,6 @@ import com.alhadi.cmms.util.DateStrings
 @Composable
 internal fun assetClassificationSection(state: AssetFormState) {
     with(state) {
-        Text("التصنيف", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("التصنيف القياسي", standardClass, { standardClass = it })
         LabeledField("فئة المعدّة", equipmentCategory, { equipmentCategory = it })
         LabeledField("صنف الأصل", assetClass, { assetClass = it })
@@ -110,7 +109,6 @@ internal fun assetClassificationSection(state: AssetFormState) {
 @Composable
 internal fun assetSafetySection(state: AssetFormState) {
     with(state) {
-        Text("السلامة والامتثال", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("أصل حرج للسلامة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = safetyCritical, onCheckedChange = { safetyCritical = it })
@@ -130,7 +128,6 @@ internal fun assetSafetySection(state: AssetFormState) {
 @Composable
 internal fun assetFinancialSection(state: AssetFormState) {
     with(state) {
-        Text("المعلومات المالية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("رقم الأصل المالي", assetNumber, { assetNumber = it })
         LabeledField("المورّد", supplier, { supplier = it })
         LabeledField("أمر الشراء", purchaseOrder, { purchaseOrder = it })
@@ -145,7 +142,6 @@ internal fun assetFinancialSection(state: AssetFormState) {
 @Composable
 internal fun assetContactSection(state: AssetFormState) {
     with(state) {
-        Text("جهة الاتصال والعنوان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("اسم الجهة أو الشخص", partnerName, { partnerName = it })
         OptionDropdown(
             label = "صفة الجهة",
@@ -170,7 +166,6 @@ internal fun assetLinearSection(
     coordinatesValid: Boolean
 ) {
     with(state) {
-        Text("الأصل الخطي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("تفعيل البيانات الخطية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = isLinearAsset, onCheckedChange = { isLinearAsset = it })
@@ -239,7 +234,6 @@ internal fun assetTechnicalSection(
     tech004Valid: Boolean
 ) {
     with(state) {
-        Text("البيانات الفنية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
         LabeledField("الموديل", model, { model = it })
         LabeledField("سنة الصنع", constructionYear, { constructionYear = it }, numeric = true)
@@ -258,7 +252,6 @@ internal fun assetNameplateSection(
     tech001Valid: Boolean
 ) {
     with(state) {
-        Text("المواصفات الفنية (لوحة الصنع)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         if (isCritical) {
             Text("AST-TECH-001: الأصل الحرج يجب أن يحتوي بيانات فنية أساسية (الشركة المصنّعة، الموديل، وأحد بيانات لوحة الصنع).",
                 color = if (tech001Valid) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
@@ -301,7 +294,6 @@ internal fun assetIdentitySection(
     tech002Valid: Boolean
 ) {
     with(state) {
-        Text("الهوية والترميز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("يتطلب تتبعاً فردياً (رقم تسلسلي إلزامي)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = requiresSerialTracking, onCheckedChange = { requiresSerialTracking = it })
@@ -327,7 +319,6 @@ internal fun assetWarrantySection(
     warrantyDatesLocked: Boolean
 ) {
     with(state) {
-        Text("الضمان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
         if (warrantyDatesLocked) {
             LabeledField("بداية الضمان", warrantyStart, {}, enabled = false)
@@ -393,7 +384,6 @@ internal fun assetOrgSection(
     hasOrgOverride: Boolean
 ) {
     with(state) {
-        Text("التنظيم والمسؤولية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         OptionDropdown("نوع التركيب", listOf("Fixed", "Mobile"), mobility, display = ::mobilityLabel) { mobility = it }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("أصل ذو تكلفة تشغيلية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)

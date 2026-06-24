@@ -45,6 +45,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -182,52 +183,75 @@ internal fun AssetFormSheet(
         (initial.warrantyStart.isNotBlank() || initial.warrantyEnd.isNotBlank()) && !canOverrideSerial
 
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
-        Text("البيانات الأساسية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LabeledField("كود الأصل", code, { code = it })
-        LabeledField("اسم الأصل", name, { name = it })
-        LabeledField("الوصف", description, { description = it }, singleLine = false)
-        OptionDropdown(
-            label = "فئة الأصل",
-            options = assetCategoryOptions,
-            selected = category,
-            display = ::assetCategoryLabel
-        ) { category = it }
-        LabeledField("نوع الأصل (مثال: مضخة، محرك، ناقل)", objectType, { objectType = it })
-        LabeledField("المجموعة", group, { group = it })
-        LabeledField("الموقع النصّي", location, { location = it })
-        if (locations.isNotEmpty()) {
-            if (initial == null) {
-                LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
-            } else {
-                // AST-ORG-007/008 & SAVE-011: location changes for an existing asset must go via a Transfer movement.
-                val locName = locations.firstOrNull { it.id == locationId }?.let { "${it.code} • ${it.name}" } ?: "غير محدد"
-                LabeledField("الموقع الفني", locName, {}, enabled = false)
-                Text("AST-ORG-008: لتغيير الموقع الفني استخدم حركة نقل (Transfer) من بطاقة الأصل.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        val expanded = remember { mutableStateMapOf("basic" to true) }
+
+        ExpandableFormSection(
+            "البيانات الأساسية",
+            expanded["basic"] == true,
+            { expanded["basic"] = expanded["basic"] != true },
+            hasError = code.isBlank() || name.isBlank()
+        ) {
+            LabeledField("كود الأصل", code, { code = it })
+            LabeledField("اسم الأصل", name, { name = it })
+            LabeledField("الوصف", description, { description = it }, singleLine = false)
+            OptionDropdown(
+                label = "فئة الأصل",
+                options = assetCategoryOptions,
+                selected = category,
+                display = ::assetCategoryLabel
+            ) { category = it }
+            LabeledField("نوع الأصل (مثال: مضخة، محرك، ناقل)", objectType, { objectType = it })
+            LabeledField("المجموعة", group, { group = it })
+            LabeledField("الموقع النصّي", location, { location = it })
+            if (locations.isNotEmpty()) {
+                if (initial == null) {
+                    LocationDropdown("الموقع الفني", locations, locationId) { locationId = it }
+                } else {
+                    // AST-ORG-007/008 & SAVE-011: location changes for an existing asset must go via a Transfer movement.
+                    val locName = locations.firstOrNull { it.id == locationId }?.let { "${it.code} • ${it.name}" } ?: "غير محدد"
+                    LabeledField("الموقع الفني", locName, {}, enabled = false)
+                    Text("AST-ORG-008: لتغيير الموقع الفني استخدم حركة نقل (Transfer) من بطاقة الأصل.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            if (allAssets.isNotEmpty()) {
+                AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
             }
         }
-        if (allAssets.isNotEmpty()) {
-            AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
+        ExpandableFormSection("التصنيف", expanded["classification"] == true, { expanded["classification"] = expanded["classification"] != true }) {
+            assetClassificationSection(s)
         }
-
-        assetClassificationSection(s)
-
-        assetLinearSection(s, linearRangeValid, linearStartValue, linearEndValue, coordinatesValid)
-
-        assetTechnicalSection(s, tech004Valid)
-
-        assetNameplateSection(s, isCritical, tech001Valid)
-
-        assetOrgSection(s, orgUnits, selectedLoc, isMobile, org001Company, org002Plant, org003Location, org004WorkCenter, org005Planner, org006CostCenter, org007FlActive, org008WcActive, org009PgActive, org010CcActive, org012OverrideReason, hasOrgOverride)
-
-        assetIdentitySection(s, serialLocked, tech002Valid)
-
-        assetSafetySection(s)
-
-        assetFinancialSection(s)
-
-        assetContactSection(s)
-
-        assetWarrantySection(s, warrantyDatesLocked)
+        ExpandableFormSection(
+            "الأصل الخطي",
+            expanded["linear"] == true,
+            { expanded["linear"] = expanded["linear"] != true },
+            hasError = !(linearRangeValid && markerDistancesValid && coordinatesValid)
+        ) {
+            assetLinearSection(s, linearRangeValid, linearStartValue, linearEndValue, coordinatesValid)
+        }
+        ExpandableFormSection("البيانات الفنية", expanded["technical"] == true, { expanded["technical"] = expanded["technical"] != true }, hasError = !tech004Valid) {
+            assetTechnicalSection(s, tech004Valid)
+        }
+        ExpandableFormSection("المواصفات الفنية (لوحة الصنع)", expanded["nameplate"] == true, { expanded["nameplate"] = expanded["nameplate"] != true }, hasError = !tech001Valid) {
+            assetNameplateSection(s, isCritical, tech001Valid)
+        }
+        ExpandableFormSection("التنظيم والمسؤولية", expanded["org"] == true, { expanded["org"] = expanded["org"] != true }, hasError = !orgValid) {
+            assetOrgSection(s, orgUnits, selectedLoc, isMobile, org001Company, org002Plant, org003Location, org004WorkCenter, org005Planner, org006CostCenter, org007FlActive, org008WcActive, org009PgActive, org010CcActive, org012OverrideReason, hasOrgOverride)
+        }
+        ExpandableFormSection("الهوية والترميز", expanded["identity"] == true, { expanded["identity"] = expanded["identity"] != true }, hasError = !tech002Valid) {
+            assetIdentitySection(s, serialLocked, tech002Valid)
+        }
+        ExpandableFormSection("السلامة والامتثال", expanded["safety"] == true, { expanded["safety"] = expanded["safety"] != true }) {
+            assetSafetySection(s)
+        }
+        ExpandableFormSection("المعلومات المالية", expanded["financial"] == true, { expanded["financial"] = expanded["financial"] != true }) {
+            assetFinancialSection(s)
+        }
+        ExpandableFormSection("جهة الاتصال والعنوان", expanded["contact"] == true, { expanded["contact"] = expanded["contact"] != true }) {
+            assetContactSection(s)
+        }
+        ExpandableFormSection("الضمان", expanded["warranty"] == true, { expanded["warranty"] = expanded["warranty"] != true }) {
+            assetWarrantySection(s, warrantyDatesLocked)
+        }
         if (!tech001Valid) Text("AST-TECH-001: أكمل البيانات الفنية الأساسية للأصل الحرج قبل الحفظ.", color = MaterialTheme.colorScheme.error)
         val today = DateStrings.today()
         // Save Draft: allow persisting an incomplete asset as a draft (skips mandatory rules).
