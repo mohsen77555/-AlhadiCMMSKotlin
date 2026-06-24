@@ -189,129 +189,156 @@ import kotlinx.coroutines.launch
 // Inventory
 // ---------------------------------------------------------------------------
 
+// ------------------------------------------------------------------------
+// Inventory cards & dialogs (moved out of InventoryScreen.kt)
+// ------------------------------------------------------------------------
+
 @Composable
-internal fun InventoryScreen(
-    innerPadding: PaddingValues,
-    parts: List<SparePartEntity>,
-    profiles: List<SerialNumberProfileEntity>,
+internal fun SparePartCard(
+    part: SparePartEntity,
+    profile: SerialNumberProfileEntity?,
     serials: List<SerialNumberEntity>,
-    transactions: List<InventoryTransactionEntity>,
-    warehouses: List<WarehouseEntity>,
+    warehouseLabel: String,
     canReceive: Boolean,
     canManage: Boolean,
-    onOpenSerialNumbers: () -> Unit,
     onIssue: (SparePartEntity, Int) -> Unit,
     onReceive: (SparePartEntity, Int) -> Unit,
-    onSave: (SparePartEntity) -> Unit,
-    onDelete: (SparePartEntity) -> Unit
+    onEdit: () -> Unit,
+    onOpenSerialNumbers: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var lowStockOnly by rememberSaveable { mutableStateOf(false) }
-    var showForm by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<SparePartEntity?>(null) }
-    var deleteTarget by remember { mutableStateOf<SparePartEntity?>(null) }
-    val lowStockCount = parts.count { it.onHandQty <= it.minQty }
-    val totalValue = parts.sumOf { it.onHandQty * it.lastPrice }
-    val filtered = remember(query, lowStockOnly, parts) {
-        parts.filter { part ->
-            val q = query.lowercase(Locale.getDefault())
-            (!lowStockOnly || part.onHandQty <= part.minQty) &&
-                (q.isBlank() ||
-                    part.partNumber.lowercase(Locale.getDefault()).contains(q) ||
-                    part.name.lowercase(Locale.getDefault()).contains(q) ||
-                    part.equipmentGroup.lowercase(Locale.getDefault()).contains(q))
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                val healthy = (parts.size - lowStockCount).coerceAtLeast(0)
-                val healthPct = if (parts.isEmpty()) 100f else healthy.toFloat() / parts.size * 100f
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        RingGauge(percent = healthPct, color = if (lowStockCount > 0) AccentOrange else AccentGreen, centerLabel = "متوفر")
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SectionHeader("حالة المخزون")
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                MetricColumn("أصناف", parts.size.toString(), AccentBlue)
-                                MetricColumn("منخفض", lowStockCount.toString(), if (lowStockCount > 0) AccentRed else AccentGreen)
-                            }
-                            InfoRow("قيمة المخزون", money(totalValue))
+    val lowStock = part.onHandQty <= part.minQty
+    val serialInStock = serials.count { it.status == "InStock" }
+    var moveMode by remember { mutableStateOf<String?>(null) } // "issue" | "receive"
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(part.partNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(part.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(if (lowStock) "منخفض" else "متوفر", statusTone(if (lowStock) "stopped" else "running"))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            InfoRow("المعدة", part.equipmentGroup)
+            InfoRow("الكمية", "${part.onHandQty} ${part.unit}")
+            InfoRow("الحد الأدنى", "${part.minQty} ${part.unit}")
+            InfoRow("المستودع", warehouseLabel.ifBlank { "غير محدد" })
+            InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
+            InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))
+            if (part.serializationActive) {
+                InfoRow("ملف التتبع", profile?.let { "${it.code} • ${it.name}" } ?: "غير محدد")
+                InfoRow("الوحدات المتسلسلة في المخزون", serialInStock.toString())
+                if (serialInStock != part.onHandQty) {
+                    StatusBadge("اختلاف بين الكمية والوحدات", statusTone("stopped"))
+                }
+                Button(onClick = onOpenSerialNumbers, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("إدارة الأرقام التسلسلية")
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { moveMode = "issue" }, enabled = part.onHandQty > 0, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("صرف")
+                    }
+                    if (canReceive) {
+                        Button(onClick = { moveMode = "receive" }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("استلام")
                         }
                     }
                 }
             }
-            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor") }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = !lowStockOnly, onClick = { lowStockOnly = false }, label = { Text("الكل") })
-                    FilterChip(
-                        selected = lowStockOnly,
-                        onClick = { lowStockOnly = true },
-                        label = { Text("منخفض المخزون ($lowStockCount)") },
-                        leadingIcon = { Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    )
-                }
-            }
-            if (canManage) {
-                item { AddButton("قطعة غيار جديدة") { editing = null; showForm = true } }
-            }
-            item { SectionHeader("قطع الغيار (${filtered.size})") }
-            if (filtered.isEmpty()) {
-                item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
-            }
-            filtered.groupBy { it.equipmentGroup.ifBlank { "عام" } }.forEach { (group, groupParts) ->
-                item(key = "grp-$group") {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.size(7.dp).background(AccentPurple, CircleShape))
-                        LtrText("$group (${groupParts.size})", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                items(groupParts, key = { it.id }) { part ->
-                    SparePartCard(
-                        part = part,
-                        profile = part.serialProfileId?.let { id -> profiles.firstOrNull { it.id == id } },
-                        serials = serials.filter { it.partId == part.id },
-                        warehouseLabel = warehouses.firstOrNull { it.code == part.location }?.let { "${it.code} — ${it.name}" } ?: part.location,
-                        canReceive = canReceive,
-                        canManage = canManage,
-                        onIssue = onIssue,
-                        onReceive = onReceive,
-                        onEdit = { editing = part; showForm = true },
-                        onOpenSerialNumbers = onOpenSerialNumbers,
-                        onDelete = { deleteTarget = part }
-                    )
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                SectionHeader("آخر حركات المخزون")
-            }
-            if (transactions.isEmpty()) {
-                item { EmptyState("لا توجد حركات مخزون") }
-            }
-            items(transactions, key = { it.id }) { transaction ->
-                TransactionCard(transaction = transaction, partNumber = parts.firstOrNull { it.id == transaction.partId }?.partNumber)
-            }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 
-    if (showForm) {
-        PartFormSheet(initial = editing, profiles = profiles, warehouses = warehouses, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
-    }
-    deleteTarget?.let { target ->
-        ConfirmDialog(
-            title = "حذف القطعة",
-            text = "هل تريد حذف ${target.partNumber} - ${target.name}؟",
-            onConfirm = { onDelete(target); deleteTarget = null },
-            onDismiss = { deleteTarget = null }
+    if (!part.serializationActive) moveMode?.let { mode ->
+        val isIssue = mode == "issue"
+        QuantityDialog(
+            title = if (isIssue) "صرف ${part.partNumber}" else "استلام ${part.partNumber}",
+            label = if (isIssue) "الكمية المصروفة (المتوفر ${part.onHandQty})" else "الكمية المستلمة",
+            maxValue = if (isIssue) part.onHandQty else null,
+            onConfirm = { qty ->
+                if (isIssue) onIssue(part, qty) else onReceive(part, qty)
+                moveMode = null
+            },
+            onDismiss = { moveMode = null }
         )
+    }
+}
+
+@Composable
+internal fun QuantityDialog(
+    title: String,
+    label: String,
+    maxValue: Int?,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf("1") }
+    val qty = text.toIntOrNull()
+    val valid = qty != null && qty > 0 && (maxValue == null || qty <= maxValue)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.filter { c -> c.isDigit() } },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = { TextButton(enabled = valid, onClick = { onConfirm(qty!!) }) { Text("تأكيد") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
+}
+
+@Composable
+internal fun TransactionCard(transaction: InventoryTransactionEntity, partNumber: String?) {
+    val isIssue = transaction.transactionType == "Issue"
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconBubble(
+                icon = if (isIssue) Icons.Filled.Bolt else Icons.Filled.Add,
+                tint = if (isIssue) StatusStopped else StatusRunning,
+                container = if (isIssue) StatusStoppedContainer else StatusRunningContainer,
+                size = 40
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = if (isIssue) "صرف ${transaction.quantity}" else "استلام ${transaction.quantity}",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall
+                )
+                LtrText(partNumber ?: "Part #${transaction.partId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${transaction.createdAt} • ${transaction.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (transaction.serialNumbers.isNotBlank()) {
+                    Text("الأرقام: ${transaction.serialNumbers}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (transaction.workOrderId != null) {
+                StatusBadge("أمر #${transaction.workOrderId}", statusTone("info"))
+            }
+        }
     }
 }

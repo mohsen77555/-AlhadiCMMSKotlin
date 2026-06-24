@@ -186,132 +186,106 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 // ---------------------------------------------------------------------------
-// Inventory
+// Dashboard
 // ---------------------------------------------------------------------------
 
-@Composable
-internal fun InventoryScreen(
-    innerPadding: PaddingValues,
-    parts: List<SparePartEntity>,
-    profiles: List<SerialNumberProfileEntity>,
-    serials: List<SerialNumberEntity>,
-    transactions: List<InventoryTransactionEntity>,
-    warehouses: List<WarehouseEntity>,
-    canReceive: Boolean,
-    canManage: Boolean,
-    onOpenSerialNumbers: () -> Unit,
-    onIssue: (SparePartEntity, Int) -> Unit,
-    onReceive: (SparePartEntity, Int) -> Unit,
-    onSave: (SparePartEntity) -> Unit,
-    onDelete: (SparePartEntity) -> Unit
-) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var lowStockOnly by rememberSaveable { mutableStateOf(false) }
-    var showForm by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<SparePartEntity?>(null) }
-    var deleteTarget by remember { mutableStateOf<SparePartEntity?>(null) }
-    val lowStockCount = parts.count { it.onHandQty <= it.minQty }
-    val totalValue = parts.sumOf { it.onHandQty * it.lastPrice }
-    val filtered = remember(query, lowStockOnly, parts) {
-        parts.filter { part ->
-            val q = query.lowercase(Locale.getDefault())
-            (!lowStockOnly || part.onHandQty <= part.minQty) &&
-                (q.isBlank() ||
-                    part.partNumber.lowercase(Locale.getDefault()).contains(q) ||
-                    part.name.lowercase(Locale.getDefault()).contains(q) ||
-                    part.equipmentGroup.lowercase(Locale.getDefault()).contains(q))
-        }
-    }
+// ------------------------------------------------------------------------
+// Dashboard helper widgets (moved out of DashboardScreen.kt)
+// ------------------------------------------------------------------------
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
+@Composable
+internal fun MetricColumn(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+internal fun DotSectionTitle(text: String, dot: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.size(8.dp).background(dot, CircleShape))
+    }
+}
+
+@Composable
+internal fun KpiTile(label: String, value: String, color: Color, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    ElevatedCard(
+        modifier = modifier.height(92.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            item {
-                val healthy = (parts.size - lowStockCount).coerceAtLeast(0)
-                val healthPct = if (parts.isEmpty()) 100f else healthy.toFloat() / parts.size * 100f
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        RingGauge(percent = healthPct, color = if (lowStockCount > 0) AccentOrange else AccentGreen, centerLabel = "متوفر")
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SectionHeader("حالة المخزون")
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                MetricColumn("أصناف", parts.size.toString(), AccentBlue)
-                                MetricColumn("منخفض", lowStockCount.toString(), if (lowStockCount > 0) AccentRed else AccentGreen)
-                            }
-                            InfoRow("قيمة المخزون", money(totalValue))
-                        }
-                    }
-                }
-            }
-            item { SearchField(query = query, onChange = { query = it }, placeholder = "بحث: BRG-6205 أو Sensor") }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = !lowStockOnly, onClick = { lowStockOnly = false }, label = { Text("الكل") })
-                    FilterChip(
-                        selected = lowStockOnly,
-                        onClick = { lowStockOnly = true },
-                        label = { Text("منخفض المخزون ($lowStockCount)") },
-                        leadingIcon = { Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    )
-                }
-            }
-            if (canManage) {
-                item { AddButton("قطعة غيار جديدة") { editing = null; showForm = true } }
-            }
-            item { SectionHeader("قطع الغيار (${filtered.size})") }
-            if (filtered.isEmpty()) {
-                item { EmptyState("لا توجد قطع غيار مطابقة", Icons.Filled.Inventory2) }
-            }
-            filtered.groupBy { it.equipmentGroup.ifBlank { "عام" } }.forEach { (group, groupParts) ->
-                item(key = "grp-$group") {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.size(7.dp).background(AccentPurple, CircleShape))
-                        LtrText("$group (${groupParts.size})", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                items(groupParts, key = { it.id }) { part ->
-                    SparePartCard(
-                        part = part,
-                        profile = part.serialProfileId?.let { id -> profiles.firstOrNull { it.id == id } },
-                        serials = serials.filter { it.partId == part.id },
-                        warehouseLabel = warehouses.firstOrNull { it.code == part.location }?.let { "${it.code} — ${it.name}" } ?: part.location,
-                        canReceive = canReceive,
-                        canManage = canManage,
-                        onIssue = onIssue,
-                        onReceive = onReceive,
-                        onEdit = { editing = part; showForm = true },
-                        onOpenSerialNumbers = onOpenSerialNumbers,
-                        onDelete = { deleteTarget = part }
-                    )
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                SectionHeader("آخر حركات المخزون")
-            }
-            if (transactions.isEmpty()) {
-                item { EmptyState("لا توجد حركات مخزون") }
-            }
-            items(transactions, key = { it.id }) { transaction ->
-                TransactionCard(transaction = transaction, partNumber = parts.firstOrNull { it.id == transaction.partId }?.partNumber)
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = color)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+internal fun BigActionButton(label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(54.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = color)
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+    }
+}
+
+@Composable
+internal fun CalmCard() {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconBubble(Icons.Filled.CheckCircle, StatusRunning, StatusRunningContainer, 40)
+            Column {
+                Text("لا شيء عاجل", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text("كل شيء تحت السيطرة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
+}
 
-    if (showForm) {
-        PartFormSheet(initial = editing, profiles = profiles, warehouses = warehouses, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
-    }
-    deleteTarget?.let { target ->
-        ConfirmDialog(
-            title = "حذف القطعة",
-            text = "هل تريد حذف ${target.partNumber} - ${target.name}؟",
-            onConfirm = { onDelete(target); deleteTarget = null },
-            onDismiss = { deleteTarget = null }
-        )
+@Composable
+internal fun AlertRow(icon: ImageVector, tint: Color, title: String, body: String, onClick: (() -> Unit)? = null) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconBubble(icon, tint, tint.copy(alpha = 0.14f), 40)
+            Column(modifier = Modifier.weight(1f)) {
+                LtrText(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (onClick != null) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
