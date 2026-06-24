@@ -206,16 +206,7 @@ internal fun AssetFormSheet(
             AssetDropdownOptional(allAssets, parentAssetId, { parentAssetId = it }, label = "الأصل الأب (اختياري)", excludeId = initial?.id)
         }
 
-        Text("التصنيف", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LabeledField("التصنيف القياسي", standardClass, { standardClass = it })
-        LabeledField("فئة المعدّة", equipmentCategory, { equipmentCategory = it })
-        LabeledField("صنف الأصل", assetClass, { assetClass = it })
-        LabeledField("الصنف الفرعي", assetSubclass, { assetSubclass = it })
-        LabeledField("نوع الإنشاء المشترك", constructionType, { constructionType = it })
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("توريث خصائص الأصل الأب", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = inheritParentCharacteristics, onCheckedChange = { inheritParentCharacteristics = it })
-        }
+        assetClassificationSection(s)
 
         Text("الأصل الخطي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -378,44 +369,11 @@ internal fun AssetFormSheet(
         LabeledField("الباركود", barcode, { barcode = it })
         LabeledField("رمز QR", qrCode, { qrCode = it })
 
-        Text("السلامة والامتثال", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("أصل حرج للسلامة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = safetyCritical, onCheckedChange = { safetyCritical = it })
-        }
-        OptionDropdown("مستوى المخاطر", listOf("", "Low", "Medium", "High", "Critical"), riskLevel) { riskLevel = it }
-        LabeledField("التصاريح المطلوبة", requiredPermits, { requiredPermits = it }, singleLine = false)
-        LabeledField("تعليمات السلامة", safetyInstructions, { safetyInstructions = it }, singleLine = false)
-        LabeledField("معدات الوقاية المطلوبة (PPE)", ppeRequired, { ppeRequired = it }, singleLine = false)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("يتطلب عزل الطاقة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = isolationRequired, onCheckedChange = { isolationRequired = it })
-        }
-        LabeledField("متطلبات الامتثال", complianceRequirements, { complianceRequirements = it }, singleLine = false)
+        assetSafetySection(s)
 
-        Text("المعلومات المالية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LabeledField("رقم الأصل المالي", assetNumber, { assetNumber = it })
-        LabeledField("المورّد", supplier, { supplier = it })
-        LabeledField("أمر الشراء", purchaseOrder, { purchaseOrder = it })
-        LabeledField("تكلفة الشراء", purchaseCost, { purchaseCost = it }, numeric = true)
-        DateField("تاريخ الاقتناء", acquiredAt) { acquiredAt = it }
-        OptionDropdown("الحالة المالية", listOf("", "Active", "Capitalized", "Depreciated", "Disposed", "Written Off"), financialStatus) { financialStatus = it }
-        LabeledField("القيمة الدفترية", bookValue, { bookValue = it }, numeric = true)
-        DateField("تاريخ الرسملة", capitalizationAt) { capitalizationAt = it }
+        assetFinancialSection(s)
 
-        Text("جهة الاتصال والعنوان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LabeledField("اسم الجهة أو الشخص", partnerName, { partnerName = it })
-        OptionDropdown(
-            label = "صفة الجهة",
-            options = assetPartnerRoleOptions,
-            selected = partnerRole,
-            display = ::assetPartnerRoleLabel
-        ) { partnerRole = it }
-        LabeledField("رقم الهاتف", partnerPhone, { partnerPhone = it })
-        LabeledField("البريد الإلكتروني", partnerEmail, { partnerEmail = it })
-        LabeledField("العنوان", addressLine, { addressLine = it }, singleLine = false)
-        LabeledField("المدينة", city, { city = it })
-        LabeledField("الدولة", country, { country = it })
+        assetContactSection(s)
 
         Text("الضمان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
