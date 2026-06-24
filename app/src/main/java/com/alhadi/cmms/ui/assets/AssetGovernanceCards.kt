@@ -318,7 +318,3 @@ internal fun LazyListScope.assetGovernanceCards(
             }
         }
 }
-
-/** Organization/responsibility and partner/address cards. */
-
-/** Warranty card (AST-WAR display): type/counter/services/document/claim + shared-ref count. */

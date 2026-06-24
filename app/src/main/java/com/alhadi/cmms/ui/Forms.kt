@@ -241,30 +241,6 @@ internal fun parseDateMillis(date: String): Long? =
 
 internal fun formatDateMillis(millis: Long): String = dateFormatterUtc().format(Date(millis))
 
-    onSelect: (String) -> Unit
-) {
-    var open by remember { mutableStateOf(false) }
-    Column {
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(selected.ifBlank { "اختر…" }.let(display), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                options.forEach { opt ->
-                    DropdownMenuItem(text = { Text(display(opt)) }, onClick = { onSelect(opt); open = false })
-                }
-            }
-        }
-    }
-}
-
-
-/** Optional functional-location picker (with a "none" option). */
-
-/** Optional asset picker (with a "none" option). */
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
