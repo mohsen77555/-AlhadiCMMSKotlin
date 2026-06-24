@@ -217,43 +217,7 @@ internal fun AssetFormSheet(
 
         assetNameplateSection(s, isCritical, tech001Valid)
 
-        Text("التنظيم والمسؤولية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        OptionDropdown("نوع التركيب", listOf("Fixed", "Mobile"), mobility, display = ::mobilityLabel) { mobility = it }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("أصل ذو تكلفة تشغيلية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = incursOperatingCost, onCheckedChange = { incursOperatingCost = it })
-        }
-        OrgUnitDropdown("الشركة (Company)", "Company", orgUnits, company) { company = it }
-        if (!org001Company) Text("AST-ORG-SAVE-001: الأصل النشط يتطلب Company.", color = MaterialTheme.colorScheme.error)
-        LabeledField("الموقع/المنشأة", site, { site = it })
-        OrgUnitDropdown("المصنع (Plant)", "Plant", orgUnits, maintenancePlant) { maintenancePlant = it }
-        InheritedCaption(selectedLoc != null && maintenancePlant.isNotBlank() && maintenancePlant.equals(selectedLoc.plantCode, ignoreCase = true))
-        if (!org002Plant) Text("AST-ORG-SAVE-002: الأصل النشط يتطلب Plant.", color = MaterialTheme.colorScheme.error)
-        LabeledField("مصنع التخطيط", planningPlant, { planningPlant = it })
-        OrgUnitDropdown("مجموعة المخططين (Planner Group)", "PlannerGroup", orgUnits, plannerGroup) { plannerGroup = it }
-        InheritedCaption(selectedLoc != null && plannerGroup.isNotBlank() && plannerGroup.equals(selectedLoc.plannerGroupCode, ignoreCase = true))
-        if (!org005Planner) Text("AST-ORG-SAVE-005: الأصل الحرج يتطلب Planner Group.", color = MaterialTheme.colorScheme.error)
-        if (!org009PgActive) Text("AST-ORG-SAVE-009: لا يمكن ربط Planner Group غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
-        OrgUnitDropdown("مركز العمل الرئيسي (Work Center)", "WorkCenter", orgUnits, mainWorkCenter) { mainWorkCenter = it }
-        InheritedCaption(selectedLoc != null && mainWorkCenter.isNotBlank() && mainWorkCenter.equals(selectedLoc.workCenterCode, ignoreCase = true))
-        if (!org004WorkCenter) Text("AST-ORG-SAVE-004: الأصل الحرج يتطلب Work Center.", color = MaterialTheme.colorScheme.error)
-        if (!org008WcActive) Text("AST-ORG-SAVE-008: لا يمكن ربط Work Center غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
-        LabeledField("مركز عمل الإنتاج", productionWorkCenter, { productionWorkCenter = it })
-        OrgUnitDropdown("مركز التكلفة (Cost Center)", "CostCenter", orgUnits, costCenter) { costCenter = it }
-        InheritedCaption(selectedLoc != null && costCenter.isNotBlank() && costCenter.equals(selectedLoc.costCenterCode, ignoreCase = true))
-        if (!org006CostCenter) Text("AST-ORG-SAVE-006: الأصل ذو التكلفة التشغيلية يتطلب Cost Center.", color = MaterialTheme.colorScheme.error)
-        if (!org010CcActive) Text("AST-ORG-SAVE-010: لا يمكن ربط Cost Center غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
-        if (hasOrgOverride) {
-            LabeledField("سبب تجاوز البيانات الموروثة (Override)", orgOverrideReason, { orgOverrideReason = it }, singleLine = false)
-            if (!org012OverrideReason) Text("AST-ORG-SAVE-012: أدخل سبب تجاوز القيم الموروثة من الموقع الفني.", color = MaterialTheme.colorScheme.error)
-        }
-        if (!org003Location) Text(
-            if (isMobile) "AST-ORG-003: الأصل المتنقل يتطلب تحديد مكانه الحالي (الموقع النصّي)."
-            else "AST-ORG-SAVE-003: الأصل المركّب يتطلب موقعاً فنياً.",
-            color = MaterialTheme.colorScheme.error
-        )
-        if (!org007FlActive) Text("AST-ORG-SAVE-007: لا يمكن ربط موقع فني غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
-        LabeledField("الشخص المسؤول", responsiblePerson, { responsiblePerson = it })
+        assetOrgSection(s, orgUnits, selectedLoc, isMobile, org001Company, org002Plant, org003Location, org004WorkCenter, org005Planner, org006CostCenter, org007FlActive, org008WcActive, org009PgActive, org010CcActive, org012OverrideReason, hasOrgOverride)
 
         assetIdentitySection(s, serialLocked, tech002Valid)
 
