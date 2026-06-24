@@ -184,141 +184,61 @@ import com.alhadi.cmms.viewmodel.*
 import com.alhadi.cmms.viewmodel.DashboardStats
 import java.util.Locale
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.lazy.LazyListScope
 
-/**
- * Read-only asset governance cards (identity codes, safety/compliance, technical
- * specs, costs, financial) — extracted from AssetDetailScreen as a LazyListScope
- * extension so the detail screen stays small.
- */
-internal fun LazyListScope.assetGovernanceCards(
+// ---------------------------------------------------------------------------
+// Assets
+// ---------------------------------------------------------------------------
+
+// ------------------------------------------------------------------------
+// Asset list card (moved out of AssetsScreen.kt)
+// ------------------------------------------------------------------------
+
+@Composable
+internal fun AssetCard(
     asset: AssetEntity,
-    allAssets: List<AssetEntity>,
-    workOrders: List<WorkOrderEntity>
+    canManage: Boolean,
+    onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    val hasIdentityCodes = listOf(
-        asset.alternativeLabel,
-        asset.externalAssetCode,
-        asset.legacyAssetCode,
-        asset.barcode,
-        asset.qrCode
-    ).any { it.isNotBlank() }
-    val hasSafety = asset.safetyCritical || asset.isolationRequired || listOf(
-        asset.riskLevel,
-        asset.requiredPermits,
-        asset.safetyInstructions,
-        asset.ppeRequired,
-        asset.complianceRequirements
-    ).any { it.isNotBlank() }
-        if (hasIdentityCodes) {
-            item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader("الهوية والترميز")
-                        if (asset.alternativeLabel.isNotBlank()) InfoRow("التسمية البديلة", asset.alternativeLabel)
-                        if (asset.externalAssetCode.isNotBlank()) InfoRow("الكود الخارجي", asset.externalAssetCode)
-                        if (asset.legacyAssetCode.isNotBlank()) InfoRow("الكود القديم", asset.legacyAssetCode)
-                        if (asset.barcode.isNotBlank()) InfoRow("الباركود", asset.barcode)
-                        if (asset.qrCode.isNotBlank()) InfoRow("رمز QR", asset.qrCode)
-                    }
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val tone = statusTone(asset.status)
+                IconBubble(Icons.Filled.PrecisionManufacturing, tone.content, tone.container, 44)
+                Column(modifier = Modifier.weight(1f)) {
+                    LtrText(asset.code, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    LtrText(asset.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                StatusBadge(asset.status, tone)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatusBadge(asset.criticality, priorityTone(asset.criticality))
+                AssistChip(onClick = {}, label = { Text(assetCategoryLabel(asset.category), maxLines = 1) })
+                if (asset.objectType.isNotBlank()) {
+                    AssistChip(onClick = {}, label = { Text(asset.objectType, maxLines = 1) })
+                }
+                if (asset.standardClass.isNotBlank()) {
+                    AssistChip(onClick = {}, label = { Text(asset.standardClass, maxLines = 1) })
+                }
+                if (asset.isLinearAsset) {
+                    StatusBadge("أصل خطي", statusTone("info"))
                 }
             }
-        }
-
-        if (hasSafety) {
-            item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader("السلامة والامتثال")
-                        InfoRow("أصل حرج للسلامة", if (asset.safetyCritical) "نعم" else "لا")
-                        if (asset.riskLevel.isNotBlank()) InfoRow("مستوى المخاطر", asset.riskLevel)
-                        InfoRow("يتطلب عزل الطاقة", if (asset.isolationRequired) "نعم" else "لا")
-                        if (asset.requiredPermits.isNotBlank()) InfoRow("التصاريح المطلوبة", asset.requiredPermits)
-                        if (asset.ppeRequired.isNotBlank()) InfoRow("معدات الوقاية (PPE)", asset.ppeRequired)
-                        if (asset.safetyInstructions.isNotBlank()) InfoRow("تعليمات السلامة", asset.safetyInstructions)
-                        if (asset.complianceRequirements.isNotBlank()) InfoRow("متطلبات الامتثال", asset.complianceRequirements)
-                    }
-                }
+            if (asset.location.isNotBlank()) {
+                Text(asset.location, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (canManage) EditDeleteRow(onEdit, onDelete)
         }
-
-        val technicalSpecs = listOf(
-            "بلد المنشأ" to asset.countryOfOrigin,
-            "نوع الإنشاء" to asset.constructionType,
-            "مجموعة المواصفات" to asset.technicalSpecGroup,
-            "السعة" to asset.capacity,
-            "القدرة" to asset.power,
-            "الجهد" to asset.voltage,
-            "التيار" to asset.current,
-            "التردد" to asset.frequency,
-            "السرعة" to asset.speed,
-            "الضغط" to asset.pressure,
-            "معدل التدفق" to asset.flowRate,
-            "نطاق الحرارة" to asset.temperatureRange,
-            "الوزن" to asset.weight,
-            "الأبعاد" to asset.dimensions,
-            "المادة" to asset.material,
-            "معيار التصميم" to asset.designStandard
-        ).filter { it.second.isNotBlank() }
-        val sameConstruction = if (asset.constructionType.isNotBlank()) {
-            allAssets.count { it.id != asset.id && it.constructionType.equals(asset.constructionType, ignoreCase = true) }
-        } else 0
-        if (technicalSpecs.isNotEmpty() || asset.nameplateData.isNotBlank() || asset.requiresSerialTracking) {
-            item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader("المواصفات الفنية (لوحة الصنع)")
-                        if (asset.requiresSerialTracking) InfoRow("تتبع فردي", "مطلوب رقم تسلسلي")
-                        technicalSpecs.forEach { (label, value) -> InfoRow(label, value) }
-                        if (asset.nameplateData.isNotBlank()) InfoRow("بيانات لوحة الصنع", asset.nameplateData)
-                        // AST-TECH-005: construction type links assets that share components/characteristics.
-                        if (sameConstruction > 0) InfoRow("أصول بنفس نوع الإنشاء", "$sameConstruction أصل")
-                    }
-                }
-            }
-        }
-
-        item {
-            val laborTotal = workOrders.sumOf { it.laborCost() }
-            val partsTotal = workOrders.sumOf { it.partsCost }
-            val grandTotal = workOrders.sumOf { it.totalCost() }
-            val closedCount = workOrders.count { it.status == "Closed" }
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        SectionHeader("التكاليف")
-                        Spacer(modifier = Modifier.weight(1f))
-                        StatusBadge(money(grandTotal), statusTone("info"))
-                    }
-                    InfoRow("إجمالي التكلفة", money(grandTotal))
-                    InfoRow("تكلفة العمالة", money(laborTotal))
-                    InfoRow("تكلفة قطع الغيار", money(partsTotal))
-                    InfoRow("أوامر العمل", "${workOrders.size} (مغلقة: $closedCount)")
-                }
-            }
-        }
-
-        val hasFinancial = asset.supplier.isNotBlank() || asset.purchaseOrder.isNotBlank() ||
-            asset.purchaseCost > 0.0 || asset.acquiredAt.isNotBlank() ||
-            asset.financialStatus.isNotBlank() || asset.bookValue > 0.0 || asset.capitalizationAt.isNotBlank()
-        if (hasFinancial) {
-            item {
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader("المعلومات المالية")
-                        if (asset.supplier.isNotBlank()) InfoRow("المورّد", asset.supplier)
-                        if (asset.purchaseOrder.isNotBlank()) InfoRow("أمر الشراء", asset.purchaseOrder)
-                        if (asset.purchaseCost > 0.0) InfoRow("تكلفة الشراء", money(asset.purchaseCost))
-                        if (asset.acquiredAt.isNotBlank()) InfoRow("تاريخ الاقتناء", asset.acquiredAt)
-                        if (asset.financialStatus.isNotBlank()) InfoRow("الحالة المالية", asset.financialStatus)
-                        if (asset.bookValue > 0.0) InfoRow("القيمة الدفترية", money(asset.bookValue))
-                        if (asset.capitalizationAt.isNotBlank()) InfoRow("تاريخ الرسملة", asset.capitalizationAt)
-                    }
-                }
-            }
-        }
+    }
 }
-
-/** Organization/responsibility and partner/address cards. */
-
-/** Warranty card (AST-WAR display): type/counter/services/document/claim + shared-ref count. */
