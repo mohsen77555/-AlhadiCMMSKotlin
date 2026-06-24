@@ -178,6 +178,9 @@ internal fun AssetFormSheet(
         linearEndLongitude to (-180.0..180.0)
     ).all { (value, range) -> value.isBlank() || value.toDoubleOrNull()?.let { it in range } == true }
 
+    val warrantyDatesLocked = initial != null &&
+        (initial.warrantyStart.isNotBlank() || initial.warrantyEnd.isNotBlank()) && !canOverrideSerial
+
     FormSheet(if (initial == null) "إضافة أصل جديد" else "تعديل الأصل", onDismiss) {
         Text("البيانات الأساسية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         LabeledField("كود الأصل", code, { code = it })
@@ -208,110 +211,11 @@ internal fun AssetFormSheet(
 
         assetClassificationSection(s)
 
-        Text("الأصل الخطي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("تفعيل البيانات الخطية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = isLinearAsset, onCheckedChange = { isLinearAsset = it })
-        }
-        if (isLinearAsset) {
-            LabeledField("رمز المسار / الخط", linearRouteCode, { linearRouteCode = it })
-            LabeledField("نمط المرجع الخطي", linearReferencePattern, { linearReferencePattern = it })
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) { LabeledField("نقطة البداية", linearStartPoint, { linearStartPoint = it }, numeric = true) }
-                Box(modifier = Modifier.weight(1f)) { LabeledField("نقطة النهاية", linearEndPoint, { linearEndPoint = it }, numeric = true) }
-            }
-            OptionDropdown("وحدة القياس", linearUnitOptions, linearUnit, display = ::linearUnitLabel) { linearUnit = it }
-            if (linearRangeValid) {
-                Text(
-                    "الطول: ${formatLinearNumber((linearEndValue ?: 0.0) - (linearStartValue ?: 0.0))} $linearUnit",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-            } else {
-                Text("يجب أن تكون نقطة النهاية أكبر من نقطة البداية.", color = MaterialTheme.colorScheme.error)
-            }
+        assetLinearSection(s, linearRangeValid, linearStartValue, linearEndValue, coordinatesValid)
 
-            Text("العلامات المرجعية", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) { LabeledField("علامة البداية", linearStartMarker, { linearStartMarker = it }) }
-                Box(modifier = Modifier.weight(1f)) { LabeledField("علامة النهاية", linearEndMarker, { linearEndMarker = it }) }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) { LabeledField("المسافة من علامة البداية", linearStartMarkerDistance, { linearStartMarkerDistance = it }, numeric = true) }
-                Box(modifier = Modifier.weight(1f)) { LabeledField("المسافة إلى علامة النهاية", linearEndMarkerDistance, { linearEndMarkerDistance = it }, numeric = true) }
-            }
-            OptionDropdown("وحدة مسافة العلامات", linearUnitOptions, linearMarkerUnit, display = ::linearUnitLabel) { linearMarkerUnit = it }
+        assetTechnicalSection(s, tech004Valid)
 
-            Text("الإزاحات والاتجاه", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) { LabeledField("الإزاحة الأفقية", linearHorizontalOffset, { linearHorizontalOffset = it }, numeric = true) }
-                Box(modifier = Modifier.weight(1f)) { LabeledField("الإزاحة الرأسية", linearVerticalOffset, { linearVerticalOffset = it }, numeric = true) }
-            }
-            OptionDropdown("وحدة الإزاحة", linearOffsetUnitOptions, linearOffsetUnit, display = ::linearUnitLabel) { linearOffsetUnit = it }
-            OptionDropdown("اتجاه الأصل", linearDirectionOptions, linearDirection, display = ::linearDirectionLabel) { linearDirection = it }
-
-            Text("الإحداثيات (اختياري)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) { LabeledField("خط عرض البداية", linearStartLatitude, { linearStartLatitude = it }, numeric = true) }
-                Box(modifier = Modifier.weight(1f)) { LabeledField("خط طول البداية", linearStartLongitude, { linearStartLongitude = it }, numeric = true) }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1f)) { LabeledField("خط عرض النهاية", linearEndLatitude, { linearEndLatitude = it }, numeric = true) }
-                Box(modifier = Modifier.weight(1f)) { LabeledField("خط طول النهاية", linearEndLongitude, { linearEndLongitude = it }, numeric = true) }
-            }
-            if (!coordinatesValid) Text("تحقق من صحة الإحداثيات.", color = MaterialTheme.colorScheme.error)
-
-            Text("ربط الشبكة", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            LabeledField("رمز كائن الشبكة", networkObjectCode, { networkObjectCode = it })
-            OptionDropdown("نوع كائن الشبكة", networkObjectTypeOptions, networkObjectType, display = ::networkObjectTypeLabel) { networkObjectType = it }
-            OptionDropdown("نوع العلاقة", networkRelationOptions, networkRelation, display = ::networkRelationLabel) { networkRelation = it }
-            LabeledField("سمات الشبكة", networkAttributes, { networkAttributes = it }, singleLine = false)
-        }
-
-        Text("البيانات الفنية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LabeledField("الشركة المصنّعة", manufacturer, { manufacturer = it })
-        LabeledField("الموديل", model, { model = it })
-        LabeledField("سنة الصنع", constructionYear, { constructionYear = it }, numeric = true)
-        LabeledField("شهر الصنع", constructionMonth, { constructionMonth = it }, numeric = true)
-        DateField("تاريخ بدء التشغيل", startupDate) { startupDate = it }
-        OptionDropdown("الحالة", listOf("Draft", "Active", "Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired", "Disposed"), status) { status = it }
-        OptionDropdown("الأهمية", listOf("Low", "Medium", "High", "Critical"), criticality) { criticality = it }
-        if (!tech004Valid) Text("AST-TECH-004: الموديل مطلوب لوجود قطع غيار مرتبطة بالموديل.", color = MaterialTheme.colorScheme.error)
-
-        Text("المواصفات الفنية (لوحة الصنع)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        if (isCritical) {
-            Text("AST-TECH-001: الأصل الحرج يجب أن يحتوي بيانات فنية أساسية (الشركة المصنّعة، الموديل، وأحد بيانات لوحة الصنع).",
-                color = if (tech001Valid) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall)
-        }
-        LabeledField("بلد المنشأ", countryOfOrigin, { countryOfOrigin = it })
-        LabeledField("بيانات لوحة الصنع", nameplateData, { nameplateData = it }, singleLine = false)
-        LabeledField("نوع الإنشاء (Construction Type)", constructionType, { constructionType = it })
-        LabeledField("مجموعة المواصفات الفنية", technicalSpecGroup, { technicalSpecGroup = it })
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.weight(1f)) { LabeledField("السعة (Capacity)", capacity, { capacity = it }) }
-            Box(modifier = Modifier.weight(1f)) { LabeledField("القدرة (Power)", power, { power = it }) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.weight(1f)) { LabeledField("الجهد (Voltage)", voltage, { voltage = it }) }
-            Box(modifier = Modifier.weight(1f)) { LabeledField("التيار (Current)", current, { current = it }) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.weight(1f)) { LabeledField("التردد (Frequency)", frequency, { frequency = it }) }
-            Box(modifier = Modifier.weight(1f)) { LabeledField("السرعة (Speed)", speed, { speed = it }) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.weight(1f)) { LabeledField("الضغط (Pressure)", pressure, { pressure = it }) }
-            Box(modifier = Modifier.weight(1f)) { LabeledField("معدل التدفق (Flow Rate)", flowRate, { flowRate = it }) }
-        }
-        LabeledField("نطاق درجة الحرارة", temperatureRange, { temperatureRange = it })
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.weight(1f)) { LabeledField("الوزن (Weight)", weight, { weight = it }) }
-            Box(modifier = Modifier.weight(1f)) { LabeledField("الأبعاد (Dimensions)", dimensions, { dimensions = it }) }
-        }
-        LabeledField("المادة (Material)", material, { material = it })
-        LabeledField("معيار التصميم (Design Standard)", designStandard, { designStandard = it })
+        assetNameplateSection(s, isCritical, tech001Valid)
 
         Text("التنظيم والمسؤولية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         OptionDropdown("نوع التركيب", listOf("Fixed", "Mobile"), mobility, display = ::mobilityLabel) { mobility = it }
@@ -351,23 +255,7 @@ internal fun AssetFormSheet(
         if (!org007FlActive) Text("AST-ORG-SAVE-007: لا يمكن ربط موقع فني غير نشط بأصل نشط.", color = MaterialTheme.colorScheme.error)
         LabeledField("الشخص المسؤول", responsiblePerson, { responsiblePerson = it })
 
-        Text("الهوية والترميز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("يتطلب تتبعاً فردياً (رقم تسلسلي إلزامي)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = requiresSerialTracking, onCheckedChange = { requiresSerialTracking = it })
-        }
-        LabeledField("الرقم التسلسلي", serialNumber, { serialNumber = it }, enabled = !serialLocked)
-        if (serialLocked) {
-            Text("AST-TECH-003: لا يمكن تعديل الرقم التسلسلي بعد تسجيل تاريخ التشغيل إلا بصلاحية خاصة.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        }
-        if (!tech002Valid) Text("AST-TECH-002: الرقم التسلسلي مطلوب لأن الأصل يتطلب تتبعاً فردياً.", color = MaterialTheme.colorScheme.error)
-        LabeledField("وسم الأصل", assetTag, { assetTag = it })
-        LabeledField("التسمية البديلة", alternativeLabel, { alternativeLabel = it })
-        LabeledField("الوصف المطوّل", longDescription, { longDescription = it }, singleLine = false)
-        LabeledField("الكود الخارجي", externalAssetCode, { externalAssetCode = it })
-        LabeledField("الكود القديم (Legacy)", legacyAssetCode, { legacyAssetCode = it })
-        LabeledField("الباركود", barcode, { barcode = it })
-        LabeledField("رمز QR", qrCode, { qrCode = it })
+        assetIdentitySection(s, serialLocked, tech002Valid)
 
         assetSafetySection(s)
 
@@ -375,52 +263,7 @@ internal fun AssetFormSheet(
 
         assetContactSection(s)
 
-        Text("الضمان", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        LabeledField("جهة الضمان", warrantyProvider, { warrantyProvider = it })
-        // AST-WAR-003: warranty dates are locked once set, unless the user can override (admin).
-        val warrantyDatesLocked = initial != null &&
-            (initial.warrantyStart.isNotBlank() || initial.warrantyEnd.isNotBlank()) && !canOverrideSerial
-        if (warrantyDatesLocked) {
-            LabeledField("بداية الضمان", warrantyStart, {}, enabled = false)
-            LabeledField("نهاية الضمان", warrantyEnd, {}, enabled = false)
-            Text("AST-WAR-003: لا يمكن تعديل تواريخ الضمان إلا بصلاحية خاصة.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        } else {
-            DateField("بداية الضمان", warrantyStart) { warrantyStart = it }
-            DateField("نهاية الضمان", warrantyEnd) { warrantyEnd = it }
-        }
-        LabeledField("مرجع/رقم عقد الضمان", warrantyReference, { warrantyReference = it })
-        OptionDropdown("نوع الضمان", listOf("", "Standard", "Extended", "Service Contract", "AMC"), warrantyType, display = ::warrantyTypeLabel) { warrantyType = it }
-        LabeledField("فئة الضمان", warrantyCategory, { warrantyCategory = it })
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("ضمان المورّد", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = vendorWarranty, onCheckedChange = { vendorWarranty = it })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("ضمان المُصنّع", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = manufacturerWarranty, onCheckedChange = { manufacturerWarranty = it })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("ضمان العميل", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = customerWarranty, onCheckedChange = { customerWarranty = it })
-        }
-        // AST-WAR-002: coverage by date and/or counter.
-        OptionDropdown("نوع عدّاد الضمان", listOf("", "Hours", "Km", "Cycles", "Production"), warrantyCounterType, display = ::warrantyCounterTypeLabel) { warrantyCounterType = it }
-        if (warrantyCounterType.isNotBlank()) {
-            LabeledField("حد العدّاد", warrantyCounterLimit, { warrantyCounterLimit = it }, numeric = true)
-        }
-        LabeledField("الشروط والأحكام", warrantyTerms, { warrantyTerms = it }, singleLine = false)
-        LabeledField("الخدمات المشمولة", coveredServices, { coveredServices = it }, singleLine = false)
-        LabeledField("الخدمات المستثناة", excludedServices, { excludedServices = it }, singleLine = false)
-        LabeledField("جهة اتصال الضمان", warrantyContact, { warrantyContact = it })
-        // AST-WAR-006: warranty document linked to the asset card.
-        LabeledField("مستند الضمان (مرجع/رابط)", warrantyDocument, { warrantyDocument = it })
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("يتطلب مطالبة ضمان", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = warrantyClaimRequired, onCheckedChange = { warrantyClaimRequired = it })
-        }
-        if (warrantyClaimRequired) {
-            OptionDropdown("حالة المطالبة", listOf("", "None", "Submitted", "UnderReview", "Approved", "Rejected"), warrantyClaimStatus, display = ::warrantyClaimStatusLabel) { warrantyClaimStatus = it }
-        }
+        assetWarrantySection(s, warrantyDatesLocked)
         if (!tech001Valid) Text("AST-TECH-001: أكمل البيانات الفنية الأساسية للأصل الحرج قبل الحفظ.", color = MaterialTheme.colorScheme.error)
         val today = DateStrings.today()
         // Save Draft: allow persisting an incomplete asset as a draft (skips mandatory rules).
