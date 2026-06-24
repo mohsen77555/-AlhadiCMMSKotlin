@@ -185,109 +185,89 @@ import com.alhadi.cmms.viewmodel.DashboardStats
 import java.util.Locale
 import kotlinx.coroutines.launch
 
-internal fun orderedLocations(all: List<FunctionalLocationEntity>): List<Pair<FunctionalLocationEntity, Int>> {
-    val byParent = all.groupBy { it.parentId }
-    val result = mutableListOf<Pair<FunctionalLocationEntity, Int>>()
-    val placed = mutableSetOf<Long>()
-    fun visit(parentId: Long?, depth: Int) {
-        byParent[parentId]?.sortedBy { it.code }?.forEach { loc ->
-            if (placed.add(loc.id)) {
-                result += loc to depth
-                visit(loc.id, depth + 1)
-            }
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
+
+// ------------------------------------------------------------------------
+// App chrome small widgets (moved out of AppChrome.kt)
+// ------------------------------------------------------------------------
+
+@Composable
+internal fun ProductionBadge() {
+    Surface(shape = CircleShape, color = StatusRunningContainer) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(modifier = Modifier.size(7.dp).background(StatusRunning, CircleShape))
+            Text(
+                "Production",
+                style = MaterialTheme.typography.labelMedium,
+                color = StatusRunning,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
-    visit(null, 0)
-    all.filter { it.id !in placed }.sortedBy { it.code }.forEach { result += it to 0 }
-    return result
 }
 
 @Composable
-internal fun LocationsScreen(
-    innerPadding: PaddingValues,
-    locations: List<FunctionalLocationEntity>,
-    assets: List<AssetEntity>,
-    orgUnits: List<OrgUnitEntity>,
-    canManage: Boolean,
-    onSave: (FunctionalLocationEntity) -> Unit,
-    onDelete: (FunctionalLocationEntity) -> Unit
-) {
-    var showForm by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<FunctionalLocationEntity?>(null) }
-    var deleteTarget by remember { mutableStateOf<FunctionalLocationEntity?>(null) }
-    var detailId by remember { mutableStateOf<Long?>(null) }
-
-    val detail = detailId?.let { id -> locations.firstOrNull { it.id == id } }
-    if (detail != null) {
-        BackHandler { detailId = null }
-        LocationDetailScreen(
-            innerPadding = innerPadding,
-            location = detail,
-            children = locations.filter { it.parentId == detail.id },
-            assets = assets.filter { it.locationId == detail.id },
-            onBack = { detailId = null },
-            onOpenChild = { detailId = it }
-        )
-        return
-    }
-
-    val ordered = remember(locations) { orderedLocations(locations) }
-    val assetCounts = remember(assets) { assets.groupBy { it.locationId } }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            item {
-                SectionHeader("شجرة المواقع الفنية")
-                Text("نظّم الأصول حسب المصنع والخط والمنطقة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (canManage) {
-                item { AddButton("موقع فني جديد") { editing = null; showForm = true } }
-            }
-            if (ordered.isEmpty()) {
-                item { EmptyState("لا توجد مواقع فنية", Icons.Filled.AccountTree) }
-            }
-            items(ordered, key = { it.first.id }) { (loc, depth) ->
-                LocationCard(
-                    location = loc,
-                    depth = depth,
-                    assetCount = assetCounts[loc.id]?.size ?: 0,
-                    childCount = locations.count { it.parentId == loc.id },
-                    canManage = canManage,
-                    onOpen = { detailId = loc.id },
-                    onEdit = { editing = loc; showForm = true },
-                    onDelete = { deleteTarget = loc }
-                )
-            }
+internal fun SyncCard() {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = StatusRunningContainer
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+            Text(
+                "حالة المزامنة",
+                style = MaterialTheme.typography.labelMedium,
+                color = StatusRunning,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "محلي • جاهز للعمل بدون إنترنت",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
+}
 
-    if (showForm) {
-        LocationFormSheet(initial = editing, allLocations = locations, orgUnits = orgUnits, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+@Composable
+internal fun StatCard(label: String, value: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
-    deleteTarget?.let { target ->
-        val linkedAssets = assets.count { it.locationId == target.id }
-        val childLocations = locations.count { it.parentId == target.id }
-        if (linkedAssets > 0 || childLocations > 0) {
-            // FLOC-008: never delete a location that still has assets or child locations — deactivate instead.
-            AlertDialog(
-                onDismissRequest = { deleteTarget = null },
-                confirmButton = { TextButton(onClick = { deleteTarget = null }) { Text("حسناً") } },
-                title = { Text("لا يمكن حذف الموقع الفني") },
-                text = { Text("يرتبط بهذا الموقع $linkedAssets أصل و $childLocations موقع فرعي. انقلها أولاً أو اجعل الموقع \"غير نشط\" بدل حذفه.") }
-            )
-        } else {
-            ConfirmDialog(
-                title = "حذف الموقع الفني",
-                text = "هل تريد حذف ${target.code} - ${target.name}؟",
-                onConfirm = { onDelete(target); deleteTarget = null },
-                onDismiss = { deleteTarget = null }
-            )
+}
+
+@Composable
+internal fun QuickPill(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
         }
     }
 }

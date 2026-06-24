@@ -296,84 +296,6 @@ internal fun AppHeader(
     }
 }
 
-@Composable
-internal fun ProductionBadge() {
-    Surface(shape = CircleShape, color = StatusRunningContainer) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Box(modifier = Modifier.size(7.dp).background(StatusRunning, CircleShape))
-            Text(
-                "Production",
-                style = MaterialTheme.typography.labelMedium,
-                color = StatusRunning,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-internal fun SyncCard() {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = StatusRunningContainer
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-            Text(
-                "حالة المزامنة",
-                style = MaterialTheme.typography.labelMedium,
-                color = StatusRunning,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "محلي • جاهز للعمل بدون إنترنت",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-internal fun StatCard(label: String, value: String, color: Color) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-internal fun QuickPill(label: String, icon: ImageVector, onClick: () -> Unit) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-        modifier = Modifier.clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Bottom navigation (custom, filled-square selected icon)
@@ -426,4 +348,3 @@ internal fun AppBottomBar(selected: BottomTab, isAdmin: Boolean, onSelect: (Bott
         }
     }
 }
-
