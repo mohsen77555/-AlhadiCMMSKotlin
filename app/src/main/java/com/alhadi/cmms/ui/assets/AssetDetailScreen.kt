@@ -244,10 +244,6 @@ internal fun AssetDetailScreen(
     val constructionDate = listOf(asset.constructionYear, asset.constructionMonth)
         .filter { it.isNotBlank() }
         .joinToString(" / ")
-    val resolvedCharacteristics = resolveAssetCharacteristics(asset, allAssets, characteristics)
-    val directCharacteristics = resolvedCharacteristics.filterNot { it.inherited }
-    val inheritedCharacteristics = resolvedCharacteristics.filter { it.inherited }
-    val characteristicGroups = resolvedCharacteristics.groupBy { it.resolvedClassName }
 
     LazyColumn(
         modifier = Modifier
@@ -290,79 +286,15 @@ internal fun AssetDetailScreen(
 
         assetGovernanceCards(asset, allAssets, workOrders)
 
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                SectionHeader("التصنيف والخصائص (${resolvedCharacteristics.size})")
-                Spacer(modifier = Modifier.weight(1f))
-                if (canManage) {
-                    OutlinedButton(onClick = { editingChar = null; showCharForm = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("إضافة")
-                    }
-                }
-            }
-        }
-        item {
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    InfoRow("التصنيف القياسي", asset.standardClass.ifBlank { "غير محدد" })
-                    if (asset.equipmentCategory.isNotBlank()) InfoRow("فئة المعدّة", asset.equipmentCategory)
-                    if (asset.assetClass.isNotBlank()) InfoRow("صنف الأصل", asset.assetClass)
-                    if (asset.assetSubclass.isNotBlank()) InfoRow("الصنف الفرعي", asset.assetSubclass)
-                    InfoRow("توريث خصائص الأصل الأب", if (asset.inheritParentCharacteristics) "مفعّل" else "متوقف")
-                    InfoRow("الخصائص المباشرة", directCharacteristics.size.toString())
-                    if (inheritedCharacteristics.isNotEmpty()) {
-                        InfoRow("الخصائص الموروثة", inheritedCharacteristics.size.toString())
-                    }
-                }
-            }
-        }
-        if (resolvedCharacteristics.isEmpty()) {
-            item { EmptyState("لا توجد خصائص مسجّلة") }
-        }
-        characteristicGroups.forEach { (className, classItems) ->
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    SectionHeader("$className (${classItems.size})")
-                    Spacer(modifier = Modifier.weight(1f))
-                    if (asset.standardClass.isNotBlank() && className.equals(asset.standardClass, ignoreCase = true)) {
-                        StatusBadge("قياسي", statusTone("info"))
-                    }
-                }
-            }
-            items(classItems, key = { resolved -> "char-${resolved.sourceAsset.id}-${resolved.item.id}-${resolved.inherited}" }) { resolved ->
-                val ch = resolved.item
-                ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(ch.name, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                            LtrText(characteristicDisplayValue(ch), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            StatusBadge(characteristicTypeLabel(ch.dataType), statusTone("info"))
-                            if (ch.isRequired) StatusBadge("إلزامية", statusTone("overdue"))
-                            if (resolved.inherited) {
-                                StatusBadge("موروثة من ${resolved.sourceAsset.code}", statusTone("scheduled"))
-                            }
-                        }
-                        if (canManage && !resolved.inherited) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                OutlinedButton(onClick = { editingChar = ch; showCharForm = true }, modifier = Modifier.weight(1f)) {
-                                    Text("تعديل")
-                                }
-                                TextButton(onClick = { deleteChar = ch }, modifier = Modifier.weight(1f)) {
-                                    Text("حذف", color = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        assetCharacteristicsSection(
+            asset = asset,
+            allAssets = allAssets,
+            characteristics = characteristics,
+            canManage = canManage,
+            onAdd = { editingChar = null; showCharForm = true },
+            onEdit = { editingChar = it; showCharForm = true },
+            onDelete = { deleteChar = it }
+        )
 
         item {
             AssetBomSection(
@@ -383,89 +315,27 @@ internal fun AssetDetailScreen(
 
         assetWarrantyCard(asset, allAssets, underWarranty)
 
-        if (canManage) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = { showEdit = true }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("تعديل")
-                    }
-                    OutlinedButton(onClick = { showStatus = true }, modifier = Modifier.weight(1f)) {
-                        Text("تغيير الحالة")
-                    }
-                }
-            }
-            item {
-                OutlinedButton(onClick = { showMoveForm = true }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("تركيب / نقل / فك")
-                }
-            }
-            item {
-                if (retired) {
-                    Text(
-                        "الأصل ${if (asset.status.equals("Disposed", ignoreCase = true)) "مُستبعَد" else "متقاعد"} — لا يمكن إنشاء أوامر عمل جديدة عليه (AST: Create Work Order).",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (underWarranty) {
-                            Text(
-                                "تنبيه: هذا الأصل ضمن الضمان — قد تتحمّل جهة الضمان تكلفة الإصلاح.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AccentOrange,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        AddButton("أمر عمل لهذا الأصل") { showWoForm = true }
-                    }
-                }
-            }
-        }
+        assetActionsSection(
+            asset = asset,
+            canManage = canManage,
+            retired = retired,
+            underWarranty = underWarranty,
+            onEditAsset = { showEdit = true },
+            onChangeStatus = { showStatus = true },
+            onMove = { showMoveForm = true },
+            onCreateWorkOrder = { showWoForm = true }
+        )
 
         assetSubAssetsSection(parent, children, onOpenAsset)
         assetWorkOrdersSection(asset, workOrders, canManage, onUpdateWorkOrderStatus)
         assetPmSection(pmItems)
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                SectionHeader("المستندات (${documents.size})")
-                Spacer(modifier = Modifier.weight(1f))
-                if (canManage) {
-                    OutlinedButton(onClick = { editingDoc = null; showDocForm = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("إضافة")
-                    }
-                }
-            }
-        }
-        if (documents.isEmpty()) {
-            item { EmptyState("لا توجد مستندات لهذا الأصل", Icons.Filled.Description) }
-        }
-        items(documents, key = { "doc-${it.id}" }) { doc ->
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        IconBubble(Icons.Filled.Description, AccentBlue, AccentBlue.copy(alpha = 0.14f), 36)
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(doc.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                            LtrText(doc.reference, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        StatusBadge(doc.type, statusTone("info"))
-                    }
-                    Text("${doc.uploadedBy} • ${doc.uploadedAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (canManage) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            OutlinedButton(onClick = { editingDoc = doc; showDocForm = true }, modifier = Modifier.weight(1f)) { Text("تعديل") }
-                            TextButton(onClick = { deleteDoc = doc }, modifier = Modifier.weight(1f)) { Text("حذف", color = MaterialTheme.colorScheme.error) }
-                        }
-                    }
-                }
-            }
-        }
+        assetDocumentsSection(
+            documents = documents,
+            canManage = canManage,
+            onAdd = { editingDoc = null; showDocForm = true },
+            onEdit = { editingDoc = it; showDocForm = true },
+            onDelete = { deleteDoc = it }
+        )
 
         assetMovementsSection(movements)
     }
