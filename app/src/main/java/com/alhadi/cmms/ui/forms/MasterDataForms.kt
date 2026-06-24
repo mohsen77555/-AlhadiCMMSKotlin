@@ -207,7 +207,7 @@ internal fun OrgUnitFormSheet(
     val parentOptions = listOf("") + existing.filter { it.id != initial?.id }.map { it.id.toString() }
 
     FormSheet(if (initial == null) "إضافة وحدة تنظيمية" else "تعديل الوحدة التنظيمية", onDismiss) {
-        OptionDropdown("النوع", listOf("Company", "Plant", "Department", "WorkCenter", "PlannerGroup", "CostCenter"), type, display = ::orgUnitTypeOption) { type = it }
+        OptionDropdown("النوع", listOf("Company", "Site", "Plant", "MaintenancePlant", "PlanningPlant", "Department", "CostCenter", "PlannerGroup", "WorkCenter", "StorageLocation"), type, display = ::orgUnitTypeOption) { type = it }
         LabeledField("الكود", code, { code = it })
         if (duplicate) Text("هذا الكود مستخدم لنفس النوع.", color = MaterialTheme.colorScheme.error)
         LabeledField("الاسم", name, { name = it })
@@ -237,11 +237,15 @@ internal fun OrgUnitFormSheet(
 
 internal fun orgUnitTypeOption(type: String): String = when (type) {
     "Company" -> "شركة"
-    "Plant" -> "مصنع / موقع"
+    "Site" -> "موقع جغرافي"
+    "Plant" -> "مصنع / وحدة تشغيلية"
+    "MaintenancePlant" -> "جهة الصيانة"
+    "PlanningPlant" -> "جهة التخطيط"
     "Department" -> "قسم"
-    "WorkCenter" -> "مركز عمل"
-    "PlannerGroup" -> "مجموعة تخطيط"
     "CostCenter" -> "مركز تكلفة"
+    "PlannerGroup" -> "مجموعة تخطيط"
+    "WorkCenter" -> "مركز عمل"
+    "StorageLocation" -> "موقع تخزين"
     else -> type
 }
 

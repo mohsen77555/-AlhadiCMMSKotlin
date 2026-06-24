@@ -313,7 +313,31 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36)
+    /** Adds the full organizational-governance fields (companies/sites/work centers/...) to org_units. */
+    val MIGRATION_36_37 = object : Migration(36, 37) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE org_units ADD COLUMN shortName TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN legalName TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN taxNumber TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN commercialRegistration TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN country TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN region TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN city TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN address TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN phone TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN email TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN website TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN latitude REAL",
+                "ALTER TABLE org_units ADD COLUMN longitude REAL",
+                "ALTER TABLE org_units ADD COLUMN capacity TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN supervisor TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE org_units ADD COLUMN manager TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

@@ -185,15 +185,22 @@ import com.alhadi.cmms.viewmodel.DashboardStats
 import java.util.Locale
 import kotlinx.coroutines.launch
 
-internal val orgUnitTypeOrder = listOf("Company", "Plant", "Department", "WorkCenter", "PlannerGroup", "CostCenter")
+internal val orgUnitTypeOrder = listOf(
+    "Company", "Site", "Plant", "MaintenancePlant", "PlanningPlant",
+    "Department", "CostCenter", "PlannerGroup", "WorkCenter", "StorageLocation"
+)
 
 internal fun orgUnitTypeLabel(type: String): String = when (type) {
     "Company" -> "شركة"
-    "Plant" -> "مصنع / موقع"
+    "Site" -> "موقع جغرافي"
+    "Plant" -> "مصنع / وحدة تشغيلية"
+    "MaintenancePlant" -> "جهة الصيانة"
+    "PlanningPlant" -> "جهة التخطيط"
     "Department" -> "قسم"
-    "WorkCenter" -> "مركز عمل"
-    "PlannerGroup" -> "مجموعة تخطيط"
     "CostCenter" -> "مركز تكلفة"
+    "PlannerGroup" -> "مجموعة تخطيط"
+    "WorkCenter" -> "مركز عمل"
+    "StorageLocation" -> "موقع تخزين"
     else -> type
 }
 

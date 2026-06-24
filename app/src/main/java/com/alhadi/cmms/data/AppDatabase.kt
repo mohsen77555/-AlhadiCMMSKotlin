@@ -91,7 +91,7 @@ import com.alhadi.cmms.data.entity.OrgUnitEntity
         WarehouseEntity::class,
         OrgUnitEntity::class
     ],
-    version = 36,
+    version = 37,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
