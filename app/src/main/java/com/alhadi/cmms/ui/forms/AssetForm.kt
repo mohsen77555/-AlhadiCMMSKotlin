@@ -103,130 +103,9 @@ internal fun AssetFormSheet(
     canOverrideSerial: Boolean = false,
     hasLinkedParts: Boolean = false
 ) {
-    var code by remember { mutableStateOf(initial?.code ?: "") }
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var group by remember { mutableStateOf(initial?.groupName ?: "") }
-    var location by remember { mutableStateOf(initial?.location ?: "") }
-    var manufacturer by remember { mutableStateOf(initial?.manufacturer ?: "") }
-    var model by remember { mutableStateOf(initial?.model ?: "") }
-    var status by remember { mutableStateOf(initial?.status ?: "Running") }
-    var criticality by remember { mutableStateOf(initial?.criticality ?: "Medium") }
-    var locationId by remember { mutableStateOf(initial?.locationId) }
-    var mobility by remember { mutableStateOf(initial?.mobility ?: "Fixed") }
-    var incursOperatingCost by remember { mutableStateOf(initial?.incursOperatingCost ?: false) }
-    var orgOverrideReason by remember { mutableStateOf(initial?.orgOverrideReason ?: "") }
-    var parentAssetId by remember { mutableStateOf(initial?.parentAssetId) }
-    var warrantyProvider by remember { mutableStateOf(initial?.warrantyProvider ?: "") }
-    var warrantyStart by remember { mutableStateOf(initial?.warrantyStart ?: "") }
-    var warrantyEnd by remember { mutableStateOf(initial?.warrantyEnd ?: "") }
-    var warrantyType by remember { mutableStateOf(initial?.warrantyType ?: "") }
-    var warrantyCategory by remember { mutableStateOf(initial?.warrantyCategory ?: "") }
-    var warrantyTerms by remember { mutableStateOf(initial?.warrantyTerms ?: "") }
-    var coveredServices by remember { mutableStateOf(initial?.coveredServices ?: "") }
-    var excludedServices by remember { mutableStateOf(initial?.excludedServices ?: "") }
-    var warrantyCounterType by remember { mutableStateOf(initial?.warrantyCounterType ?: "") }
-    var warrantyCounterLimit by remember { mutableStateOf((initial?.warrantyCounterLimit ?: 0.0).toString()) }
-    var warrantyClaimRequired by remember { mutableStateOf(initial?.warrantyClaimRequired ?: false) }
-    var warrantyClaimStatus by remember { mutableStateOf(initial?.warrantyClaimStatus ?: "") }
-    var warrantyContact by remember { mutableStateOf(initial?.warrantyContact ?: "") }
-    var warrantyDocument by remember { mutableStateOf(initial?.warrantyDocument ?: "") }
-    var vendorWarranty by remember { mutableStateOf(initial?.vendorWarranty ?: false) }
-    var manufacturerWarranty by remember { mutableStateOf(initial?.manufacturerWarranty ?: false) }
-    var customerWarranty by remember { mutableStateOf(initial?.customerWarranty ?: false) }
-    var warrantyReference by remember { mutableStateOf(initial?.warrantyReference ?: "") }
-    var serialNumber by remember { mutableStateOf(initial?.serialNumber ?: "") }
-    var assetTag by remember { mutableStateOf(initial?.assetTag ?: "") }
-    var supplier by remember { mutableStateOf(initial?.supplier ?: "") }
-    var purchaseOrder by remember { mutableStateOf(initial?.purchaseOrder ?: "") }
-    var purchaseCost by remember { mutableStateOf((initial?.purchaseCost ?: 0.0).toString()) }
-    var acquiredAt by remember { mutableStateOf(initial?.acquiredAt ?: "") }
-    var category by remember { mutableStateOf(initial?.category ?: "Machine") }
-    var objectType by remember { mutableStateOf(initial?.objectType ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var maintenancePlant by remember { mutableStateOf(initial?.maintenancePlant ?: "") }
-    var planningPlant by remember { mutableStateOf(initial?.planningPlant ?: "") }
-    var plannerGroup by remember { mutableStateOf(initial?.plannerGroup ?: "") }
-    var mainWorkCenter by remember { mutableStateOf(initial?.mainWorkCenter ?: "") }
-    var productionWorkCenter by remember { mutableStateOf(initial?.productionWorkCenter ?: "") }
-    var costCenter by remember { mutableStateOf(initial?.costCenter ?: "") }
-    var responsiblePerson by remember { mutableStateOf(initial?.responsiblePerson ?: "") }
-    var assetNumber by remember { mutableStateOf(initial?.assetNumber ?: "") }
-    var constructionYear by remember { mutableStateOf(initial?.constructionYear ?: "") }
-    var constructionMonth by remember { mutableStateOf(initial?.constructionMonth ?: "") }
-    var startupDate by remember { mutableStateOf(initial?.startupDate ?: "") }
-    var partnerName by remember { mutableStateOf(initial?.partnerName ?: "") }
-    var partnerRole by remember { mutableStateOf(initial?.partnerRole ?: "") }
-    var partnerPhone by remember { mutableStateOf(initial?.partnerPhone ?: "") }
-    var partnerEmail by remember { mutableStateOf(initial?.partnerEmail ?: "") }
-    var addressLine by remember { mutableStateOf(initial?.addressLine ?: "") }
-    var city by remember { mutableStateOf(initial?.city ?: "") }
-    var country by remember { mutableStateOf(initial?.country ?: "") }
-    var standardClass by remember { mutableStateOf(initial?.standardClass ?: "") }
-    var constructionType by remember { mutableStateOf(initial?.constructionType ?: "") }
-    var inheritParentCharacteristics by remember { mutableStateOf(initial?.inheritParentCharacteristics ?: true) }
-    var isLinearAsset by remember { mutableStateOf(initial?.isLinearAsset ?: false) }
-    var linearStartPoint by remember { mutableStateOf(formatLinearNumber(initial?.linearStartPoint ?: 0.0)) }
-    var linearEndPoint by remember { mutableStateOf(formatLinearNumber(initial?.linearEndPoint ?: 0.0)) }
-    var linearUnit by remember { mutableStateOf(initial?.linearUnit ?: "km") }
-    var linearReferencePattern by remember { mutableStateOf(initial?.linearReferencePattern ?: "") }
-    var linearRouteCode by remember { mutableStateOf(initial?.linearRouteCode ?: "") }
-    var linearStartMarker by remember { mutableStateOf(initial?.linearStartMarker ?: "") }
-    var linearEndMarker by remember { mutableStateOf(initial?.linearEndMarker ?: "") }
-    var linearStartMarkerDistance by remember { mutableStateOf(formatLinearNumber(initial?.linearStartMarkerDistance ?: 0.0)) }
-    var linearEndMarkerDistance by remember { mutableStateOf(formatLinearNumber(initial?.linearEndMarkerDistance ?: 0.0)) }
-    var linearMarkerUnit by remember { mutableStateOf(initial?.linearMarkerUnit ?: "km") }
-    var linearHorizontalOffset by remember { mutableStateOf(formatLinearNumber(initial?.linearHorizontalOffset ?: 0.0)) }
-    var linearVerticalOffset by remember { mutableStateOf(formatLinearNumber(initial?.linearVerticalOffset ?: 0.0)) }
-    var linearOffsetUnit by remember { mutableStateOf(initial?.linearOffsetUnit ?: "m") }
-    var linearDirection by remember { mutableStateOf(initial?.linearDirection ?: "Both") }
-    var networkObjectCode by remember { mutableStateOf(initial?.networkObjectCode ?: "") }
-    var networkObjectType by remember { mutableStateOf(initial?.networkObjectType ?: "") }
-    var networkRelation by remember { mutableStateOf(initial?.networkRelation ?: "") }
-    var networkAttributes by remember { mutableStateOf(initial?.networkAttributes ?: "") }
-    var linearStartLatitude by remember { mutableStateOf(initial?.linearStartLatitude?.let(::formatLinearNumber) ?: "") }
-    var linearStartLongitude by remember { mutableStateOf(initial?.linearStartLongitude?.let(::formatLinearNumber) ?: "") }
-    var linearEndLatitude by remember { mutableStateOf(initial?.linearEndLatitude?.let(::formatLinearNumber) ?: "") }
-    var linearEndLongitude by remember { mutableStateOf(initial?.linearEndLongitude?.let(::formatLinearNumber) ?: "") }
-    // Asset identity governance
-    var longDescription by remember { mutableStateOf(initial?.longDescription ?: "") }
-    var alternativeLabel by remember { mutableStateOf(initial?.alternativeLabel ?: "") }
-    var externalAssetCode by remember { mutableStateOf(initial?.externalAssetCode ?: "") }
-    var legacyAssetCode by remember { mutableStateOf(initial?.legacyAssetCode ?: "") }
-    var barcode by remember { mutableStateOf(initial?.barcode ?: "") }
-    var qrCode by remember { mutableStateOf(initial?.qrCode ?: "") }
-    var equipmentCategory by remember { mutableStateOf(initial?.equipmentCategory ?: "") }
-    var assetClass by remember { mutableStateOf(initial?.assetClass ?: "") }
-    var assetSubclass by remember { mutableStateOf(initial?.assetSubclass ?: "") }
-    var company by remember { mutableStateOf(initial?.company ?: "") }
-    var site by remember { mutableStateOf(initial?.site ?: "") }
-    var safetyCritical by remember { mutableStateOf(initial?.safetyCritical ?: false) }
-    var riskLevel by remember { mutableStateOf(initial?.riskLevel ?: "") }
-    var requiredPermits by remember { mutableStateOf(initial?.requiredPermits ?: "") }
-    var safetyInstructions by remember { mutableStateOf(initial?.safetyInstructions ?: "") }
-    var ppeRequired by remember { mutableStateOf(initial?.ppeRequired ?: "") }
-    var isolationRequired by remember { mutableStateOf(initial?.isolationRequired ?: false) }
-    var complianceRequirements by remember { mutableStateOf(initial?.complianceRequirements ?: "") }
-    var financialStatus by remember { mutableStateOf(initial?.financialStatus ?: "") }
-    var bookValue by remember { mutableStateOf((initial?.bookValue ?: 0.0).toString()) }
-    var capitalizationAt by remember { mutableStateOf(initial?.capitalizationAt ?: "") }
-    // Manufacturing & technical specifications
-    var countryOfOrigin by remember { mutableStateOf(initial?.countryOfOrigin ?: "") }
-    var nameplateData by remember { mutableStateOf(initial?.nameplateData ?: "") }
-    var capacity by remember { mutableStateOf(initial?.capacity ?: "") }
-    var power by remember { mutableStateOf(initial?.power ?: "") }
-    var voltage by remember { mutableStateOf(initial?.voltage ?: "") }
-    var current by remember { mutableStateOf(initial?.current ?: "") }
-    var frequency by remember { mutableStateOf(initial?.frequency ?: "") }
-    var speed by remember { mutableStateOf(initial?.speed ?: "") }
-    var pressure by remember { mutableStateOf(initial?.pressure ?: "") }
-    var flowRate by remember { mutableStateOf(initial?.flowRate ?: "") }
-    var temperatureRange by remember { mutableStateOf(initial?.temperatureRange ?: "") }
-    var weight by remember { mutableStateOf(initial?.weight ?: "") }
-    var dimensions by remember { mutableStateOf(initial?.dimensions ?: "") }
-    var material by remember { mutableStateOf(initial?.material ?: "") }
-    var designStandard by remember { mutableStateOf(initial?.designStandard ?: "") }
-    var technicalSpecGroup by remember { mutableStateOf(initial?.technicalSpecGroup ?: "") }
-    var requiresSerialTracking by remember { mutableStateOf(initial?.requiresSerialTracking ?: false) }
+    val s = remember { AssetFormState(initial) }
+
+    with(s) {
 
     // --- Asset technical governance rules (AST-TECH-001..005) ---
     val isCritical = criticality.equals("Critical", ignoreCase = true)
@@ -586,139 +465,9 @@ internal fun AssetFormSheet(
         }
         if (!tech001Valid) Text("AST-TECH-001: أكمل البيانات الفنية الأساسية للأصل الحرج قبل الحفظ.", color = MaterialTheme.colorScheme.error)
         val today = DateStrings.today()
-        val buildAsset: (String) -> AssetEntity = { statusValue ->
-                AssetEntity(
-                    id = initial?.id ?: 0,
-                    code = code.trim(),
-                    name = name.trim(),
-                    groupName = group.ifBlank { "General" },
-                    location = location,
-                    manufacturer = manufacturer,
-                    model = model,
-                    status = statusValue,
-                    criticality = criticality,
-                    installedAt = initial?.installedAt ?: today,
-                    lastInspectionAt = initial?.lastInspectionAt ?: today,
-                    locationId = locationId,
-                    warrantyProvider = warrantyProvider.trim(),
-                    parentAssetId = parentAssetId,
-                    serialNumber = if (serialLocked) (initial?.serialNumber ?: "") else serialNumber.trim(),
-                    assetTag = assetTag.trim(),
-                    supplier = supplier.trim(),
-                    purchaseOrder = purchaseOrder.trim(),
-                    purchaseCost = purchaseCost.toDoubleOrNull() ?: 0.0,
-                    acquiredAt = acquiredAt.trim(),
-                    category = category,
-                    objectType = objectType.trim(),
-                    description = description.trim(),
-                    maintenancePlant = maintenancePlant.trim(),
-                    planningPlant = planningPlant.trim(),
-                    plannerGroup = plannerGroup.trim(),
-                    mainWorkCenter = mainWorkCenter.trim(),
-                    productionWorkCenter = productionWorkCenter.trim(),
-                    costCenter = costCenter.trim(),
-                    responsiblePerson = responsiblePerson.trim(),
-                    assetNumber = assetNumber.trim(),
-                    constructionYear = constructionYear.trim(),
-                    constructionMonth = constructionMonth.trim(),
-                    startupDate = startupDate.trim(),
-                    partnerName = partnerName.trim(),
-                    partnerRole = partnerRole,
-                    partnerPhone = partnerPhone.trim(),
-                    partnerEmail = partnerEmail.trim(),
-                    addressLine = addressLine.trim(),
-                    city = city.trim(),
-                    country = country.trim(),
-                    standardClass = standardClass.trim(),
-                    constructionType = constructionType.trim(),
-                    inheritParentCharacteristics = inheritParentCharacteristics,
-                    isLinearAsset = isLinearAsset,
-                    linearStartPoint = if (isLinearAsset) linearStartValue ?: 0.0 else 0.0,
-                    linearEndPoint = if (isLinearAsset) linearEndValue ?: 0.0 else 0.0,
-                    linearUnit = linearUnit,
-                    linearReferencePattern = if (isLinearAsset) linearReferencePattern.trim() else "",
-                    linearRouteCode = if (isLinearAsset) linearRouteCode.trim() else "",
-                    linearStartMarker = if (isLinearAsset) linearStartMarker.trim() else "",
-                    linearEndMarker = if (isLinearAsset) linearEndMarker.trim() else "",
-                    linearStartMarkerDistance = if (isLinearAsset) linearStartMarkerDistance.toDoubleOrNull() ?: 0.0 else 0.0,
-                    linearEndMarkerDistance = if (isLinearAsset) linearEndMarkerDistance.toDoubleOrNull() ?: 0.0 else 0.0,
-                    linearMarkerUnit = linearMarkerUnit,
-                    linearHorizontalOffset = if (isLinearAsset) linearHorizontalOffset.toDoubleOrNull() ?: 0.0 else 0.0,
-                    linearVerticalOffset = if (isLinearAsset) linearVerticalOffset.toDoubleOrNull() ?: 0.0 else 0.0,
-                    linearOffsetUnit = linearOffsetUnit,
-                    linearDirection = linearDirection,
-                    networkObjectCode = if (isLinearAsset) networkObjectCode.trim() else "",
-                    networkObjectType = if (isLinearAsset) networkObjectType else "",
-                    networkRelation = if (isLinearAsset) networkRelation else "",
-                    networkAttributes = if (isLinearAsset) networkAttributes.trim() else "",
-                    linearStartLatitude = if (isLinearAsset) linearStartLatitude.toDoubleOrNull() else null,
-                    linearStartLongitude = if (isLinearAsset) linearStartLongitude.toDoubleOrNull() else null,
-                    linearEndLatitude = if (isLinearAsset) linearEndLatitude.toDoubleOrNull() else null,
-                    linearEndLongitude = if (isLinearAsset) linearEndLongitude.toDoubleOrNull() else null,
-                    longDescription = longDescription.trim(),
-                    alternativeLabel = alternativeLabel.trim(),
-                    externalAssetCode = externalAssetCode.trim(),
-                    legacyAssetCode = legacyAssetCode.trim(),
-                    barcode = barcode.trim(),
-                    qrCode = qrCode.trim(),
-                    equipmentCategory = equipmentCategory.trim(),
-                    assetClass = assetClass.trim(),
-                    assetSubclass = assetSubclass.trim(),
-                    company = company.trim(),
-                    site = site.trim(),
-                    safetyCritical = safetyCritical,
-                    riskLevel = riskLevel,
-                    requiredPermits = requiredPermits.trim(),
-                    safetyInstructions = safetyInstructions.trim(),
-                    ppeRequired = ppeRequired.trim(),
-                    isolationRequired = isolationRequired,
-                    complianceRequirements = complianceRequirements.trim(),
-                    financialStatus = financialStatus,
-                    bookValue = bookValue.toDoubleOrNull() ?: 0.0,
-                    capitalizationAt = capitalizationAt.trim(),
-                    countryOfOrigin = countryOfOrigin.trim(),
-                    nameplateData = nameplateData.trim(),
-                    capacity = capacity.trim(),
-                    power = power.trim(),
-                    voltage = voltage.trim(),
-                    current = current.trim(),
-                    frequency = frequency.trim(),
-                    speed = speed.trim(),
-                    pressure = pressure.trim(),
-                    flowRate = flowRate.trim(),
-                    temperatureRange = temperatureRange.trim(),
-                    weight = weight.trim(),
-                    dimensions = dimensions.trim(),
-                    material = material.trim(),
-                    designStandard = designStandard.trim(),
-                    technicalSpecGroup = technicalSpecGroup.trim(),
-                    requiresSerialTracking = requiresSerialTracking,
-                    warrantyType = warrantyType,
-                    warrantyCategory = warrantyCategory.trim(),
-                    warrantyTerms = warrantyTerms.trim(),
-                    coveredServices = coveredServices.trim(),
-                    excludedServices = excludedServices.trim(),
-                    warrantyCounterType = warrantyCounterType,
-                    warrantyCounterLimit = warrantyCounterLimit.toDoubleOrNull() ?: 0.0,
-                    warrantyClaimRequired = warrantyClaimRequired,
-                    warrantyClaimStatus = if (warrantyClaimRequired) warrantyClaimStatus else "",
-                    warrantyContact = warrantyContact.trim(),
-                    warrantyDocument = warrantyDocument.trim(),
-                    vendorWarranty = vendorWarranty,
-                    manufacturerWarranty = manufacturerWarranty,
-                    customerWarranty = customerWarranty,
-                    warrantyReference = warrantyReference.trim(),
-                    // AST-WAR-003: preserve locked dates when the user cannot override them.
-                    warrantyStart = if (warrantyDatesLocked) (initial?.warrantyStart ?: "") else warrantyStart.trim(),
-                    warrantyEnd = if (warrantyDatesLocked) (initial?.warrantyEnd ?: "") else warrantyEnd.trim(),
-                    mobility = mobility,
-                    incursOperatingCost = incursOperatingCost,
-                    orgOverrideReason = if (hasOrgOverride) orgOverrideReason.trim() else ""
-                )
-        }
         // Save Draft: allow persisting an incomplete asset as a draft (skips mandatory rules).
         OutlinedButton(
-            onClick = { onSave(buildAsset("Draft")) },
+            onClick = { onSave(toAssetEntity(initial, "Draft", today, serialLocked, warrantyDatesLocked, hasOrgOverride, linearStartValue, linearEndValue)) },
             enabled = code.isNotBlank() && name.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) { Text("حفظ كمسودة") }
@@ -727,8 +476,9 @@ internal fun AssetFormSheet(
             code.isNotBlank() && name.isNotBlank() && linearRangeValid && markerDistancesValid && coordinatesValid &&
                 tech001Valid && tech002Valid && tech004Valid && orgValid
         ) {
-            onSave(buildAsset(if (status.equals("Draft", ignoreCase = true)) "Active" else status))
+            onSave(toAssetEntity(initial, if (status.equals("Draft", ignoreCase = true)) "Active" else status, today, serialLocked, warrantyDatesLocked, hasOrgOverride, linearStartValue, linearEndValue))
         }
+    }
     }
 }
 
