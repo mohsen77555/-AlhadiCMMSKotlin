@@ -96,17 +96,31 @@ internal suspend fun CmmsRepository.saveWorkOrder(workOrder: WorkOrderEntity, ac
             workOrder.linearVerticalOffset
         )
         val isNew = workOrder.id == 0L
+        val asset = assetDao.getAssetById(workOrder.assetId)
+        // WO-AST-003/004: new orders are not allowed on retired/disposed assets.
+        if (isNew) {
+            val assetStatus = asset?.status?.lowercase().orEmpty()
+            if (assetStatus == "retired" || assetStatus == "disposed") {
+                throw IllegalStateException(
+                    if (assetStatus == "disposed") "الأصل مُستبعَد — لا يمكن إنشاء أوامر عمل جديدة عليه"
+                    else "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه"
+                )
+            }
+        }
+        // WO-ORG-001..008 & WO-AST-006/007: inherit the org + asset snapshot on creation only
+        // (WO-AST-008: later asset moves must not rewrite the historical order).
+        val inherited = if (isNew) workOrder.inheritOrgFrom(asset) else workOrder
         // Keep an existing decision; otherwise (re)derive whether sign-off is needed.
-        val toSave = if (workOrder.approvalStatus == "Approved" || workOrder.approvalStatus == "Rejected") {
-            workOrder
+        val toSave = if (inherited.approvalStatus == "Approved" || inherited.approvalStatus == "Rejected") {
+            inherited
         } else {
-            workOrder.copy(approvalStatus = if (workOrder.needsApproval()) "Pending" else "NotRequired")
+            inherited.copy(approvalStatus = if (inherited.needsApproval()) "Pending" else "NotRequired")
         }
         workOrderDao.insertWorkOrder(toSave)
         recordAudit(if (isNew) "Create" else "Update", "WorkOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر عمل: ${workOrder.title}", actor)
         // AST-WAR-010: persist the warranty decision/review outcome into the asset history.
         if (workOrder.repairType.isNotBlank()) {
-            val assetCode = assetDao.getAssetById(workOrder.assetId)?.code ?: workOrder.assetId.toString()
+            val assetCode = asset?.code ?: workOrder.assetId.toString()
             val decision = when (workOrder.repairType) {
                 "Internal" -> "إصلاح داخلي"
                 "WarrantyClaim" -> "مطالبة ضمان"
@@ -128,9 +142,34 @@ internal suspend fun CmmsRepository.setWorkOrderApproval(workOrder: WorkOrderEnt
     }
 
 internal suspend fun CmmsRepository.deleteWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
-        workOrderDao.deleteById(workOrder.id)
-        recordAudit("Delete", "WorkOrder", "حذف أمر عمل: ${workOrder.title}", actor)
+        // WO-GOV-003/004 & WO-LC-005/006: work orders are never hard-deleted — cancel and keep the record.
+        val current = workOrderDao.getById(workOrder.id) ?: workOrder
+        workOrderDao.insertWorkOrder(current.copy(status = "Cancelled", cancelledReason = current.cancelledReason.ifBlank { "أُلغي بدل الحذف" }))
+        recordAudit("Cancel", "WorkOrder", "إلغاء أمر عمل: ${workOrder.title}", actor)
     }
+
+/** WO-GOV-004: cancel a work order with a reason instead of deleting it. */
+internal suspend fun CmmsRepository.cancelWorkOrder(workOrder: WorkOrderEntity, reason: String, actor: String = "System") {
+    val current = workOrderDao.getById(workOrder.id) ?: workOrder
+    workOrderDao.insertWorkOrder(current.copy(status = "Cancelled", cancelledReason = reason.ifBlank { "ملغى" }))
+    recordAudit("Cancel", "WorkOrder", "إلغاء أمر عمل: ${workOrder.title}", actor)
+}
+
+/** Snapshots the asset's organizational + identity data onto a new work order (WO-ORG-001..008 / WO-AST-006/007). */
+internal fun WorkOrderEntity.inheritOrgFrom(asset: AssetEntity?): WorkOrderEntity =
+    if (asset == null) this else copy(
+        assetCode = asset.code,
+        assetName = asset.name,
+        functionalLocation = asset.location,
+        companyCode = asset.company,
+        siteCode = asset.site,
+        plantCode = asset.maintenancePlant,
+        maintenancePlantCode = asset.maintenancePlant,
+        planningPlantCode = asset.planningPlant,
+        plannerGroup = asset.plannerGroup,
+        workCenter = asset.mainWorkCenter,
+        costCenter = asset.costCenter
+    )
 
     // ---------------------------------------------------------------------
     // CRUD — Preventive maintenance

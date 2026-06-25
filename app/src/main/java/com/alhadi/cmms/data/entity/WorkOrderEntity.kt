@@ -48,7 +48,34 @@ data class WorkOrderEntity(
     val warrantyReviewed: Boolean = false,
     /** AST-WAR-010: the recorded outcome of the warranty review. */
     @ColumnInfo(defaultValue = "''")
-    val warrantyReviewResult: String = ""
+    val warrantyReviewResult: String = "",
+    // --- Work order type (WO-GOV-005 / WO-TYPE-*) ---
+    @ColumnInfo(defaultValue = "'Corrective'")
+    val type: String = "Corrective",
+    // --- Organizational snapshot inherited from the asset (WO-ORG-001..008) ---
+    @ColumnInfo(defaultValue = "''") val companyCode: String = "",
+    @ColumnInfo(defaultValue = "''") val siteCode: String = "",
+    @ColumnInfo(defaultValue = "''") val plantCode: String = "",
+    @ColumnInfo(defaultValue = "''") val maintenancePlantCode: String = "",
+    @ColumnInfo(defaultValue = "''") val planningPlantCode: String = "",
+    @ColumnInfo(defaultValue = "''") val plannerGroup: String = "",
+    @ColumnInfo(defaultValue = "''") val workCenter: String = "",
+    @ColumnInfo(defaultValue = "''") val costCenter: String = "",
+    // --- Asset / functional-location snapshot at creation (WO-AST-006/007/008) ---
+    @ColumnInfo(defaultValue = "''") val assetCode: String = "",
+    @ColumnInfo(defaultValue = "''") val assetName: String = "",
+    @ColumnInfo(defaultValue = "''") val functionalLocation: String = "",
+    // --- Failure data (WO-FLR-001..004) ---
+    @ColumnInfo(defaultValue = "''") val failureCode: String = "",
+    @ColumnInfo(defaultValue = "''") val failureCause: String = "",
+    @ColumnInfo(defaultValue = "''") val failureEffect: String = "",
+    @ColumnInfo(defaultValue = "''") val rootCause: String = "",
+    // --- Planning (WO-PLAN-001) ---
+    @ColumnInfo(defaultValue = "''") val plannedStart: String = "",
+    // --- Lifecycle / closure (WO-GOV-004, WO-CLS-005/006) ---
+    @ColumnInfo(defaultValue = "''") val cancelledReason: String = "",
+    @ColumnInfo(defaultValue = "''") val closedAt: String = "",
+    @ColumnInfo(defaultValue = "''") val closedBy: String = ""
 ) {
     /** Recorded labour cost (hours × rate). */
     fun laborCost(): Double = laborHours * laborRate

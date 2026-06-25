@@ -104,6 +104,7 @@ internal fun WorkOrderFormSheet(
     var assetId by remember { mutableStateOf(initial?.assetId ?: assets.firstOrNull()?.id ?: 0L) }
     var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
     var status by remember { mutableStateOf(initial?.status ?: "Open") }
+    var type by remember { mutableStateOf(initial?.type ?: "Corrective") }
     var assignedTo by remember { mutableStateOf(initial?.assignedTo ?: defaultAssignee) }
     var cost by remember { mutableStateOf((initial?.estimatedCost ?: 0.0).toString()) }
     var dueDays by remember { mutableStateOf("3") }
@@ -177,6 +178,7 @@ internal fun WorkOrderFormSheet(
                 onVerticalOffsetChange = { linearVerticalOffset = it }
             )
         }
+        OptionDropdown("نوع الأمر", listOf("Corrective", "Preventive", "Breakdown", "Calibration", "Inspection", "Improvement"), type, display = ::workOrderTypeLabel) { type = it }
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
         OptionDropdown("الحالة", listOf("Open", "In Progress", "Technically Completed", "Closed"), status) { status = it }
         LabeledField("المسؤول", assignedTo, { assignedTo = it })
@@ -250,11 +252,42 @@ internal fun WorkOrderFormSheet(
                     linearVerticalOffset = if (selectedAsset?.isLinearAsset == true) linearVerticalOffset.toDoubleOrNull() else null,
                     repairType = if (underWarranty) repairType else "",
                     warrantyReviewed = underWarranty && warrantyReviewed,
-                    warrantyReviewResult = if (underWarranty && warrantyReviewed) warrantyReviewResult.trim() else ""
+                    warrantyReviewResult = if (underWarranty && warrantyReviewed) warrantyReviewResult.trim() else "",
+                    type = type,
+                    // Governance/org snapshot is filled by the repository on creation and preserved on edit (WO-AST-008).
+                    companyCode = initial?.companyCode ?: "",
+                    siteCode = initial?.siteCode ?: "",
+                    plantCode = initial?.plantCode ?: "",
+                    maintenancePlantCode = initial?.maintenancePlantCode ?: "",
+                    planningPlantCode = initial?.planningPlantCode ?: "",
+                    plannerGroup = initial?.plannerGroup ?: "",
+                    workCenter = initial?.workCenter ?: "",
+                    costCenter = initial?.costCenter ?: "",
+                    assetCode = initial?.assetCode ?: "",
+                    assetName = initial?.assetName ?: "",
+                    functionalLocation = initial?.functionalLocation ?: "",
+                    failureCode = initial?.failureCode ?: "",
+                    failureCause = initial?.failureCause ?: "",
+                    failureEffect = initial?.failureEffect ?: "",
+                    rootCause = initial?.rootCause ?: "",
+                    plannedStart = initial?.plannedStart ?: "",
+                    cancelledReason = initial?.cancelledReason ?: "",
+                    closedAt = initial?.closedAt ?: "",
+                    closedBy = initial?.closedBy ?: ""
                 )
             )
         }
     }
+}
+
+internal fun workOrderTypeLabel(type: String): String = when (type) {
+    "Corrective" -> "تصحيحي"
+    "Preventive" -> "وقائي"
+    "Breakdown" -> "عطل (Breakdown)"
+    "Calibration" -> "معايرة"
+    "Inspection" -> "فحص"
+    "Improvement" -> "تحسين"
+    else -> type
 }
 
 internal const val WARRANTY_REVIEW_POLICY = true

@@ -337,7 +337,35 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37)
+    /** Adds work-order governance fields (type, org/asset snapshot, failure data, closure) to work_orders. */
+    val MIGRATION_37_38 = object : Migration(37, 38) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE work_orders ADD COLUMN type TEXT NOT NULL DEFAULT 'Corrective'",
+                "ALTER TABLE work_orders ADD COLUMN companyCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN siteCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN plantCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN maintenancePlantCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN planningPlantCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN plannerGroup TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN workCenter TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN costCenter TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN assetCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN assetName TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN functionalLocation TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN failureCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN failureCause TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN failureEffect TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN rootCause TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN plannedStart TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN cancelledReason TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN closedAt TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE work_orders ADD COLUMN closedBy TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

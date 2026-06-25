@@ -48,23 +48,33 @@ internal suspend fun CmmsRepository.createWorkOrder(
         assignedTo: String,
         dueAt: String,
         estimatedCost: Double,
-        actor: String
+        actor: String,
+        type: String = "Corrective"
     ) {
         val now = DateStrings.today()
-        workOrderDao.insertWorkOrder(
-            WorkOrderEntity(
-                assetId = assetId,
-                title = title.ifBlank { "Maintenance request" },
-                description = description,
-                priority = priority,
-                status = "Open",
-                assignedTo = assignedTo,
-                createdAt = now,
-                dueAt = dueAt,
-                estimatedCost = estimatedCost,
-                approvalStatus = if (priority == "Critical" || estimatedCost >= WorkOrderEntity.APPROVAL_THRESHOLD) "Pending" else "NotRequired"
+        val asset = assetDao.getAssetById(assetId)
+        // WO-AST-003/004: retired/disposed assets cannot receive new work orders.
+        val assetStatus = asset?.status?.lowercase().orEmpty()
+        if (assetStatus == "retired" || assetStatus == "disposed") {
+            throw IllegalStateException(
+                if (assetStatus == "disposed") "الأصل مُستبعَد — لا يمكن إنشاء أوامر عمل جديدة عليه"
+                else "الأصل متقاعد — لا يمكن إنشاء أوامر عمل جديدة عليه"
             )
-        )
+        }
+        val order = WorkOrderEntity(
+            assetId = assetId,
+            title = title.ifBlank { "Maintenance request" },
+            description = description,
+            priority = priority,
+            status = "Open",
+            assignedTo = assignedTo,
+            createdAt = now,
+            dueAt = dueAt,
+            estimatedCost = estimatedCost,
+            type = type,
+            approvalStatus = if (priority == "Critical" || estimatedCost >= WorkOrderEntity.APPROVAL_THRESHOLD) "Pending" else "NotRequired"
+        ).inheritOrgFrom(asset)
+        workOrderDao.insertWorkOrder(order)
         recordAudit("Create", "WorkOrder", "إنشاء أمر عمل: $title", actor)
     }
 
@@ -82,6 +92,11 @@ internal suspend fun CmmsRepository.createDemoWorkOrder(assetId: Long = 7, actor
     }
 
 internal suspend fun CmmsRepository.updateWorkOrderStatus(id: Long, status: String, actor: String = "System") {
+        val current = workOrderDao.getById(id)
+        // WO-STAT-008: a cancelled order cannot be executed or transitioned further.
+        if (current != null && current.status.equals("Cancelled", ignoreCase = true) && !status.equals("Cancelled", ignoreCase = true)) {
+            throw IllegalStateException("أمر العمل ملغى — لا يمكن تنفيذه")
+        }
         // Governance: hazardous work cannot start without an approved, valid permit (SAFE-002).
         if (status == "In Progress" && workOrderDao.requiresPermit(id) == true &&
             permitDao.countValid(id, DateStrings.today()) == 0
@@ -101,7 +116,12 @@ internal suspend fun CmmsRepository.updateWorkOrderStatus(id: Long, status: Stri
         if (status == "Closed" && photoDao.countForOrder(id) == 0) {
             throw IllegalStateException("التقط صورة دليل تنفيذ بالكاميرا قبل إغلاق أمر العمل")
         }
-        workOrderDao.updateStatus(id, status)
+        // WO-CLS-005/006: stamp who closed the order and when.
+        if (status == "Closed" && current != null) {
+            workOrderDao.insertWorkOrder(current.copy(status = status, closedAt = DateStrings.today(), closedBy = actor))
+        } else {
+            workOrderDao.updateStatus(id, status)
+        }
         recordAudit("Update", "WorkOrder", "تحديث حالة أمر العمل #$id إلى $status", actor)
     }
 
