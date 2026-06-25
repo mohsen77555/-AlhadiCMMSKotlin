@@ -217,6 +217,7 @@ internal fun MoreRouteContent(
     val readings by viewModel.readings.collectAsStateWithLifecycle()
     val locations by viewModel.functionalLocations.collectAsStateWithLifecycle()
     val warehouses by viewModel.warehouses.collectAsStateWithLifecycle()
+    val suppliers by viewModel.suppliers.collectAsStateWithLifecycle()
     val orgUnits by viewModel.orgUnits.collectAsStateWithLifecycle()
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
@@ -321,6 +322,13 @@ internal fun MoreRouteContent(
                             canManage = canManage,
                             onSave = viewModel::saveWarehouse,
                             onDelete = viewModel::deleteWarehouse
+                        )
+                        MoreRoute.Suppliers -> SuppliersScreen(
+                            innerPadding = innerPadding,
+                            suppliers = suppliers,
+                            canManage = canManage,
+                            onSave = viewModel::saveSupplier,
+                            onDelete = viewModel::deleteSupplier
                         )
                         MoreRoute.OrgUnits -> OrgUnitsScreen(
                             innerPadding = innerPadding,

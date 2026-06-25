@@ -29,6 +29,7 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PasswordHasher
@@ -302,6 +303,17 @@ internal suspend fun CmmsRepository.deleteWarehouse(warehouse: WarehouseEntity, 
         warehouseDao.deleteById(warehouse.id)
         recordAudit("Delete", "Warehouse", "حذف مستودع: ${warehouse.code}", actor)
     }
+
+internal suspend fun CmmsRepository.saveSupplier(supplier: SupplierEntity, actor: String = "System") {
+    val isNew = supplier.id == 0L
+    supplierDao.insert(supplier)
+    recordAudit(if (isNew) "Create" else "Update", "Supplier", "${if (isNew) "إضافة" else "تعديل"} مورّد: ${supplier.code}", actor)
+}
+
+internal suspend fun CmmsRepository.deleteSupplier(supplier: SupplierEntity, actor: String = "System") {
+    supplierDao.deleteById(supplier.id)
+    recordAudit("Delete", "Supplier", "حذف مورّد: ${supplier.code}", actor)
+}
 
     // ---------------------------------------------------------------------
     // Organizational units (Company / Plant / Work Center / Cost Center / Planner Group / Department)

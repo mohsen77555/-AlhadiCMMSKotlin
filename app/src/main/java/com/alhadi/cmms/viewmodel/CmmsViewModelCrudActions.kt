@@ -19,6 +19,7 @@ import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
@@ -71,6 +72,9 @@ fun CmmsViewModel.deleteFunctionalLocation(location: FunctionalLocationEntity) =
 
 fun CmmsViewModel.saveWarehouse(warehouse: WarehouseEntity) = launchAction("تم حفظ المستودع") { repository.saveWarehouse(warehouse, actor()) }
 fun CmmsViewModel.deleteWarehouse(warehouse: WarehouseEntity) = launchAction("تم حذف المستودع") { repository.deleteWarehouse(warehouse, actor()) }
+
+fun CmmsViewModel.saveSupplier(supplier: SupplierEntity) = launchAction("تم حفظ المورّد") { repository.saveSupplier(supplier, actor()) }
+fun CmmsViewModel.deleteSupplier(supplier: SupplierEntity) = launchAction("تم حذف المورّد") { repository.deleteSupplier(supplier, actor()) }
 
 fun CmmsViewModel.saveOrgUnit(unit: OrgUnitEntity) = launchAction("تم حفظ الوحدة التنظيمية") { repository.saveOrgUnit(unit, actor()) }
 fun CmmsViewModel.deleteOrgUnit(unit: OrgUnitEntity) = launchAction("تم حذف الوحدة التنظيمية") { repository.deleteOrgUnit(unit, actor()) }

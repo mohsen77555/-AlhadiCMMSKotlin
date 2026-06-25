@@ -41,6 +41,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Warehouse
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.CorporateFare
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Analytics
@@ -197,7 +198,7 @@ internal enum class BottomTab(val label: String, val icon: ImageVector, val acce
     More("المزيد", Icons.Filled.GridView, AccentBrown)
 }
 
-internal enum class MoreRoute { Notifications, Inventory, SerialNumbers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Warehouses, OrgUnits, Capa, Failures }
+internal enum class MoreRoute { Notifications, Inventory, SerialNumbers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Warehouses, OrgUnits, Suppliers, Capa, Failures }
 
 internal data class ScreenMeta(
     val title: String,
@@ -453,6 +454,7 @@ internal fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (t
         MoreRoute.Meters -> ScreenMeta("العدّادات والقراءات", "مراقبة الأداء والقياسات", Icons.Filled.Speed, AccentPurple)
         MoreRoute.Locations -> ScreenMeta("المواقع الفنية", "هرمية المواقع والمصانع", Icons.Filled.AccountTree, AccentGreen)
         MoreRoute.Warehouses -> ScreenMeta("المستودعات", "المخازن وأمناء العهدة", Icons.Filled.Warehouse, AccentPurple)
+        MoreRoute.Suppliers -> ScreenMeta("الموردون", "بيانات الموردين والمشتريات", Icons.Filled.LocalShipping, AccentBrown)
         MoreRoute.OrgUnits -> ScreenMeta("الوحدات التنظيمية", "الشركات والمصانع ومراكز العمل والتكلفة", Icons.Filled.CorporateFare, AccentNavy)
         MoreRoute.Capa -> ScreenMeta("الإجراءات CAPA", "إجراءات تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange)
         MoreRoute.Failures -> ScreenMeta("تحليل الأعطال", "MTTR و MTBF وتكرار الأعطال", Icons.Filled.TrendingUp, AccentRed)

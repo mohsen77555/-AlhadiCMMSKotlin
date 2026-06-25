@@ -84,12 +84,74 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 
 // ---------------------------------------------------------------------------
 // Warehouse form
 // ---------------------------------------------------------------------------
+
+@Composable
+internal fun SupplierFormSheet(
+    initial: SupplierEntity?,
+    existing: List<SupplierEntity>,
+    onDismiss: () -> Unit,
+    onSave: (SupplierEntity) -> Unit
+) {
+    var code by remember { mutableStateOf(initial?.code ?: "") }
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var contactPerson by remember { mutableStateOf(initial?.contactPerson ?: "") }
+    var phone by remember { mutableStateOf(initial?.phone ?: "") }
+    var email by remember { mutableStateOf(initial?.email ?: "") }
+    var address by remember { mutableStateOf(initial?.address ?: "") }
+    var category by remember { mutableStateOf(initial?.category ?: "Parts") }
+    var taxNumber by remember { mutableStateOf(initial?.taxNumber ?: "") }
+    var paymentTerms by remember { mutableStateOf(initial?.paymentTerms ?: "") }
+    var rating by remember { mutableStateOf((initial?.rating ?: 0).toString()) }
+    var status by remember { mutableStateOf(initial?.status ?: "Active") }
+    var notes by remember { mutableStateOf(initial?.notes ?: "") }
+
+    val trimmedCode = code.trim()
+    val duplicateCode = trimmedCode.isNotBlank() && existing.any {
+        it.id != initial?.id && it.code.equals(trimmedCode, ignoreCase = true)
+    }
+
+    FormSheet(if (initial == null) "إضافة مورّد" else "تعديل المورّد", onDismiss) {
+        LabeledField("كود المورّد", code, { code = it })
+        if (duplicateCode) Text("هذا الكود مستخدم بالفعل.", color = MaterialTheme.colorScheme.error)
+        LabeledField("اسم المورّد", name, { name = it })
+        OptionDropdown("التصنيف", listOf("Parts", "Services", "Both"), category, display = ::supplierCategoryLabel) { category = it }
+        LabeledField("جهة الاتصال", contactPerson, { contactPerson = it })
+        LabeledField("الهاتف", phone, { phone = it })
+        LabeledField("البريد الإلكتروني", email, { email = it })
+        LabeledField("العنوان", address, { address = it }, singleLine = false)
+        LabeledField("الرقم الضريبي", taxNumber, { taxNumber = it })
+        LabeledField("شروط الدفع", paymentTerms, { paymentTerms = it })
+        LabeledField("التقييم (0-5)", rating, { rating = it }, numeric = true)
+        OptionDropdown("الحالة", listOf("Active", "Inactive", "Blacklisted"), status, display = ::supplierStatusLabel) { status = it }
+        LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
+        SaveButton(code.isNotBlank() && name.isNotBlank() && !duplicateCode) {
+            onSave(
+                SupplierEntity(
+                    id = initial?.id ?: 0,
+                    code = trimmedCode,
+                    name = name.trim(),
+                    contactPerson = contactPerson.trim(),
+                    phone = phone.trim(),
+                    email = email.trim(),
+                    address = address.trim(),
+                    category = category,
+                    taxNumber = taxNumber.trim(),
+                    paymentTerms = paymentTerms.trim(),
+                    rating = rating.toIntOrNull()?.coerceIn(0, 5) ?: 0,
+                    status = status,
+                    notes = notes.trim()
+                )
+            )
+        }
+    }
+}
 
 @Composable
 internal fun WarehouseFormSheet(

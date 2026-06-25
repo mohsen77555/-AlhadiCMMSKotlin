@@ -30,6 +30,7 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PasswordHasher
@@ -64,6 +65,7 @@ class CmmsRepository(internal val database: AppDatabase) {
     internal val warehouseDao = database.warehouseDao()
     internal val orgUnitDao = database.orgUnitDao()
     internal val workOrderHistoryDao = database.workOrderHistoryDao()
+    internal val supplierDao = database.supplierDao()
     internal val serialService = SerialNumberService(database, ::recordAudit)
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
@@ -81,6 +83,7 @@ class CmmsRepository(internal val database: AppDatabase) {
     val readings: Flow<List<MeasurementReadingEntity>> = measurementDao.observeReadings()
     val functionalLocations: Flow<List<FunctionalLocationEntity>> = locationDao.observeLocations()
     val warehouses: Flow<List<WarehouseEntity>> = warehouseDao.observeWarehouses()
+    val suppliers: Flow<List<SupplierEntity>> = supplierDao.observeSuppliers()
     val orgUnits: Flow<List<OrgUnitEntity>> = orgUnitDao.observeOrgUnits()
     val capaActions: Flow<List<CapaEntity>> = capaDao.observeCapa()
     val assetDocuments: Flow<List<AssetDocumentEntity>> = documentDao.observeDocuments()
