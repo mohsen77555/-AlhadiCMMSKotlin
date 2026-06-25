@@ -110,6 +110,11 @@ internal fun WorkOrderFormSheet(
     var dueDays by remember { mutableStateOf("3") }
     var isFailure by remember { mutableStateOf(initial?.isFailure ?: false) }
     var downtime by remember { mutableStateOf((initial?.downtimeHours ?: 0.0).toString()) }
+    var failureCode by remember { mutableStateOf(initial?.failureCode ?: "") }
+    var failureCause by remember { mutableStateOf(initial?.failureCause ?: "") }
+    var failureEffect by remember { mutableStateOf(initial?.failureEffect ?: "") }
+    var rootCause by remember { mutableStateOf(initial?.rootCause ?: "") }
+    var plannedStart by remember { mutableStateOf(initial?.plannedStart ?: "") }
     var laborHours by remember { mutableStateOf((initial?.laborHours ?: 0.0).toString()) }
     var laborRate by remember { mutableStateOf((initial?.laborRate ?: 0.0).toString()) }
     var partsCost by remember { mutableStateOf((initial?.partsCost ?: 0.0).toString()) }
@@ -211,9 +216,16 @@ internal fun WorkOrderFormSheet(
             Text("عطل (Breakdown)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = isFailure, onCheckedChange = { isFailure = it })
         }
-        if (isFailure) {
+        if (isFailure || type == "Breakdown") {
             LabeledField("مدة التوقف (ساعات)", downtime, { downtime = it }, numeric = true)
+            // WO-FLR-001..004: failure code, cause, effect and (optional) root cause.
+            LabeledField("رمز العطل (Failure Code)", failureCode, { failureCode = it })
+            LabeledField("سبب العطل (Cause)", failureCause, { failureCause = it }, singleLine = false)
+            LabeledField("أثر العطل (Effect)", failureEffect, { failureEffect = it }, singleLine = false)
+            LabeledField("السبب الجذري (Root Cause)", rootCause, { rootCause = it }, singleLine = false)
         }
+        // WO-PLAN-001: planned start date.
+        LabeledField("تاريخ البدء المخطط", plannedStart, { plannedStart = it })
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("يتطلّب تصريح عمل (خطر)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = requiresPermit, onCheckedChange = { requiresPermit = it })
@@ -266,11 +278,11 @@ internal fun WorkOrderFormSheet(
                     assetCode = initial?.assetCode ?: "",
                     assetName = initial?.assetName ?: "",
                     functionalLocation = initial?.functionalLocation ?: "",
-                    failureCode = initial?.failureCode ?: "",
-                    failureCause = initial?.failureCause ?: "",
-                    failureEffect = initial?.failureEffect ?: "",
-                    rootCause = initial?.rootCause ?: "",
-                    plannedStart = initial?.plannedStart ?: "",
+                    failureCode = failureCode.trim(),
+                    failureCause = failureCause.trim(),
+                    failureEffect = failureEffect.trim(),
+                    rootCause = rootCause.trim(),
+                    plannedStart = plannedStart.trim(),
                     cancelledReason = initial?.cancelledReason ?: "",
                     closedAt = initial?.closedAt ?: "",
                     closedBy = initial?.closedBy ?: ""
