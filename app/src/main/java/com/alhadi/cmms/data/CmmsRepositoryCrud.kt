@@ -30,6 +30,8 @@ import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.data.entity.SupplierEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
 import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PasswordHasher
@@ -313,6 +315,51 @@ internal suspend fun CmmsRepository.saveSupplier(supplier: SupplierEntity, actor
 internal suspend fun CmmsRepository.deleteSupplier(supplier: SupplierEntity, actor: String = "System") {
     supplierDao.deleteById(supplier.id)
     recordAudit("Delete", "Supplier", "حذف مورّد: ${supplier.code}", actor)
+}
+
+// --- Purchase orders ---
+
+private suspend fun CmmsRepository.recalcPoTotal(poId: Long) {
+    val total = purchaseOrderLineDao.forOrder(poId).sumOf { it.lineTotal }
+    purchaseOrderDao.updateTotal(poId, total)
+}
+
+internal suspend fun CmmsRepository.savePurchaseOrder(order: PurchaseOrderEntity, actor: String = "System") {
+    val isNew = order.id == 0L
+    val supplierName = supplierDao.dumpAll().firstOrNull { it.id == order.supplierId }?.name ?: order.supplierName
+    val toSave = order.copy(
+        supplierName = supplierName,
+        createdBy = if (isNew) actor else order.createdBy
+    )
+    val id = purchaseOrderDao.insert(toSave)
+    if (!isNew) recalcPoTotal(order.id)
+    recordAudit(if (isNew) "Create" else "Update", "PurchaseOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر شراء: ${order.poNumber}", actor)
+}
+
+/** Procurement governance: orders are cancelled, never hard-deleted. */
+internal suspend fun CmmsRepository.cancelPurchaseOrder(order: PurchaseOrderEntity, reason: String, actor: String = "System") {
+    val current = purchaseOrderDao.getById(order.id) ?: order
+    purchaseOrderDao.insert(current.copy(status = "Cancelled", cancelledReason = reason.ifBlank { "ملغى" }))
+    recordAudit("Cancel", "PurchaseOrder", "إلغاء أمر شراء: ${order.poNumber}", actor)
+}
+
+internal suspend fun CmmsRepository.setPurchaseOrderStatus(order: PurchaseOrderEntity, status: String, actor: String = "System") {
+    val current = purchaseOrderDao.getById(order.id) ?: order
+    val stamped = if (status == "Approved") current.copy(status = status, approvedBy = actor) else current.copy(status = status)
+    purchaseOrderDao.insert(stamped)
+    recordAudit("Update", "PurchaseOrder", "تحديث حالة أمر الشراء ${order.poNumber} إلى $status", actor)
+}
+
+internal suspend fun CmmsRepository.savePurchaseOrderLine(line: PurchaseOrderLineEntity, actor: String = "System") {
+    purchaseOrderLineDao.insert(line)
+    recalcPoTotal(line.poId)
+    recordAudit("Update", "PurchaseOrder", "بند شراء: ${line.description}", actor)
+}
+
+internal suspend fun CmmsRepository.deletePurchaseOrderLine(line: PurchaseOrderLineEntity, actor: String = "System") {
+    purchaseOrderLineDao.deleteById(line.id)
+    recalcPoTotal(line.poId)
+    recordAudit("Update", "PurchaseOrder", "حذف بند شراء: ${line.description}", actor)
 }
 
     // ---------------------------------------------------------------------

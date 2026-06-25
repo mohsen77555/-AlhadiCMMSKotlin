@@ -20,6 +20,8 @@ import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.data.entity.SupplierEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
@@ -75,6 +77,12 @@ fun CmmsViewModel.deleteWarehouse(warehouse: WarehouseEntity) = launchAction("ت
 
 fun CmmsViewModel.saveSupplier(supplier: SupplierEntity) = launchAction("تم حفظ المورّد") { repository.saveSupplier(supplier, actor()) }
 fun CmmsViewModel.deleteSupplier(supplier: SupplierEntity) = launchAction("تم حذف المورّد") { repository.deleteSupplier(supplier, actor()) }
+
+fun CmmsViewModel.savePurchaseOrder(order: PurchaseOrderEntity) = launchAction("تم حفظ أمر الشراء") { repository.savePurchaseOrder(order, actor()) }
+fun CmmsViewModel.cancelPurchaseOrder(order: PurchaseOrderEntity, reason: String) = launchAction("تم إلغاء أمر الشراء") { repository.cancelPurchaseOrder(order, reason, actor()) }
+fun CmmsViewModel.setPurchaseOrderStatus(order: PurchaseOrderEntity, status: String) = launchAction("تم تحديث حالة أمر الشراء") { repository.setPurchaseOrderStatus(order, status, actor()) }
+fun CmmsViewModel.savePurchaseOrderLine(line: PurchaseOrderLineEntity) = launchAction("تم حفظ البند") { repository.savePurchaseOrderLine(line, actor()) }
+fun CmmsViewModel.deletePurchaseOrderLine(line: PurchaseOrderLineEntity) = launchAction("تم حذف البند") { repository.deletePurchaseOrderLine(line, actor()) }
 
 fun CmmsViewModel.saveOrgUnit(unit: OrgUnitEntity) = launchAction("تم حفظ الوحدة التنظيمية") { repository.saveOrgUnit(unit, actor()) }
 fun CmmsViewModel.deleteOrgUnit(unit: OrgUnitEntity) = launchAction("تم حذف الوحدة التنظيمية") { repository.deleteOrgUnit(unit, actor()) }

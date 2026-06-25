@@ -31,8 +31,12 @@ import com.alhadi.cmms.data.dao.WarehouseDao
 import com.alhadi.cmms.data.dao.OrgUnitDao
 import com.alhadi.cmms.data.dao.WorkOrderHistoryDao
 import com.alhadi.cmms.data.dao.SupplierDao
+import com.alhadi.cmms.data.dao.PurchaseOrderDao
+import com.alhadi.cmms.data.dao.PurchaseOrderLineDao
 import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
 import com.alhadi.cmms.data.entity.SupplierEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
@@ -95,9 +99,11 @@ import com.alhadi.cmms.data.entity.OrgUnitEntity
         WarehouseEntity::class,
         OrgUnitEntity::class,
         WorkOrderHistoryEntity::class,
-        SupplierEntity::class
+        SupplierEntity::class,
+        PurchaseOrderEntity::class,
+        PurchaseOrderLineEntity::class
     ],
-    version = 42,
+    version = 43,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -128,6 +134,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun orgUnitDao(): OrgUnitDao
     abstract fun workOrderHistoryDao(): WorkOrderHistoryDao
     abstract fun supplierDao(): SupplierDao
+    abstract fun purchaseOrderDao(): PurchaseOrderDao
+    abstract fun purchaseOrderLineDao(): PurchaseOrderLineDao
 
     companion object {
         @Volatile

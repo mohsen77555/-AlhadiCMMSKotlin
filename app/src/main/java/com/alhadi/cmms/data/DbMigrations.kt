@@ -402,7 +402,21 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41, MIGRATION_41_42)
+    /** Adds the purchase-order header + lines tables. */
+    val MIGRATION_42_43 = object : Migration(42, 43) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "CREATE TABLE IF NOT EXISTS purchase_orders (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, poNumber TEXT NOT NULL, supplierId INTEGER NOT NULL, supplierName TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'Draft', orderDate TEXT NOT NULL DEFAULT '', expectedDate TEXT NOT NULL DEFAULT '', currency TEXT NOT NULL DEFAULT 'SAR', totalAmount REAL NOT NULL DEFAULT 0, warehouse TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', createdBy TEXT NOT NULL DEFAULT '', approvedBy TEXT NOT NULL DEFAULT '', cancelledReason TEXT NOT NULL DEFAULT '')",
+                "CREATE INDEX IF NOT EXISTS index_purchase_orders_supplierId ON purchase_orders (supplierId)",
+                "CREATE INDEX IF NOT EXISTS index_purchase_orders_status ON purchase_orders (status)",
+                "CREATE TABLE IF NOT EXISTS purchase_order_lines (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, poId INTEGER NOT NULL, partId INTEGER, partNumber TEXT NOT NULL DEFAULT '', description TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 1, unitPrice REAL NOT NULL DEFAULT 0, receivedQty INTEGER NOT NULL DEFAULT 0)",
+                "CREATE INDEX IF NOT EXISTS index_purchase_order_lines_poId ON purchase_order_lines (poId)",
+                "CREATE INDEX IF NOT EXISTS index_purchase_order_lines_partId ON purchase_order_lines (partId)"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41, MIGRATION_41_42, MIGRATION_42_43)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

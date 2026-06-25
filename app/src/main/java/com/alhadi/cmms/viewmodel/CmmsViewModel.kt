@@ -42,6 +42,8 @@ import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.data.entity.SupplierEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
 import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.util.DateStrings
 import com.alhadi.cmms.util.PdfExporter
@@ -148,6 +150,12 @@ class CmmsViewModel(internal val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val suppliers: StateFlow<List<SupplierEntity>> = repository.suppliers
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val purchaseOrders: StateFlow<List<PurchaseOrderEntity>> = repository.purchaseOrders
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val purchaseOrderLines: StateFlow<List<PurchaseOrderLineEntity>> = repository.purchaseOrderLines
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val orgUnits: StateFlow<List<OrgUnitEntity>> = repository.orgUnits
