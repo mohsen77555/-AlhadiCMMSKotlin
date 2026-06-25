@@ -212,6 +212,8 @@ internal fun WorkOrdersScreen(
     onExportPdf: (WorkOrderEntity) -> Unit,
     onSave: (WorkOrderEntity) -> Unit,
     onDelete: (WorkOrderEntity) -> Unit,
+    onCancel: (WorkOrderEntity, String) -> Unit,
+    onReopen: (WorkOrderEntity) -> Unit,
     onUpdateStatus: (WorkOrderEntity, String) -> Unit,
     onApprove: (WorkOrderEntity, Boolean) -> Unit,
     onSaveOperation: (WorkOrderOperationEntity) -> Unit,
@@ -357,7 +359,9 @@ internal fun WorkOrdersScreen(
                     onSetPermitStatus = onSetPermitStatus,
                     onDeletePermit = onDeletePermit,
                     onEdit = { editing = workOrder; showForm = true },
-                    onDelete = { deleteTarget = workOrder }
+                    onDelete = { deleteTarget = workOrder },
+                    onReopen = onReopen,
+                    currentUser = currentUser
                 )
             }
         }
@@ -373,11 +377,28 @@ internal fun WorkOrdersScreen(
         )
     }
     deleteTarget?.let { target ->
-        ConfirmDialog(
-            title = "حذف أمر العمل",
-            text = "هل تريد حذف \"${target.title}\"؟",
-            onConfirm = { onDelete(target); deleteTarget = null },
-            onDismiss = { deleteTarget = null }
+        var cancelReason by remember(target.id) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("إلغاء أمر العمل") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("لا يُحذف أمر العمل نهائياً — يُلغى ويبقى في السجل التاريخي (WO-GOV-003/004). اكتب سبب الإلغاء:")
+                    OutlinedTextField(
+                        value = cancelReason,
+                        onValueChange = { cancelReason = it },
+                        label = { Text("سبب الإلغاء") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = cancelReason.isNotBlank(),
+                    onClick = { onCancel(target, cancelReason.trim()); deleteTarget = null }
+                ) { Text("إلغاء الأمر") }
+            },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("تراجع") } }
         )
     }
 }

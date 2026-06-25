@@ -348,6 +348,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         },
                         onSave = viewModel::saveWorkOrder,
                         onDelete = viewModel::deleteWorkOrder,
+                        onCancel = viewModel::cancelWorkOrder,
+                        onReopen = viewModel::reopenWorkOrder,
                         onUpdateStatus = viewModel::updateWorkOrderStatus,
                         onApprove = viewModel::setWorkOrderApproval,
                         onSaveOperation = viewModel::saveOperation,

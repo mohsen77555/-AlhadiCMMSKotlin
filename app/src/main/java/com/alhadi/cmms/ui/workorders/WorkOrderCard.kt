@@ -164,6 +164,7 @@ import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
+import com.alhadi.cmms.data.WorkOrderAuthority
 import com.alhadi.cmms.ui.theme.AccentBlue
 import com.alhadi.cmms.ui.theme.AccentBrown
 import com.alhadi.cmms.ui.theme.AccentGreen
@@ -214,7 +215,9 @@ internal fun WorkOrderCard(
     onSetPermitStatus: (WorkPermitEntity, Boolean) -> Unit,
     onDeletePermit: (WorkPermitEntity) -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onReopen: (WorkOrderEntity) -> Unit = {},
+    currentUser: UserEntity? = null
 ) {
     val context = LocalContext.current
     val today = DateStrings.today()
@@ -330,6 +333,14 @@ internal fun WorkOrderCard(
                 hasEvidence = hasEvidence,
                 onUpdateStatus = onUpdateStatus
             )
+            // WO-CLS-008 / WO-AUTH-006: reopening a closed order is Admin-only.
+            if (workOrder.status == "Closed" && WorkOrderAuthority.canReopen(currentUser)) {
+                OutlinedButton(onClick = { onReopen(workOrder) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("إعادة فتح الأمر")
+                }
+            }
             if (history.isNotEmpty()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                 Row(

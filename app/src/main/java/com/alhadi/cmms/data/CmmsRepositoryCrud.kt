@@ -159,7 +159,15 @@ internal suspend fun CmmsRepository.cancelWorkOrder(workOrder: WorkOrderEntity, 
     val current = workOrderDao.getById(workOrder.id) ?: workOrder
     workOrderDao.insertWorkOrder(current.copy(status = "Cancelled", cancelledReason = reason.ifBlank { "ملغى" }))
     recordWoHistory(workOrder.id, "status", current.status, "Cancelled", actor)
-    recordAudit("Cancel", "WorkOrder", "إلغاء أمر عمل: ${workOrder.title}", actor)
+    recordAudit("Cancel", "WorkOrder", "إلغاء أمر عمل: ${workOrder.title} — ${reason.ifBlank { "بدون سبب" }}", actor)
+}
+
+/** WO-CLS-008: reopen a closed/cancelled order (Admin only, enforced in the UI). */
+internal suspend fun CmmsRepository.reopenWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
+    val current = workOrderDao.getById(workOrder.id) ?: workOrder
+    workOrderDao.insertWorkOrder(current.copy(status = "In Progress", closedAt = "", closedBy = ""))
+    recordWoHistory(workOrder.id, "status", current.status, "In Progress", actor)
+    recordAudit("Reopen", "WorkOrder", "إعادة فتح أمر عمل: ${workOrder.title}", actor)
 }
 
 /** Snapshots the asset's organizational + identity data onto a new work order (WO-ORG-001..008 / WO-AST-006/007). */

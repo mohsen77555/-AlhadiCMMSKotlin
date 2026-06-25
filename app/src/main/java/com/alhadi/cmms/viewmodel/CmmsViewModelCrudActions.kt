@@ -42,6 +42,8 @@ fun CmmsViewModel.saveWorkOrder(workOrder: WorkOrderEntity) = launchAction("تم
 fun CmmsViewModel.setWorkOrderApproval(workOrder: WorkOrderEntity, approved: Boolean) =
     launchAction(if (approved) "تم اعتماد أمر العمل" else "تم رفض أمر العمل") { repository.setWorkOrderApproval(workOrder, approved, actor()) }
 fun CmmsViewModel.deleteWorkOrder(workOrder: WorkOrderEntity) = launchAction("تم حذف أمر العمل") { repository.deleteWorkOrder(workOrder, actor()) }
+fun CmmsViewModel.cancelWorkOrder(workOrder: WorkOrderEntity, reason: String) = launchAction("تم إلغاء أمر العمل") { repository.cancelWorkOrder(workOrder, reason, actor()) }
+fun CmmsViewModel.reopenWorkOrder(workOrder: WorkOrderEntity) = launchAction("تمت إعادة فتح أمر العمل") { repository.reopenWorkOrder(workOrder, actor()) }
 
 // ----- CRUD: Preventive maintenance -----
 fun CmmsViewModel.savePreventiveMaintenance(item: PreventiveMaintenanceEntity) = launchAction("تم حفظ مهمة الصيانة") { repository.savePreventiveMaintenance(item, actor()) }
