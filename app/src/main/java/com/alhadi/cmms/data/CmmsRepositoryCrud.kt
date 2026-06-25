@@ -95,6 +95,10 @@ internal suspend fun CmmsRepository.saveWorkOrder(workOrder: WorkOrderEntity, ac
             workOrder.linearHorizontalOffset,
             workOrder.linearVerticalOffset
         )
+        // WO-LAB-003: no negative hours/cost.
+        require(workOrder.laborHours >= 0.0 && workOrder.laborRate >= 0.0 && workOrder.partsCost >= 0.0 && workOrder.downtimeHours >= 0.0) {
+            "لا يسمح بقيم سالبة للساعات أو التكلفة"
+        }
         val isNew = workOrder.id == 0L
         val asset = assetDao.getAssetById(workOrder.assetId)
         // WO-AST-003/004: new orders are not allowed on retired/disposed assets.

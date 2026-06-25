@@ -285,7 +285,8 @@ internal fun WorkOrderFormSheet(
                     plannedStart = plannedStart.trim(),
                     cancelledReason = initial?.cancelledReason ?: "",
                     closedAt = initial?.closedAt ?: "",
-                    closedBy = initial?.closedBy ?: ""
+                    closedBy = initial?.closedBy ?: "",
+                    notificationId = initial?.notificationId
                 )
             )
         }

@@ -279,13 +279,15 @@ internal suspend fun CmmsRepository.createOrderFromNotification(
                     dueAt = dueAt,
                     estimatedCost = 0.0,
                     isFailure = notification.type == "Breakdown",
+                    type = if (notification.type == "Breakdown") "Breakdown" else "Corrective",
+                    notificationId = notification.id,
                     approvalStatus = if (notification.priority == "Critical") "Pending" else "NotRequired",
                     linearStartPoint = notification.linearStartPoint,
                     linearEndPoint = notification.linearEndPoint,
                     linearMarker = notification.linearMarker,
                     linearHorizontalOffset = notification.linearHorizontalOffset,
                     linearVerticalOffset = notification.linearVerticalOffset
-                )
+                ).inheritOrgFrom(assetDao.getAssetById(notification.assetId ?: 0L))
             )
             notificationDao.insert(notification.copy(status = "OrderCreated", linkedOrderId = orderId))
             recordAudit("Create", "WorkOrder", "إنشاء أمر عمل من البلاغ ${notification.number}", actor)

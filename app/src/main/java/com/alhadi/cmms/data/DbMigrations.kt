@@ -375,7 +375,14 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39)
+    /** Adds the source-notification reference to work orders (WO-NOTIF-002). */
+    val MIGRATION_39_40 = object : Migration(39, 40) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec("ALTER TABLE work_orders ADD COLUMN notificationId INTEGER")
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */

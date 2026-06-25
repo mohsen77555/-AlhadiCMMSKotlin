@@ -75,7 +75,9 @@ data class WorkOrderEntity(
     // --- Lifecycle / closure (WO-GOV-004, WO-CLS-005/006) ---
     @ColumnInfo(defaultValue = "''") val cancelledReason: String = "",
     @ColumnInfo(defaultValue = "''") val closedAt: String = "",
-    @ColumnInfo(defaultValue = "''") val closedBy: String = ""
+    @ColumnInfo(defaultValue = "''") val closedBy: String = "",
+    // --- Source notification reference (WO-NOTIF-002/003/005) ---
+    val notificationId: Long? = null
 ) {
     /** Recorded labour cost (hours × rate). */
     fun laborCost(): Double = laborHours * laborRate
