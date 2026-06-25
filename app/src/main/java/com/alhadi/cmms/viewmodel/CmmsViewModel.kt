@@ -38,6 +38,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.data.entity.OrgUnitEntity
@@ -179,6 +180,9 @@ class CmmsViewModel(internal val repository: CmmsRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val workOrderPhotos: StateFlow<List<WorkOrderPhotoEntity>> = repository.workOrderPhotos
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val workOrderHistory: StateFlow<List<WorkOrderHistoryEntity>> = repository.workOrderHistory
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val taskLists: StateFlow<List<TaskListEntity>> = repository.taskLists

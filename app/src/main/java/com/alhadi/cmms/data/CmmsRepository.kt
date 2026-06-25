@@ -93,6 +93,7 @@ class CmmsRepository(internal val database: AppDatabase) {
     val workOrderOperations: Flow<List<WorkOrderOperationEntity>> = operationDao.observeOperations()
     val workOrderConfirmations: Flow<List<WorkOrderConfirmationEntity>> = confirmationDao.observeConfirmations()
     val workOrderPhotos: Flow<List<WorkOrderPhotoEntity>> = photoDao.observePhotos()
+    val workOrderHistory: Flow<List<WorkOrderHistoryEntity>> = workOrderHistoryDao.observeAll()
     val taskLists: Flow<List<TaskListEntity>> = taskListDao.observeTaskLists()
     val taskListOperations: Flow<List<TaskListOperationEntity>> = taskListDao.observeTaskListOperations()
     val workPermits: Flow<List<WorkPermitEntity>> = permitDao.observePermits()

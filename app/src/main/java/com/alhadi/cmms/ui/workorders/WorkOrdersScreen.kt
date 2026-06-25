@@ -162,6 +162,7 @@ import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.ui.theme.AccentBlue
 import com.alhadi.cmms.ui.theme.AccentBrown
@@ -199,6 +200,8 @@ internal fun WorkOrdersScreen(
     confirmations: List<WorkOrderConfirmationEntity>,
     photos: List<WorkOrderPhotoEntity>,
     permits: List<WorkPermitEntity>,
+    history: List<WorkOrderHistoryEntity>,
+    currentUser: UserEntity?,
     parts: List<SparePartEntity>,
     transactions: List<InventoryTransactionEntity>,
     bomHeaders: List<AssetBomHeaderEntity>,
@@ -328,6 +331,7 @@ internal fun WorkOrdersScreen(
                     confirmations = confirmations.filter { it.orderId == workOrder.id },
                     photos = photos.filter { it.orderId == workOrder.id },
                     permits = permits.filter { it.orderId == workOrder.id },
+                    history = history.filter { it.orderId == workOrder.id },
                     materials = transactions.filter { it.workOrderId == workOrder.id },
                     catalog = parts,
                     bomPartIds = assetMap[workOrder.assetId]?.let { orderAsset ->

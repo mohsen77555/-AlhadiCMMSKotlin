@@ -229,6 +229,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
     val workOrderConfirmations by viewModel.workOrderConfirmations.collectAsStateWithLifecycle()
     val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
+    val workOrderHistory by viewModel.workOrderHistory.collectAsStateWithLifecycle()
     val workPermits by viewModel.workPermits.collectAsStateWithLifecycle()
     val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
@@ -332,6 +333,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         confirmations = workOrderConfirmations,
                         photos = workOrderPhotos,
                         permits = workPermits,
+                        history = workOrderHistory,
+                        currentUser = currentUser,
                         parts = spareParts,
                         transactions = transactions,
                         bomHeaders = assetBomHeaders,

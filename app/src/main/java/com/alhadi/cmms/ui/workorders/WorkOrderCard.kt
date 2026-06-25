@@ -163,6 +163,7 @@ import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
+import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
 import com.alhadi.cmms.ui.theme.AccentBlue
 import com.alhadi.cmms.ui.theme.AccentBrown
 import com.alhadi.cmms.ui.theme.AccentGreen
@@ -193,6 +194,7 @@ internal fun WorkOrderCard(
     confirmations: List<WorkOrderConfirmationEntity>,
     photos: List<WorkOrderPhotoEntity>,
     permits: List<WorkPermitEntity>,
+    history: List<WorkOrderHistoryEntity> = emptyList(),
     materials: List<InventoryTransactionEntity>,
     catalog: List<SparePartEntity>,
     bomPartIds: Set<Long>,
@@ -222,6 +224,7 @@ internal fun WorkOrderCard(
     val rejected = workOrder.approvalStatus == "Rejected"
     val blocked = workOrder.isBlockedByApproval()
     var showOperations by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
     var showAddOp by remember { mutableStateOf(false) }
     var showAddPermit by remember { mutableStateOf(false) }
     var confirmTarget by remember { mutableStateOf<WorkOrderOperationEntity?>(null) }
@@ -327,6 +330,32 @@ internal fun WorkOrderCard(
                 hasEvidence = hasEvidence,
                 onUpdateStatus = onUpdateStatus
             )
+            if (history.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showHistory = !showHistory },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentBrown)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("السجل (${history.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Icon(if (showHistory) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null)
+                }
+                if (showHistory) {
+                    history.forEach { h ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text("${workOrderHistoryFieldLabel(h.field)}: ${h.oldValue.ifBlank { "—" }} ← ${h.newValue.ifBlank { "—" }}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            Text("${h.actor} • ${h.changedAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
             OutlinedButton(onClick = { onExportPdf(workOrder) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
@@ -376,5 +405,12 @@ internal fun WorkOrderCard(
             onDismiss = { materialTarget = null }
         )
     }
+}
+
+internal fun workOrderHistoryFieldLabel(field: String): String = when (field) {
+    "status" -> "الحالة"
+    "approvalStatus" -> "الاعتماد"
+    "priority" -> "الأولوية"
+    else -> field
 }
 
