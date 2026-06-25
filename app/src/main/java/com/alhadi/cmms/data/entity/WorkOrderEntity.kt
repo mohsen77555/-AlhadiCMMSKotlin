@@ -89,6 +89,20 @@ data class WorkOrderEntity(
     /** Critical or high-value orders require supervisor/admin sign-off. */
     fun needsApproval(): Boolean = priority == "Critical" || estimatedCost >= APPROVAL_THRESHOLD
 
+    /** WO-PRI-002: SLA window (days) derived from the priority. */
+    fun slaDays(): Int = when (priority.lowercase()) {
+        "critical" -> 1
+        "high" -> 3
+        "medium" -> 7
+        else -> 14
+    }
+
+    /** WO-COST-007/008: variance of realised cost against the planned estimate. */
+    fun costVariance(): Double = totalCost() - estimatedCost
+
+    fun isCancelled(): Boolean = status.equals("Cancelled", ignoreCase = true)
+    fun isClosed(): Boolean = status.equals("Closed", ignoreCase = true)
+
     /** Pending approval blocks starting/closing the work order. */
     fun isBlockedByApproval(): Boolean = approvalStatus == "Pending" || approvalStatus == "Rejected"
 
