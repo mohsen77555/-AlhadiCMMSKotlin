@@ -200,25 +200,77 @@ internal fun OrgUnitFormSheet(
     var status by remember { mutableStateOf(initial?.status ?: "Active") }
     var parentId by remember { mutableStateOf(initial?.parentId) }
     var notes by remember { mutableStateOf(initial?.notes ?: "") }
+    var shortName by remember { mutableStateOf(initial?.shortName ?: "") }
+    var legalName by remember { mutableStateOf(initial?.legalName ?: "") }
+    var taxNumber by remember { mutableStateOf(initial?.taxNumber ?: "") }
+    var commercialRegistration by remember { mutableStateOf(initial?.commercialRegistration ?: "") }
+    var country by remember { mutableStateOf(initial?.country ?: "") }
+    var region by remember { mutableStateOf(initial?.region ?: "") }
+    var city by remember { mutableStateOf(initial?.city ?: "") }
+    var address by remember { mutableStateOf(initial?.address ?: "") }
+    var phone by remember { mutableStateOf(initial?.phone ?: "") }
+    var email by remember { mutableStateOf(initial?.email ?: "") }
+    var website by remember { mutableStateOf(initial?.website ?: "") }
+    var latitude by remember { mutableStateOf(initial?.latitude?.toString() ?: "") }
+    var longitude by remember { mutableStateOf(initial?.longitude?.toString() ?: "") }
+    var capacity by remember { mutableStateOf(initial?.capacity ?: "") }
+    var supervisor by remember { mutableStateOf(initial?.supervisor ?: "") }
+    var manager by remember { mutableStateOf(initial?.manager ?: "") }
 
     val trimmedCode = code.trim()
     val duplicate = trimmedCode.isNotBlank() && existing.any {
         it.id != initial?.id && it.type == type && it.code.equals(trimmedCode, ignoreCase = true)
     }
-    val parentOptions = listOf("") + existing.filter { it.id != initial?.id }.map { it.id.toString() }
+    val parentType = orgParentType(type)
+    val parentCandidates = if (parentType == null) emptyList() else existing.filter { it.type == parentType && it.id != initial?.id }
+    val parentOptions = listOf("") + parentCandidates.map { it.id.toString() }
 
     FormSheet(if (initial == null) "إضافة وحدة تنظيمية" else "تعديل الوحدة التنظيمية", onDismiss) {
-        OptionDropdown("النوع", listOf("Company", "Site", "Plant", "MaintenancePlant", "PlanningPlant", "Department", "CostCenter", "PlannerGroup", "WorkCenter", "StorageLocation"), type, display = ::orgUnitTypeOption) { type = it }
+        OptionDropdown("النوع", listOf("Company", "Site", "Plant", "MaintenancePlant", "PlanningPlant", "Department", "CostCenter", "PlannerGroup", "WorkCenter", "StorageLocation"), type, display = ::orgUnitTypeOption) { type = it; parentId = null }
         LabeledField("الكود", code, { code = it })
         if (duplicate) Text("هذا الكود مستخدم لنفس النوع.", color = MaterialTheme.colorScheme.error)
         LabeledField("الاسم", name, { name = it })
-        OptionDropdown(
-            label = "الوحدة الأعلى (اختياري)",
-            options = parentOptions,
-            selected = parentId?.toString() ?: "",
-            display = { idStr -> if (idStr.isBlank()) "بدون" else existing.firstOrNull { it.id.toString() == idStr }?.let { "${it.code} • ${it.name}" } ?: idStr }
-        ) { parentId = it.toLongOrNull() }
+        if (parentType != null) {
+            OptionDropdown(
+                label = "${orgUnitTypeOption(parentType)} (الوحدة الأعلى)",
+                options = parentOptions,
+                selected = parentId?.toString() ?: "",
+                display = { idStr -> if (idStr.isBlank()) "بدون" else existing.firstOrNull { it.id.toString() == idStr }?.let { "${it.code} • ${it.name}" } ?: idStr }
+            ) { parentId = it.toLongOrNull() }
+        }
         OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+
+        // Smart, type-specific fields (only what's relevant to the selected type).
+        when (type) {
+            "Company" -> {
+                LabeledField("الاسم المختصر", shortName, { shortName = it })
+                LabeledField("الاسم القانوني", legalName, { legalName = it })
+                LabeledField("الرقم الضريبي", taxNumber, { taxNumber = it })
+                LabeledField("السجل التجاري", commercialRegistration, { commercialRegistration = it })
+                LabeledField("الدولة", country, { country = it })
+                LabeledField("المدينة", city, { city = it })
+                LabeledField("العنوان", address, { address = it }, singleLine = false)
+                LabeledField("الهاتف", phone, { phone = it })
+                LabeledField("البريد الإلكتروني", email, { email = it })
+                LabeledField("الموقع الإلكتروني", website, { website = it })
+            }
+            "Site" -> {
+                LabeledField("الدولة", country, { country = it })
+                LabeledField("المنطقة", region, { region = it })
+                LabeledField("المدينة", city, { city = it })
+                LabeledField("العنوان", address, { address = it }, singleLine = false)
+                LabeledField("خط العرض (Latitude)", latitude, { latitude = it }, numeric = true)
+                LabeledField("خط الطول (Longitude)", longitude, { longitude = it }, numeric = true)
+            }
+            "WorkCenter" -> {
+                LabeledField("السعة (Capacity)", capacity, { capacity = it })
+                LabeledField("المشرف", supervisor, { supervisor = it })
+            }
+            "Department" -> {
+                LabeledField("المدير", manager, { manager = it })
+            }
+        }
+
         LabeledField("ملاحظات", notes, { notes = it }, singleLine = false)
         SaveButton(code.isNotBlank() && name.isNotBlank() && !duplicate) {
             onSave(
@@ -229,11 +281,41 @@ internal fun OrgUnitFormSheet(
                     name = name.trim(),
                     status = status,
                     parentId = parentId,
-                    notes = notes.trim()
+                    notes = notes.trim(),
+                    shortName = shortName.trim(),
+                    legalName = legalName.trim(),
+                    taxNumber = taxNumber.trim(),
+                    commercialRegistration = commercialRegistration.trim(),
+                    country = country.trim(),
+                    region = region.trim(),
+                    city = city.trim(),
+                    address = address.trim(),
+                    phone = phone.trim(),
+                    email = email.trim(),
+                    website = website.trim(),
+                    latitude = latitude.toDoubleOrNull(),
+                    longitude = longitude.toDoubleOrNull(),
+                    capacity = capacity.trim(),
+                    supervisor = supervisor.trim(),
+                    manager = manager.trim()
                 )
             )
         }
     }
+}
+
+/** The expected parent org-unit type for a given type, per the org hierarchy (null = top level). */
+internal fun orgParentType(type: String): String? = when (type) {
+    "Site" -> "Company"
+    "Plant" -> "Site"
+    "MaintenancePlant" -> "Plant"
+    "PlanningPlant" -> "MaintenancePlant"
+    "WorkCenter" -> "Plant"
+    "StorageLocation" -> "Plant"
+    "Department" -> "Plant"
+    "CostCenter" -> "Department"
+    "PlannerGroup" -> "PlanningPlant"
+    else -> null
 }
 
 internal fun orgUnitTypeOption(type: String): String = when (type) {

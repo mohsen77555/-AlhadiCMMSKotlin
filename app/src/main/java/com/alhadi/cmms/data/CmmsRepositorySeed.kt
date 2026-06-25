@@ -274,12 +274,16 @@ internal suspend fun CmmsRepository.seedSampleData(replace: Boolean = false) {
 
             val orgUnits = listOf(
                 OrgUnitEntity(1, "Company", "ALHADI", "مجموعة الهادي", "Active", null, ""),
-                OrgUnitEntity(2, "Plant", "PLANT-01", "مصنع الطحن الرئيسي", "Active", 1, ""),
+                OrgUnitEntity(8, "Site", "SITE-RYD", "موقع الرياض", "Active", 1, ""),
+                OrgUnitEntity(2, "Plant", "PLANT-01", "مصنع الطحن الرئيسي", "Active", 8, ""),
+                OrgUnitEntity(9, "MaintenancePlant", "MP-01", "جهة صيانة المصنع", "Active", 2, ""),
+                OrgUnitEntity(10, "PlanningPlant", "PP-01", "جهة تخطيط الصيانة", "Active", 9, ""),
+                OrgUnitEntity(7, "Department", "DEP-MNT", "إدارة الصيانة", "Active", 2, ""),
+                OrgUnitEntity(5, "CostCenter", "CC-1000", "مركز تكلفة الصيانة", "Active", 7, ""),
+                OrgUnitEntity(6, "PlannerGroup", "PG-01", "مجموعة تخطيط الصيانة", "Active", 10, ""),
                 OrgUnitEntity(3, "WorkCenter", "WC-MECH", "مركز العمل الميكانيكي", "Active", 2, ""),
                 OrgUnitEntity(4, "WorkCenter", "WC-ELEC", "مركز العمل الكهربائي", "Active", 2, ""),
-                OrgUnitEntity(5, "CostCenter", "CC-1000", "مركز تكلفة الصيانة", "Active", 2, ""),
-                OrgUnitEntity(6, "PlannerGroup", "PG-01", "مجموعة تخطيط الصيانة", "Active", 2, ""),
-                OrgUnitEntity(7, "Department", "DEP-MNT", "إدارة الصيانة", "Active", 1, "")
+                OrgUnitEntity(11, "StorageLocation", "SL-01", "مستودع قطع الغيار", "Active", 2, "")
             )
 
             measurementDao.insertPoints(measuringPoints)
