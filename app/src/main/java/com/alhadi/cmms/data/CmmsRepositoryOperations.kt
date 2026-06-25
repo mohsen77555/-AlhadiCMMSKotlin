@@ -122,6 +122,10 @@ internal suspend fun CmmsRepository.updateWorkOrderStatus(id: Long, status: Stri
         if (status == "Closed" && photoDao.countForOrder(id) == 0) {
             throw IllegalStateException("التقط صورة دليل تنفيذ بالكاميرا قبل إغلاق أمر العمل")
         }
+        // WO-CLS-003: cannot close while issued materials are not settled into the order cost.
+        if (status == "Closed" && current != null && current.partsCost <= 0.0 && transactionsForOrder(id).isNotEmpty()) {
+            throw IllegalStateException("سوِّ تكاليف المواد المصروفة (سجّل تكلفة القطع) قبل إغلاق الأمر")
+        }
         // WO-CLS-005/006: stamp who closed the order and when.
         if (status == "Closed" && current != null) {
             workOrderDao.insertWorkOrder(current.copy(status = status, closedAt = DateStrings.today(), closedBy = actor))
