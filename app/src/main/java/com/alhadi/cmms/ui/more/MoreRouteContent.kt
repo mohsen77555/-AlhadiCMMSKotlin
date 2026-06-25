@@ -131,6 +131,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alhadi.cmms.data.MovementType
+import com.alhadi.cmms.data.WorkOrderAuthority
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.notify.Reminders
 import com.journeyapps.barcodescanner.ScanContract
@@ -288,7 +289,11 @@ internal fun MoreRouteContent(
                             parts = spareParts,
                             pmItems = preventiveMaintenance
                         )
-                        MoreRoute.Audit -> AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
+                        MoreRoute.Audit -> if (WorkOrderAuthority.canViewAudit(currentUser)) {
+                            AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
+                        } else {
+                            EmptyState("لا تملك صلاحية عرض سجل التدقيق (Admin فقط) — WO-AUTH-009")
+                        }
                         MoreRoute.Meters -> MetersScreen(
                             innerPadding = innerPadding,
                             points = measuringPoints,
