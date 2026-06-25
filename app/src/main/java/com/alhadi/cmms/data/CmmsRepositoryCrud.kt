@@ -138,6 +138,7 @@ internal suspend fun CmmsRepository.saveWorkOrder(workOrder: WorkOrderEntity, ac
 internal suspend fun CmmsRepository.setWorkOrderApproval(workOrder: WorkOrderEntity, approved: Boolean, actor: String = "System") {
         val status = if (approved) "Approved" else "Rejected"
         workOrderDao.insertWorkOrder(workOrder.copy(approvalStatus = status, approvedBy = actor))
+        recordWoHistory(workOrder.id, "approvalStatus", workOrder.approvalStatus, status, actor)
         recordAudit("Approval", "WorkOrder", "${if (approved) "اعتماد" else "رفض"} أمر العمل: ${workOrder.title}", actor)
     }
 
@@ -145,6 +146,7 @@ internal suspend fun CmmsRepository.deleteWorkOrder(workOrder: WorkOrderEntity, 
         // WO-GOV-003/004 & WO-LC-005/006: work orders are never hard-deleted — cancel and keep the record.
         val current = workOrderDao.getById(workOrder.id) ?: workOrder
         workOrderDao.insertWorkOrder(current.copy(status = "Cancelled", cancelledReason = current.cancelledReason.ifBlank { "أُلغي بدل الحذف" }))
+        recordWoHistory(workOrder.id, "status", current.status, "Cancelled", actor)
         recordAudit("Cancel", "WorkOrder", "إلغاء أمر عمل: ${workOrder.title}", actor)
     }
 
@@ -152,6 +154,7 @@ internal suspend fun CmmsRepository.deleteWorkOrder(workOrder: WorkOrderEntity, 
 internal suspend fun CmmsRepository.cancelWorkOrder(workOrder: WorkOrderEntity, reason: String, actor: String = "System") {
     val current = workOrderDao.getById(workOrder.id) ?: workOrder
     workOrderDao.insertWorkOrder(current.copy(status = "Cancelled", cancelledReason = reason.ifBlank { "ملغى" }))
+    recordWoHistory(workOrder.id, "status", current.status, "Cancelled", actor)
     recordAudit("Cancel", "WorkOrder", "إلغاء أمر عمل: ${workOrder.title}", actor)
 }
 

@@ -8,6 +8,7 @@ import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
@@ -62,6 +63,7 @@ class CmmsRepository(internal val database: AppDatabase) {
     internal val permitDao = database.workPermitDao()
     internal val warehouseDao = database.warehouseDao()
     internal val orgUnitDao = database.orgUnitDao()
+    internal val workOrderHistoryDao = database.workOrderHistoryDao()
     internal val serialService = SerialNumberService(database, ::recordAudit)
 
     val assets: Flow<List<AssetEntity>> = assetDao.observeAssets()
@@ -126,6 +128,21 @@ class CmmsRepository(internal val database: AppDatabase) {
                 details = details,
                 performedBy = actor,
                 createdAt = DateStrings.now()
+            )
+        )
+    }
+
+    /** WO-HIS-001..004: append an immutable history row for a work-order field change. */
+    internal suspend fun recordWoHistory(orderId: Long, field: String, oldValue: String, newValue: String, actor: String) {
+        if (oldValue == newValue) return
+        workOrderHistoryDao.insert(
+            WorkOrderHistoryEntity(
+                orderId = orderId,
+                field = field,
+                oldValue = oldValue,
+                newValue = newValue,
+                actor = actor,
+                changedAt = DateStrings.now()
             )
         )
     }

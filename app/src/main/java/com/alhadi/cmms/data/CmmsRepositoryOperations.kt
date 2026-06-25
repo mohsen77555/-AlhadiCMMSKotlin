@@ -122,6 +122,8 @@ internal suspend fun CmmsRepository.updateWorkOrderStatus(id: Long, status: Stri
         } else {
             workOrderDao.updateStatus(id, status)
         }
+        // WO-HIS-001..004 & WO-STAT-006: record the status transition (old -> new).
+        recordWoHistory(id, "status", current?.status ?: "", status, actor)
         recordAudit("Update", "WorkOrder", "تحديث حالة أمر العمل #$id إلى $status", actor)
     }
 
