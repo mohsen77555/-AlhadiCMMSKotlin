@@ -97,6 +97,12 @@ internal suspend fun CmmsRepository.updateWorkOrderStatus(id: Long, status: Stri
         if (current != null && current.status.equals("Cancelled", ignoreCase = true) && !status.equals("Cancelled", ignoreCase = true)) {
             throw IllegalStateException("أمر العمل ملغى — لا يمكن تنفيذه")
         }
+        // WO-STAT-003: a draft must be released (-> Open) before any execution.
+        if (current != null && current.status.equals("Draft", ignoreCase = true) &&
+            status in listOf("In Progress", "Technically Completed", "Closed")
+        ) {
+            throw IllegalStateException("أطلق الأمر (Release) قبل بدء التنفيذ")
+        }
         // Governance: hazardous work cannot start without an approved, valid permit (SAFE-002).
         if (status == "In Progress" && workOrderDao.requiresPermit(id) == true &&
             permitDao.countValid(id, DateStrings.today()) == 0

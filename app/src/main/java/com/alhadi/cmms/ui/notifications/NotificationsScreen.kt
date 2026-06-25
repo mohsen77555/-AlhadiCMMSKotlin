@@ -207,10 +207,12 @@ internal fun roleLabel(role: String): String = when (role.lowercase(Locale.getDe
 }
 
 internal fun workOrderStatusLabel(status: String): String = when (status) {
+    "Draft" -> "مسودة"
     "Open" -> "مفتوح"
     "In Progress" -> "قيد التنفيذ"
     "Technically Completed" -> "مكتمل فنياً"
     "Closed" -> "مغلق"
+    "Cancelled" -> "ملغى"
     else -> status
 }
 

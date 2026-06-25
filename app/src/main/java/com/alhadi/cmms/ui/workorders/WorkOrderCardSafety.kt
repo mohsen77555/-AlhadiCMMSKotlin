@@ -276,6 +276,10 @@ internal fun WorkOrderStatusActions(
                 val allConfirmed = operations.isNotEmpty() && operations.none { it.requiresConfirmation && it.status != "Confirmed" }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     when (workOrder.status) {
+                        "Draft" -> {
+                            // WO-STAT-002/003: a draft must be released before any execution.
+                            Button(onClick = { onUpdateStatus(workOrder, "Open") }, modifier = Modifier.fillMaxWidth()) { Text("إطلاق الأمر (Release)") }
+                        }
                         "Open" -> {
                             Button(onClick = { onUpdateStatus(workOrder, "In Progress") }, enabled = !permitBlocked, modifier = Modifier.fillMaxWidth()) { Text("بدء التنفيذ") }
                         }

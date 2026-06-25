@@ -103,7 +103,7 @@ internal fun WorkOrderFormSheet(
     var description by remember { mutableStateOf(initial?.description ?: "") }
     var assetId by remember { mutableStateOf(initial?.assetId ?: assets.firstOrNull()?.id ?: 0L) }
     var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
-    var status by remember { mutableStateOf(initial?.status ?: "Open") }
+    var status by remember { mutableStateOf(initial?.status ?: "Draft") }
     var type by remember { mutableStateOf(initial?.type ?: "Corrective") }
     var assignedTo by remember { mutableStateOf(initial?.assignedTo ?: defaultAssignee) }
     var cost by remember { mutableStateOf((initial?.estimatedCost ?: 0.0).toString()) }
@@ -185,7 +185,7 @@ internal fun WorkOrderFormSheet(
         }
         OptionDropdown("نوع الأمر", listOf("Corrective", "Preventive", "Breakdown", "Calibration", "Inspection", "Improvement"), type, display = ::workOrderTypeLabel) { type = it }
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
-        OptionDropdown("الحالة", listOf("Open", "In Progress", "Technically Completed", "Closed"), status) { status = it }
+        OptionDropdown("الحالة", listOf("Draft", "Open", "In Progress", "Technically Completed", "Closed"), status) { status = it }
         LabeledField("المسؤول", assignedTo, { assignedTo = it })
         LabeledField("التكلفة التقديرية", cost, { cost = it }, numeric = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
