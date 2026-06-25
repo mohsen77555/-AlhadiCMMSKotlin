@@ -30,9 +30,9 @@ data class WorkOrderConfirmationEntity(
     val causeFound: String = "",
     val actionTaken: String = "",
     val downtime: Double = 0.0,
+    val finalConfirmation: Boolean = false,
+    val createdAt: String,
     // WO-LAB-006: overtime hours recorded separately from regular work.
     @ColumnInfo(defaultValue = "0")
-    val overtimeHours: Double = 0.0,
-    val finalConfirmation: Boolean = false,
-    val createdAt: String
+    val overtimeHours: Double = 0.0
 )
