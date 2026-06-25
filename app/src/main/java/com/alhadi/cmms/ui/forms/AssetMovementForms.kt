@@ -140,10 +140,12 @@ internal fun ConfirmationFormSheet(
     var causeFound by remember { mutableStateOf("") }
     var actionTaken by remember { mutableStateOf("") }
     var downtime by remember { mutableStateOf("0") }
+    var overtimeHours by remember { mutableStateOf("0") }
     var finalConfirmation by remember { mutableStateOf(true) }
 
     FormSheet("تأكيد العملية ${operation.operationNumber}", onDismiss) {
         LabeledField("الساعات الفعلية", actualWork, { actualWork = it }, numeric = true)
+        LabeledField("ساعات العمل الإضافي (Overtime)", overtimeHours, { overtimeHours = it }, numeric = true)
         LabeledField("وصف العمل المنفذ", activityText, { activityText = it }, singleLine = false)
         if (isFailureOrder) {
             LabeledField("العطل المكتشف", damageFound, { damageFound = it })
@@ -169,6 +171,7 @@ internal fun ConfirmationFormSheet(
                     causeFound = causeFound.trim(),
                     actionTaken = actionTaken.trim(),
                     downtime = downtime.toDoubleOrNull() ?: 0.0,
+                    overtimeHours = overtimeHours.toDoubleOrNull() ?: 0.0,
                     finalConfirmation = finalConfirmation,
                     createdAt = ""
                 )
@@ -192,9 +195,11 @@ internal fun OperationFormSheet(
     var description by remember { mutableStateOf("") }
     var workCenter by remember { mutableStateOf("Mechanical") }
     var plannedHours by remember { mutableStateOf("1") }
+    var sequence by remember { mutableStateOf("") }
 
     FormSheet("إضافة عملية", onDismiss) {
         LabeledField("رقم العملية", operationNumber, { operationNumber = it })
+        LabeledField("الترتيب (Sequence)", sequence, { sequence = it }, numeric = true)
         LabeledField("الوصف", description, { description = it }, singleLine = false)
         OptionDropdown("مركز العمل", listOf("Mechanical", "Electrical", "Instrumentation", "Civil", "External"), workCenter) { workCenter = it }
         LabeledField("الساعات المخططة", plannedHours, { plannedHours = it }, numeric = true)
@@ -209,7 +214,8 @@ internal fun OperationFormSheet(
                     plannedHours = plannedHours.toDoubleOrNull() ?: 0.0,
                     actualHours = 0.0,
                     requiresConfirmation = true,
-                    status = "Open"
+                    status = "Open",
+                    sequence = sequence.toIntOrNull() ?: (operationNumber.trim().toIntOrNull() ?: 0)
                 )
             )
         }

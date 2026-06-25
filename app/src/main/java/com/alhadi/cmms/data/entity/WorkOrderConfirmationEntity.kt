@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -29,6 +30,9 @@ data class WorkOrderConfirmationEntity(
     val causeFound: String = "",
     val actionTaken: String = "",
     val downtime: Double = 0.0,
+    // WO-LAB-006: overtime hours recorded separately from regular work.
+    @ColumnInfo(defaultValue = "0")
+    val overtimeHours: Double = 0.0,
     val finalConfirmation: Boolean = false,
     val createdAt: String
 )

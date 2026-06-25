@@ -211,7 +211,7 @@ internal fun WorkOrderOperationsSection(
                 if (operations.isEmpty()) {
                     Text("لا توجد عمليات. أضِف خطوات التنفيذ.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                operations.forEach { op ->
+                operations.sortedWith(compareBy({ it.sequence }, { it.operationNumber })).forEach { op ->
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()

@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -26,5 +27,8 @@ data class WorkOrderOperationEntity(
     val plannedHours: Double = 0.0,
     val actualHours: Double = 0.0,
     val requiresConfirmation: Boolean = true,
-    val status: String = "Open"
+    val status: String = "Open",
+    // WO-OPR-006: execution order within the work order.
+    @ColumnInfo(defaultValue = "0")
+    val sequence: Int = 0
 )
