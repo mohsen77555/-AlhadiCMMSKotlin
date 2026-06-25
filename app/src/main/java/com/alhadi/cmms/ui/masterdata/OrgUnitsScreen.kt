@@ -216,40 +216,57 @@ internal fun OrgUnitsScreen(
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<OrgUnitEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<OrgUnitEntity?>(null) }
+    var selectedType by rememberSaveable { mutableStateOf(orgUnitTypeOrder.first()) }
     val unitsById = remember(units) { units.associateBy { it.id } }
+    val group = units.filter { it.type == selectedType }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+    ) {
+        Column(
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            SectionHeader("الوحدات التنظيمية")
+            Text("اختر النوع من التبويبات ثم أضِف أو عدّل وحدات هذا النوع.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            orgUnitTypeOrder.forEach { type ->
+                val count = units.count { it.type == type }
+                FilterChip(
+                    selected = selectedType == type,
+                    onClick = { selectedType = type },
+                    label = { Text(if (count > 0) "${orgUnitTypeLabel(type)} ($count)" else orgUnitTypeLabel(type)) }
+                )
+            }
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            item {
-                SectionHeader("الوحدات التنظيمية")
-                Text("الشركات والمصانع والأقسام ومراكز العمل ومجموعات التخطيط ومراكز التكلفة.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             if (canManage) {
-                item { AddButton("وحدة تنظيمية جديدة") { editing = null; showForm = true } }
+                item { AddButton("${orgUnitTypeLabel(selectedType)} جديدة") { editing = null; showForm = true } }
             }
-            if (units.isEmpty()) {
-                item { EmptyState("لا توجد وحدات تنظيمية", Icons.Filled.CorporateFare) }
+            if (group.isEmpty()) {
+                item { EmptyState("لا توجد ${orgUnitTypeLabel(selectedType)} بعد", Icons.Filled.CorporateFare) }
             }
-            orgUnitTypeOrder.forEach { type ->
-                val group = units.filter { it.type == type }
-                if (group.isNotEmpty()) {
-                    item { SectionHeader("${orgUnitTypeLabel(type)} (${group.size})") }
-                    items(group, key = { it.id }) { unit ->
-                        OrgUnitCard(
-                            unit = unit,
-                            parentName = unit.parentId?.let { unitsById[it] }?.let { "${it.code} • ${it.name}" },
-                            canManage = canManage,
-                            onEdit = { editing = unit; showForm = true },
-                            onDelete = { deleteTarget = unit }
-                        )
-                    }
-                }
+            items(group, key = { it.id }) { unit ->
+                OrgUnitCard(
+                    unit = unit,
+                    parentName = unit.parentId?.let { unitsById[it] }?.let { "${it.code} • ${it.name}" },
+                    canManage = canManage,
+                    onEdit = { editing = unit; showForm = true },
+                    onDelete = { deleteTarget = unit }
+                )
             }
         }
     }
@@ -258,6 +275,7 @@ internal fun OrgUnitsScreen(
         OrgUnitFormSheet(
             initial = editing,
             existing = units,
+            defaultType = selectedType,
             onDismiss = { showForm = false },
             onSave = { onSave(it); showForm = false }
         )

@@ -190,10 +190,11 @@ internal fun warehouseTypeOption(type: String): String = when (type) {
 internal fun OrgUnitFormSheet(
     initial: OrgUnitEntity?,
     existing: List<OrgUnitEntity>,
+    defaultType: String = "WorkCenter",
     onDismiss: () -> Unit,
     onSave: (OrgUnitEntity) -> Unit
 ) {
-    var type by remember { mutableStateOf(initial?.type ?: "WorkCenter") }
+    var type by remember { mutableStateOf(initial?.type ?: defaultType) }
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var status by remember { mutableStateOf(initial?.status ?: "Active") }
