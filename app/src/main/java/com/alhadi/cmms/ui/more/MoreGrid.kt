@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.CorporateFare
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Analytics
@@ -260,6 +261,12 @@ internal fun MoreGrid(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ModuleCard("الوحدات التنظيمية", "مراكز العمل والتكلفة", Icons.Filled.CorporateFare, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.OrgUnits) }
                 ModuleCard("الموردون", "المشتريات والموردون", Icons.Filled.LocalShipping, AccentBrown, Modifier.weight(1f)) { onOpen(MoreRoute.Suppliers) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                ModuleCard("أوامر الشراء", "إنشاء ومتابعة المشتريات", Icons.Filled.ShoppingCart, AccentBrown, Modifier.weight(1f)) { onOpen(MoreRoute.PurchaseOrders) }
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
         item {
