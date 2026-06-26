@@ -112,7 +112,7 @@ import com.alhadi.cmms.data.entity.OrgUnitEntity
         AssetStatusHistoryEntity::class,
         WorkOrderMaterialEntity::class
     ],
-    version = 50,
+    version = 51,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

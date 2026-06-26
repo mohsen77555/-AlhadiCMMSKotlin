@@ -342,6 +342,7 @@ internal suspend fun CmmsRepository.addReading(point: MeasuringPointEntity, valu
             return "لا يمكن أن تقل قراءة العداد التراكمي عن ${point.lastReading}"
         }
         val now = DateStrings.now()
+        val status = point.readingStatus(value)
         database.withTransaction {
             measurementDao.insertReading(
                 MeasurementReadingEntity(
@@ -350,14 +351,35 @@ internal suspend fun CmmsRepository.addReading(point: MeasuringPointEntity, valu
                     value = value,
                     createdAt = now,
                     createdBy = actor,
-                    note = note
+                    note = note,
+                    status = status
                 )
             )
             measurementDao.updateLastReading(point.id, value, now)
-            recordAudit("Reading", "Meter", "قراءة ${point.name}: $value ${point.unit}", actor)
+            recordAudit("Reading", "Meter", "قراءة ${point.name}: $value ${point.unit} ($status)", actor)
+            // MEAS-ALM-010: an alarm breach can raise a maintenance notification automatically.
+            if (status == "Alarm" && point.autoNotifyOnAlarm) {
+                notificationDao.insert(
+                    MaintenanceNotificationEntity(
+                        number = "MTR-${point.id}-${System.currentTimeMillis()}",
+                        type = "Condition",
+                        title = "تجاوز حد القياس: ${point.name}",
+                        description = "سُجّلت قراءة $value ${point.unit} خارج الحدود المسموحة للأصل.",
+                        assetId = point.assetId,
+                        priority = "High",
+                        reportedBy = actor,
+                        reportedAt = now,
+                        status = "Open"
+                    )
+                )
+                recordAudit("Generate", "Notification", "بلاغ تلقائي من تجاوز قياس ${point.name}", actor)
+            }
         }
-        val limit = point.upperLimit
-        return if (limit != null && value > limit) "تنبيه: تجاوزت القراءة الحد الأعلى ($limit ${point.unit})" else null
+        return when (status) {
+            "Alarm" -> "إنذار: القراءة $value ${point.unit} خارج الحدود المسموحة"
+            "Warning" -> "تحذير: القراءة $value ${point.unit} قريبة من الحد"
+            else -> null
+        }
     }
 
     // ---------------------------------------------------------------------

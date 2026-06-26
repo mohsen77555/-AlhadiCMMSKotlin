@@ -2,6 +2,7 @@ package com.alhadi.cmms.data.entity
 
 import kotlinx.serialization.Serializable
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -19,5 +20,8 @@ data class MeasurementReadingEntity(
     val value: Double,
     val createdAt: String,
     val createdBy: String,
-    val note: String
+    val note: String,
+    /** Reading classification at capture time: Normal / Warning / Alarm (MEAS-ALM-001). */
+    @ColumnInfo(defaultValue = "'Normal'")
+    val status: String = "Normal"
 )
