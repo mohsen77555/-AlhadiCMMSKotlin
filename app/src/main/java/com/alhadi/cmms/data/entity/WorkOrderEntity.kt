@@ -77,7 +77,9 @@ data class WorkOrderEntity(
     @ColumnInfo(defaultValue = "''") val closedAt: String = "",
     @ColumnInfo(defaultValue = "''") val closedBy: String = "",
     // --- Source notification reference (WO-NOTIF-002/003/005) ---
-    val notificationId: Long? = null
+    val notificationId: Long? = null,
+    // --- Source preventive-maintenance plan (PM-GEN-001): links auto-generated orders to their plan ---
+    val sourcePmId: Long? = null
 ) {
     /** Recorded labour cost (hours × rate). */
     fun laborCost(): Double = laborHours * laborRate

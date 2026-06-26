@@ -140,6 +140,7 @@ fun CmmsViewModel.deleteTaskList(taskList: TaskListEntity) = launchAction("تم 
 fun CmmsViewModel.saveTaskListOperation(operation: TaskListOperationEntity) = launchAction("تم حفظ عملية القالب") { repository.saveTaskListOperation(operation, actor()) }
 fun CmmsViewModel.deleteTaskListOperation(operation: TaskListOperationEntity) = launchAction("تم حذف عملية القالب") { repository.deleteTaskListOperation(operation, actor()) }
 fun CmmsViewModel.generateWorkOrderFromPm(pm: PreventiveMaintenanceEntity) = launchAction("تم توليد أمر عمل من الخطة") { repository.generateWorkOrderFromPm(pm, actor()) }
+fun CmmsViewModel.generateDueWorkOrders() = launchAction("تم توليد أوامر العمل المستحقة") { repository.generateDueWorkOrders(actor()) }
 
 fun CmmsViewModel.savePermit(permit: WorkPermitEntity) = launchAction("تم حفظ التصريح") { repository.savePermit(permit, actor()) }
 fun CmmsViewModel.setPermitStatus(permit: WorkPermitEntity, approved: Boolean) =

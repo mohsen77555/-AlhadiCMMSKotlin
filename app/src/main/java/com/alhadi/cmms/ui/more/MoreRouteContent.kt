@@ -395,13 +395,15 @@ internal fun MoreRouteContent(
                             canManage = canManage,
                             checklist = pmChecklist,
                             taskLists = taskLists,
+                            measuringPoints = measuringPoints,
                             onSave = viewModel::savePreventiveMaintenance,
                             onDelete = viewModel::deletePreventiveMaintenance,
                             onDone = viewModel::markPreventiveMaintenanceDone,
                             onSaveChecklistItem = viewModel::saveChecklistItem,
                             onSetChecklistResult = viewModel::setChecklistResult,
                             onDeleteChecklistItem = viewModel::deleteChecklistItem,
-                            onGenerateOrder = viewModel::generateWorkOrderFromPm
+                            onGenerateOrder = viewModel::generateWorkOrderFromPm,
+                            onGenerateDue = viewModel::generateDueWorkOrders
                         )
                         MoreRoute.TaskLists -> TaskListsScreen(
                             innerPadding = innerPadding,

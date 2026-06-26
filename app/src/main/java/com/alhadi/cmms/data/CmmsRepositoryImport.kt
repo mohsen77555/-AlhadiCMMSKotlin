@@ -140,36 +140,71 @@ internal suspend fun CmmsRepository.importMachineKit(sheets: Map<String, List<Li
      */
 internal suspend fun CmmsRepository.generateWorkOrderFromPm(pm: PreventiveMaintenanceEntity, actor: String = "System") {
         database.withTransaction {
-            val today = DateStrings.today()
-            val orderId = workOrderDao.insertWorkOrder(
-                WorkOrderEntity(
-                    assetId = pm.assetId,
-                    title = "صيانة دورية: ${pm.title}",
-                    description = "مُولّد تلقائياً من الخطة الوقائية",
-                    priority = "Medium",
-                    status = "Open",
-                    assignedTo = actor,
-                    createdAt = today,
-                    dueAt = pm.nextDueAt,
-                    estimatedCost = 0.0
-                )
-            )
-            val template = pm.taskListId?.let { taskListDao.operationsForList(it) } ?: emptyList()
-            if (template.isNotEmpty()) {
-                operationDao.insertAll(
-                    template.map {
-                        WorkOrderOperationEntity(
-                            orderId = orderId,
-                            operationNumber = it.operationNumber,
-                            description = it.description,
-                            workCenter = it.workCenter,
-                            plannedHours = it.plannedHours,
-                            requiresConfirmation = true,
-                            status = "Open"
-                        )
-                    }
-                )
-            }
-            recordAudit("Generate", "WorkOrder", "توليد أمر عمل من الصيانة الدورية: ${pm.title} (${template.size} عملية)", actor)
+            createOrderFromPm(pm, actor)
         }
+    }
+
+/** Creates a work order from a PM plan (priority, source link and copied operations). Caller wraps the transaction. */
+private suspend fun CmmsRepository.createOrderFromPm(pm: PreventiveMaintenanceEntity, actor: String): Long {
+        val today = DateStrings.today()
+        val orderId = workOrderDao.insertWorkOrder(
+            WorkOrderEntity(
+                assetId = pm.assetId,
+                title = "صيانة دورية: ${pm.title}",
+                description = "مُولّد تلقائياً من الخطة الوقائية",
+                priority = pm.priority.ifBlank { "Medium" },
+                status = "Open",
+                assignedTo = actor,
+                createdAt = today,
+                dueAt = pm.nextDueAt,
+                estimatedCost = 0.0,
+                sourcePmId = pm.id
+            )
+        )
+        val template = pm.taskListId?.let { taskListDao.operationsForList(it) } ?: emptyList()
+        if (template.isNotEmpty()) {
+            operationDao.insertAll(
+                template.map {
+                    WorkOrderOperationEntity(
+                        orderId = orderId,
+                        operationNumber = it.operationNumber,
+                        description = it.description,
+                        workCenter = it.workCenter,
+                        plannedHours = it.plannedHours,
+                        requiresConfirmation = true,
+                        status = "Open"
+                    )
+                }
+            )
+        }
+        recordAudit("Generate", "WorkOrder", "توليد أمر عمل من الصيانة الدورية: ${pm.title} (${template.size} عملية)", actor)
+        return orderId
+    }
+
+/**
+ * PM-GEN-002: bulk auto-generation. Scans active maintenance plans, and for every plan that is due
+ * (time-due within its call horizon, or counter-due) and does not already have an open generated
+ * order, raises a work order. Returns how many orders were generated.
+ */
+internal suspend fun CmmsRepository.generateDueWorkOrders(actor: String = "System"): Int {
+        val plans = preventiveMaintenance.first().filter { it.planActive }
+        if (plans.isEmpty()) return 0
+        val openOrders = workOrders.first().filter { !it.isClosed() && !it.isCancelled() }
+        val pmWithOpenOrder = openOrders.mapNotNull { it.sourcePmId }.toSet()
+        var generated = 0
+        database.withTransaction {
+            for (pm in plans) {
+                if (pm.id in pmWithOpenOrder) continue
+                val timeDue = pm.isTimeScheduled &&
+                    DateStrings.isDueOrOverdue(DateStrings.addDays(pm.nextDueAt, -pm.callHorizonDays))
+                val counterDue = pm.isCounterScheduled && pm.measuringPointId?.let { pointId ->
+                    measurementDao.getPointById(pointId)?.let { pm.isCounterDue(it.lastReading) }
+                } == true
+                if (timeDue || counterDue) {
+                    createOrderFromPm(pm, actor)
+                    generated++
+                }
+            }
+        }
+        return generated
     }

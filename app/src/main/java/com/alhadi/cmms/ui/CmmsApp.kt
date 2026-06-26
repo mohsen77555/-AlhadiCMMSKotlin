@@ -387,7 +387,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onSaveChecklistItem = viewModel::saveChecklistItem,
                         onSetChecklistResult = viewModel::setChecklistResult,
                         onDeleteChecklistItem = viewModel::deleteChecklistItem,
-                        onGenerateOrder = viewModel::generateWorkOrderFromPm
+                        onGenerateOrder = viewModel::generateWorkOrderFromPm,
+                        onGenerateDue = viewModel::generateDueWorkOrders
                     )
 
                     BottomTab.Assets -> AssetsScreen(

@@ -205,7 +205,8 @@ internal fun PreventiveMaintenanceScreen(
     onSaveChecklistItem: (PmChecklistItemEntity) -> Unit,
     onSetChecklistResult: (PmChecklistItemEntity, String) -> Unit,
     onDeleteChecklistItem: (PmChecklistItemEntity) -> Unit,
-    onGenerateOrder: (PreventiveMaintenanceEntity) -> Unit
+    onGenerateOrder: (PreventiveMaintenanceEntity) -> Unit,
+    onGenerateDue: () -> Unit = {}
 ) {
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<PreventiveMaintenanceEntity?>(null) }
@@ -241,6 +242,23 @@ internal fun PreventiveMaintenanceScreen(
             }
             if (canManage) {
                 item { AddButton("مهمة صيانة جديدة") { editing = null; showForm = true } }
+                val dueForGen = pmItems.count { pm ->
+                    pm.planActive && run {
+                        val timeDue = pm.isTimeScheduled && DateStrings.isDueOrOverdue(DateStrings.addDays(pm.nextDueAt, -pm.callHorizonDays))
+                        val point = pm.measuringPointId?.let { id -> measuringPoints.firstOrNull { it.id == id } }
+                        val counterDue = point != null && pm.isCounterDue(point.lastReading)
+                        timeDue || counterDue
+                    }
+                }
+                if (dueForGen > 0) {
+                    item {
+                        Button(onClick = onGenerateDue, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("توليد أوامر العمل المستحقة ($dueForGen)")
+                        }
+                    }
+                }
             }
             if (pmItems.isEmpty()) {
                 item { EmptyState("لا توجد مهام صيانة دورية", Icons.Filled.EventRepeat) }
