@@ -220,12 +220,18 @@ internal fun SparePartCard(
                     LtrText(part.partNumber, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     Text(part.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(if (lowStock) "منخفض" else "متوفر", statusTone(if (lowStock) "stopped" else "running"))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (part.abcClass.isNotBlank()) StatusBadge("فئة ${part.abcClass}", statusTone("info"))
+                    StatusBadge(if (lowStock) "منخفض" else "متوفر", statusTone(if (lowStock) "stopped" else "running"))
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             InfoRow("المعدة", part.equipmentGroup)
             InfoRow("الكمية", "${part.onHandQty} ${part.unit}")
             InfoRow("الحد الأدنى", "${part.minQty} ${part.unit}")
+            if (part.maxQty > 0) InfoRow("الحد الأقصى", "${part.maxQty} ${part.unit}")
+            if (part.reorderQty > 0) InfoRow("كمية إعادة الطلب", "${part.reorderQty} ${part.unit}")
+            if (part.leadTimeDays > 0) InfoRow("مهلة التوريد", "${part.leadTimeDays} يوم")
             InfoRow("المستودع", warehouseLabel.ifBlank { "غير محدد" })
             InfoRow("آخر سعر", "%.2f".format(part.lastPrice))
             InfoRow("قيمة المخزون", money(part.onHandQty * part.lastPrice))

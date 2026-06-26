@@ -107,6 +107,11 @@ internal fun PartFormSheet(
     var minQty by remember { mutableStateOf((initial?.minQty ?: 0).toString()) }
     var location by remember { mutableStateOf(initial?.location ?: "") }
     var price by remember { mutableStateOf((initial?.lastPrice ?: 0.0).toString()) }
+    var maxQty by remember { mutableStateOf((initial?.maxQty ?: 0).toString()) }
+    var reorderQty by remember { mutableStateOf((initial?.reorderQty ?: 0).toString()) }
+    var safetyStock by remember { mutableStateOf((initial?.safetyStock ?: 0).toString()) }
+    var leadTimeDays by remember { mutableStateOf((initial?.leadTimeDays ?: 0).toString()) }
+    var abcClass by remember { mutableStateOf(initial?.abcClass ?: "") }
     var serializationActive by remember { mutableStateOf(initial?.serializationActive ?: false) }
     var serialProfileId by remember { mutableStateOf(initial?.serialProfileId) }
 
@@ -132,6 +137,14 @@ internal fun PartFormSheet(
             ) { location = it }
         }
         LabeledField("آخر سعر", price, { price = it }, numeric = true)
+
+        Text("سياسة إعادة الطلب (الحوكمة)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        LabeledField("الحد الأقصى", maxQty, { maxQty = it }, numeric = true)
+        LabeledField("كمية إعادة الطلب", reorderQty, { reorderQty = it }, numeric = true)
+        LabeledField("مخزون الأمان", safetyStock, { safetyStock = it }, numeric = true)
+        LabeledField("مهلة التوريد (أيام)", leadTimeDays, { leadTimeDays = it }, numeric = true)
+        OptionDropdown("تصنيف ABC", listOf("", "A", "B", "C"), abcClass) { abcClass = it }
+
         Text("التتبع الفردي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("تفعيل الأرقام التسلسلية", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
@@ -154,7 +167,13 @@ internal fun PartFormSheet(
                     location = location,
                     lastPrice = price.toDoubleOrNull() ?: 0.0,
                     serializationActive = serializationActive,
-                    serialProfileId = if (serializationActive) serialProfileId else null
+                    serialProfileId = if (serializationActive) serialProfileId else null,
+                    maxQty = maxQty.toIntOrNull() ?: 0,
+                    reorderQty = reorderQty.toIntOrNull() ?: 0,
+                    safetyStock = safetyStock.toIntOrNull() ?: 0,
+                    leadTimeDays = leadTimeDays.toIntOrNull() ?: 0,
+                    abcClass = abcClass,
+                    preferredSupplierId = initial?.preferredSupplierId
                 )
             )
         }
