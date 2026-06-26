@@ -119,7 +119,30 @@ internal fun LocationFormSheet(
     val descendantIds = remember(allLocations, initial?.id) { locationDescendantIds(initial?.id, allLocations) }
     val parentChoices = allLocations.filter { it.id != initial?.id && it.id !in descendantIds }
 
+    // FLOC-040: a new real location can be created from a reference (template) location,
+    // copying its classification and organizational assignment.
+    val referenceLocations = allLocations.filter { it.isReference && it.id != initial?.id }
+
     FormSheet(if (initial == null) "إضافة موقع فني" else "تعديل الموقع الفني", onDismiss) {
+        if (initial == null && referenceLocations.isNotEmpty()) {
+            Text("إنشاء من قالب مرجعي (اختياري)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            OptionDropdown("الموقع المرجعي", listOf("") + referenceLocations.map { it.code }, referenceCode) { selected ->
+                referenceCode = selected
+                referenceLocations.firstOrNull { it.code == selected }?.let { ref ->
+                    category = ref.category
+                    abcIndicator = ref.abcIndicator
+                    sortField = ref.sortField
+                    authorizationGroup = ref.authorizationGroup
+                    singleInstallation = ref.singleInstallation
+                    plantSection = ref.plantSection
+                    plantCode = ref.plantCode
+                    workCenterCode = ref.workCenterCode
+                    costCenterCode = ref.costCenterCode
+                    plannerGroupCode = ref.plannerGroupCode
+                    if (description.isBlank()) description = ref.description
+                }
+            }
+        }
         LabeledField("الكود (Code)", code, { code = it })
         LabeledField("الاسم (Name)", name, { name = it })
         LabeledField("الوصف", description, { description = it }, singleLine = false)

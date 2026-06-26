@@ -12,6 +12,9 @@ interface FunctionalLocationDao {
     @Query("SELECT * FROM functional_locations ORDER BY code ASC")
     fun observeLocations(): Flow<List<FunctionalLocationEntity>>
 
+    @Query("SELECT * FROM functional_locations WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): FunctionalLocationEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(location: FunctionalLocationEntity): Long
 

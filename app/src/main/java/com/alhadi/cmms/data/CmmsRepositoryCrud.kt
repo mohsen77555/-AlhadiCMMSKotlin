@@ -45,10 +45,28 @@ import kotlinx.serialization.json.Json
 
 internal suspend fun CmmsRepository.saveAsset(asset: AssetEntity, actor: String = "System") {
         validateLinearAssetMaster(asset)
+        enforceSingleInstallation(asset)
         val isNew = asset.id == 0L
         assetDao.insertAsset(asset)
         recordAudit(if (isNew) "Create" else "Update", "Asset", "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code}", actor)
     }
+
+/**
+ * FLOC-031: a functional location flagged as a single-installation position may hold only one
+ * active asset at a time. An asset that is Retired/Disposed no longer occupies the position.
+ */
+private suspend fun CmmsRepository.enforceSingleInstallation(asset: AssetEntity) {
+    val locationId = asset.locationId ?: return
+    if (asset.status == "Retired" || asset.status == "Disposed") return
+    val location = locationDao.getById(locationId) ?: return
+    if (!location.singleInstallation) return
+    val occupied = assetDao.assetsAtLocation(locationId).any { other ->
+        other.id != asset.id && other.status != "Retired" && other.status != "Disposed"
+    }
+    if (occupied) {
+        throw IllegalStateException("الموقع ${location.code} موضع تركيب مفرد ويحتوي أصلاً نشطاً بالفعل")
+    }
+}
 
 internal suspend fun CmmsRepository.deleteAsset(asset: AssetEntity, actor: String = "System") {
         serialService.ensureAssetDeletable(asset.id)
