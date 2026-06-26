@@ -77,6 +77,11 @@ data class DashboardStats(
 class CmmsViewModel(internal val repository: CmmsRepository) : ViewModel() {
     private val today = DateStrings.today()
 
+    init {
+        // Start Firestore down-sync (no-op without Firebase config).
+        repository.startCloudSync(viewModelScope)
+    }
+
     // ----- Authentication / session -----
     private val _sessionUserId = MutableStateFlow<Long?>(null)
 

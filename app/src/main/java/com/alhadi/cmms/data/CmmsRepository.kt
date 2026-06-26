@@ -44,6 +44,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 
 class CmmsRepository(internal val database: AppDatabase) {
+    private var cloudSync: com.alhadi.cmms.data.cloud.CloudSyncService? = null
+
+    /** Starts the Firestore down-sync (pull) listeners once. No-op when Firebase isn't configured. */
+    fun startCloudSync(scope: kotlinx.coroutines.CoroutineScope) {
+        if (cloudSync != null) return
+        cloudSync = com.alhadi.cmms.data.cloud.CloudSyncService(database, scope).also { it.start() }
+    }
+
     internal val assetDao = database.assetDao()
     internal val workOrderDao = database.workOrderDao()
     internal val pmDao = database.preventiveMaintenanceDao()
