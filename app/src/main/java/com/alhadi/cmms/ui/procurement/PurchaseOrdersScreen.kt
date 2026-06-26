@@ -185,7 +185,7 @@ internal fun PurchaseOrderCard(
                         Text(line.description, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                         Text("%.2f × %d = %.2f".format(line.unitPrice, line.quantity, line.lineTotal), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (line.receivedQty > 0 || receiving) {
-                            val tone = if (line.isFullyReceived) statusTone("running") else statusTone("info")
+                            val tone = if (line.isFullyReceived) statusTone("running").content else statusTone("info").content
                             Text("مستلم ${line.receivedQty}/${line.quantity}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = tone)
                         }
                     }
