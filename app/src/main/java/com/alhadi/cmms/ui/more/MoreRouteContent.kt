@@ -220,6 +220,7 @@ internal fun MoreRouteContent(
     val suppliers by viewModel.suppliers.collectAsStateWithLifecycle()
     val purchaseOrders by viewModel.purchaseOrders.collectAsStateWithLifecycle()
     val purchaseOrderLines by viewModel.purchaseOrderLines.collectAsStateWithLifecycle()
+    val assetInstallations by viewModel.assetInstallations.collectAsStateWithLifecycle()
     val orgUnits by viewModel.orgUnits.collectAsStateWithLifecycle()
     val capaActions by viewModel.capaActions.collectAsStateWithLifecycle()
     val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
@@ -313,6 +314,7 @@ internal fun MoreRouteContent(
                             locations = locations,
                             assets = assets,
                             orgUnits = orgUnits,
+                            installations = assetInstallations,
                             canManage = canManage,
                             onSave = viewModel::saveFunctionalLocation,
                             onDelete = viewModel::deleteFunctionalLocation

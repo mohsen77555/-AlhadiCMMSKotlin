@@ -135,6 +135,7 @@ import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.notify.Reminders
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.alhadi.cmms.data.entity.AssetInstallationEntity
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
@@ -251,6 +252,7 @@ internal fun LocationDetailScreen(
     location: FunctionalLocationEntity,
     children: List<FunctionalLocationEntity>,
     assets: List<AssetEntity>,
+    installations: List<AssetInstallationEntity> = emptyList(),
     onBack: () -> Unit,
     onOpenChild: (Long) -> Unit
 ) {
@@ -343,6 +345,39 @@ internal fun LocationDetailScreen(
                     StatusBadge(asset.status, statusTone(asset.status))
                 }
             }
+        }
+
+        item { SectionHeader("سجل التركيب والفك (${installations.size})") }
+        if (installations.isEmpty()) {
+            item { EmptyState("لا توجد حركات تركيب أو فك لهذا الموقع") }
+        }
+        items(installations, key = { "i-${it.id}" }) { event ->
+            InstallationEventCard(event)
+        }
+    }
+}
+
+@Composable
+internal fun InstallationEventCard(event: AssetInstallationEntity) {
+    val install = event.eventType == "Install"
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(
+                if (install) Icons.Filled.Add else Icons.Filled.SwapHoriz,
+                contentDescription = null,
+                tint = if (install) StatusRunning else StatusStopped
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    if (install) "تركيب" else "فك",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (install) StatusRunning else StatusStopped
+                )
+                Text("أصل #${event.assetId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (event.performedBy.isNotBlank()) Text("بواسطة: ${event.performedBy}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(event.eventDate, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

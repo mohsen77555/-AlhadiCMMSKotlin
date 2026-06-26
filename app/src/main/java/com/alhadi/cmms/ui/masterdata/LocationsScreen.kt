@@ -141,6 +141,7 @@ import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
+import com.alhadi.cmms.data.entity.AssetInstallationEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
@@ -208,6 +209,7 @@ internal fun LocationsScreen(
     locations: List<FunctionalLocationEntity>,
     assets: List<AssetEntity>,
     orgUnits: List<OrgUnitEntity>,
+    installations: List<AssetInstallationEntity> = emptyList(),
     canManage: Boolean,
     onSave: (FunctionalLocationEntity) -> Unit,
     onDelete: (FunctionalLocationEntity) -> Unit
@@ -225,6 +227,7 @@ internal fun LocationsScreen(
             location = detail,
             children = locations.filter { it.parentId == detail.id },
             assets = assets.filter { it.locationId == detail.id },
+            installations = installations.filter { it.locationId == detail.id },
             onBack = { detailId = null },
             onOpenChild = { detailId = it }
         )
