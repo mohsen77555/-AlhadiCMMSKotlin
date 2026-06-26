@@ -7,6 +7,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Offline-first Firebase: the Google Services plugin is applied only when a real
+// google-services.json is present, so the project still builds without it. Drop your
+// google-services.json into the app/ folder to activate Firebase Auth + Firestore sync.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.alhadi.cmms"
     compileSdk = 36
@@ -85,6 +92,11 @@ dependencies {
 
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
+    // Firebase (offline-first cloud auth + sync). Active only when google-services.json is present.
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
