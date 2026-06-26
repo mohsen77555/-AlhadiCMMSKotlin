@@ -140,6 +140,7 @@ import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
+import com.alhadi.cmms.data.entity.AssetStatusHistoryEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
@@ -324,6 +325,34 @@ internal fun LazyListScope.assetMovementsSection(
                         if (route.isNotBlank()) LtrText(route, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (mv.notes.isNotBlank()) Text(mv.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${mv.performedBy} • ${mv.occurredAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+}
+
+/** assetStatusHistorySection: equipment lifecycle status-change log (asset detail). */
+internal fun LazyListScope.assetStatusHistorySection(
+    history: List<AssetStatusHistoryEntity>
+) {
+        item { SectionHeader("سجل دورة الحياة (${history.size})") }
+        if (history.isEmpty()) {
+            item { EmptyState("لا توجد تغييرات حالة مسجّلة", Icons.Filled.History) }
+        }
+        items(history, key = { "sh-${it.id}" }) { record ->
+            val tone = statusTone(record.toStatus).content
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconBubble(Icons.Filled.History, tone, tone.copy(alpha = 0.14f), 36)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (record.fromStatus.isBlank()) record.toStatus else "${record.fromStatus} ← ${record.toStatus}",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = tone
+                        )
+                        if (record.reason.isNotBlank()) Text(record.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${record.changedBy} • ${record.changedAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

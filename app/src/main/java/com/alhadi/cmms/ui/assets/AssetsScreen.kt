@@ -140,6 +140,7 @@ import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
+import com.alhadi.cmms.data.entity.AssetStatusHistoryEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
@@ -201,6 +202,7 @@ internal fun AssetsScreen(
     bomHeaders: List<AssetBomHeaderEntity>,
     bomItems: List<AssetBomItemEntity>,
     movements: List<AssetMovementEntity>,
+    statusHistory: List<AssetStatusHistoryEntity> = emptyList(),
     spareParts: List<SparePartEntity>,
     serials: List<SerialNumberEntity>,
     serialMovements: List<SerialNumberMovementEntity>,
@@ -262,6 +264,7 @@ internal fun AssetsScreen(
             bomHeaders = bomHeaders,
             bomItems = bomItems,
             movements = movements.filter { it.assetId == detailAsset.id },
+            statusHistory = statusHistory.filter { it.assetId == detailAsset.id },
             spareParts = spareParts,
             serials = serials,
             serialMovements = serialMovements,

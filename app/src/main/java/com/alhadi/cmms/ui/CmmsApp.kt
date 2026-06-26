@@ -226,6 +226,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val assetBomHeaders by viewModel.assetBomHeaders.collectAsStateWithLifecycle()
     val assetBom by viewModel.assetBom.collectAsStateWithLifecycle()
     val assetMovements by viewModel.assetMovements.collectAsStateWithLifecycle()
+    val assetStatusHistory by viewModel.assetStatusHistory.collectAsStateWithLifecycle()
     val pmChecklist by viewModel.pmChecklist.collectAsStateWithLifecycle()
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
     val workOrderOperations by viewModel.workOrderOperations.collectAsStateWithLifecycle()
@@ -393,6 +394,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         bomHeaders = assetBomHeaders,
                         bomItems = assetBom,
                         movements = assetMovements,
+                        statusHistory = assetStatusHistory,
                         spareParts = spareParts,
                         serials = serialNumbers,
                         serialMovements = serialNumberMovements,
