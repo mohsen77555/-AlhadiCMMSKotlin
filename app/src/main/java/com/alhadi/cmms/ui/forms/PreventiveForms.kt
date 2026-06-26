@@ -96,6 +96,7 @@ internal fun PmFormSheet(
     initial: PreventiveMaintenanceEntity?,
     assets: List<AssetEntity>,
     taskLists: List<TaskListEntity>,
+    measuringPoints: List<MeasuringPointEntity> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (PreventiveMaintenanceEntity) -> Unit
 ) {
@@ -104,18 +105,68 @@ internal fun PmFormSheet(
     var frequency by remember { mutableStateOf((initial?.frequencyDays ?: 30).toString()) }
     var duration by remember { mutableStateOf((initial?.estimatedDurationMinutes ?: 60).toString()) }
     var taskListId by remember { mutableStateOf(initial?.taskListId) }
+    var scheduleType by remember { mutableStateOf(initial?.scheduleType ?: "Time") }
+    var measuringPointId by remember { mutableStateOf(initial?.measuringPointId) }
+    var counterInterval by remember { mutableStateOf((initial?.counterInterval ?: 0.0).toString()) }
+    var callHorizonDays by remember { mutableStateOf((initial?.callHorizonDays ?: 0).toString()) }
+    var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
+    var floatingSchedule by remember { mutableStateOf(initial?.floatingSchedule ?: true) }
+    var planActive by remember { mutableStateOf(initial?.planActive ?: true) }
+    var strategy by remember { mutableStateOf(initial?.strategy ?: "") }
+    val counterScheduled = scheduleType == "Counter" || scheduleType == "Both"
+    val timeScheduled = scheduleType == "Time" || scheduleType == "Both"
+    val assetPoints = measuringPoints.filter { it.assetId == assetId }
 
     FormSheet(if (initial == null) "إضافة صيانة دورية" else "تعديل الصيانة الدورية", onDismiss) {
         LabeledField("عنوان المهمة", title, { title = it })
         AssetDropdown(assets, assetId) { assetId = it }
-        LabeledField("التكرار (أيام)", frequency, { frequency = it }, numeric = true)
         LabeledField("المدة المقدرة (دقائق)", duration, { duration = it }, numeric = true)
         if (taskLists.isNotEmpty()) {
             TaskListDropdown(taskLists, taskListId) { taskListId = it }
         }
-        SaveButton(title.isNotBlank() && assetId != 0L) {
+
+        Text("أساس الجدولة (الحوكمة)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        OptionDropdown("نوع الجدولة", listOf("Time", "Counter", "Both"), scheduleType) { scheduleType = it }
+        if (timeScheduled) {
+            LabeledField("التكرار (أيام)", frequency, { frequency = it }, numeric = true)
+        }
+        if (counterScheduled) {
+            if (assetPoints.isEmpty()) {
+                Text("لا توجد نقاط قياس لهذا الأصل. أضِف عدّاداً أولاً.", color = MaterialTheme.colorScheme.error)
+            } else {
+                OptionDropdown(
+                    label = "العدّاد (نقطة القياس)",
+                    options = assetPoints.map { it.id.toString() },
+                    selected = measuringPointId?.toString() ?: "",
+                    display = { idStr -> assetPoints.firstOrNull { it.id.toString() == idStr }?.let { "${it.name} (${it.lastReading} ${it.unit})" } ?: idStr }
+                ) { measuringPointId = it.toLongOrNull() }
+            }
+            LabeledField("فاصل العدّاد (كل كم وحدة)", counterInterval, { counterInterval = it }, numeric = true)
+        }
+        OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
+        LabeledField("أفق الاستدعاء (أيام قبل الاستحقاق)", callHorizonDays, { callHorizonDays = it }, numeric = true)
+        LabeledField("الاستراتيجية", strategy, { strategy = it })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("جدولة عائمة (من تاريخ التنفيذ)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = floatingSchedule, onCheckedChange = { floatingSchedule = it })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("الخطة فعّالة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = planActive, onCheckedChange = { planActive = it })
+        }
+
+        val counterValid = !counterScheduled || (measuringPointId != null && (counterInterval.toDoubleOrNull() ?: 0.0) > 0)
+        SaveButton(title.isNotBlank() && assetId != 0L && counterValid) {
             val today = DateStrings.today()
             val freq = frequency.toIntOrNull() ?: 30
+            val interval = counterInterval.toDoubleOrNull() ?: 0.0
+            val basePoint = assetPoints.firstOrNull { it.id == measuringPointId }
+            // Project the first counter trigger from the current reading when newly counter-scheduled.
+            val nextCounter = when {
+                !counterScheduled || interval <= 0 -> initial?.nextCounterReading ?: 0.0
+                (initial?.nextCounterReading ?: 0.0) > 0 -> initial!!.nextCounterReading
+                else -> (basePoint?.lastReading ?: 0.0) + interval
+            }
             onSave(
                 PreventiveMaintenanceEntity(
                     id = initial?.id ?: 0,
@@ -126,7 +177,17 @@ internal fun PmFormSheet(
                     nextDueAt = initial?.nextDueAt ?: DateStrings.daysFromToday(freq),
                     status = initial?.status ?: "Scheduled",
                     estimatedDurationMinutes = duration.toIntOrNull() ?: 60,
-                    taskListId = taskListId
+                    taskListId = taskListId,
+                    scheduleType = scheduleType,
+                    measuringPointId = if (counterScheduled) measuringPointId else null,
+                    counterInterval = interval,
+                    lastCounterReading = initial?.lastCounterReading ?: 0.0,
+                    nextCounterReading = nextCounter,
+                    callHorizonDays = callHorizonDays.toIntOrNull() ?: 0,
+                    priority = priority,
+                    floatingSchedule = floatingSchedule,
+                    planActive = planActive,
+                    strategy = strategy.trim()
                 )
             )
         }

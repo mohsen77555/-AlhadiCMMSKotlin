@@ -198,6 +198,7 @@ internal fun PreventiveMaintenanceScreen(
     canManage: Boolean,
     checklist: List<PmChecklistItemEntity>,
     taskLists: List<TaskListEntity>,
+    measuringPoints: List<MeasuringPointEntity> = emptyList(),
     onSave: (PreventiveMaintenanceEntity) -> Unit,
     onDelete: (PreventiveMaintenanceEntity) -> Unit,
     onDone: (PreventiveMaintenanceEntity) -> Unit,
@@ -251,6 +252,7 @@ internal fun PreventiveMaintenanceScreen(
                     canManage = canManage,
                     checklist = checklist.filter { it.pmId == item.id },
                     taskListName = item.taskListId?.let { taskListMap[it]?.name },
+                    point = item.measuringPointId?.let { id -> measuringPoints.firstOrNull { it.id == id } },
                     onDone = onDone,
                     onGenerateOrder = onGenerateOrder,
                     onEdit = { editing = item; showForm = true },
@@ -264,7 +266,7 @@ internal fun PreventiveMaintenanceScreen(
     }
 
     if (showForm) {
-        PmFormSheet(initial = editing, assets = assets, taskLists = taskLists, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+        PmFormSheet(initial = editing, assets = assets, taskLists = taskLists, measuringPoints = measuringPoints, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
@@ -283,6 +285,7 @@ internal fun PreventiveMaintenanceCard(
     canManage: Boolean,
     checklist: List<PmChecklistItemEntity>,
     taskListName: String?,
+    point: MeasuringPointEntity? = null,
     onDone: (PreventiveMaintenanceEntity) -> Unit,
     onGenerateOrder: (PreventiveMaintenanceEntity) -> Unit,
     onEdit: () -> Unit,
@@ -291,7 +294,9 @@ internal fun PreventiveMaintenanceCard(
     onSetChecklistResult: (PmChecklistItemEntity, String) -> Unit,
     onDeleteChecklistItem: (PmChecklistItemEntity) -> Unit
 ) {
-    val due = DateStrings.isDueOrOverdue(item.nextDueAt)
+    val counterDue = point?.let { item.isCounterDue(it.lastReading) } ?: false
+    val timeDue = item.isTimeScheduled && DateStrings.isDueOrOverdue(item.nextDueAt)
+    val due = timeDue || counterDue
     var showChecklist by remember { mutableStateOf(false) }
     var showAddItem by remember { mutableStateOf(false) }
     val doneCount = checklist.count { it.result == "OK" || it.result == "NA" }
@@ -305,13 +310,24 @@ internal fun PreventiveMaintenanceCard(
                     Text(item.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     LtrText(asset?.let { "${it.code} • ${it.name}" } ?: "Asset #${item.assetId}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(if (due) "مستحقة" else "مجدولة", statusTone(if (due) "overdue" else "scheduled"))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (!item.planActive) StatusBadge("موقوفة", statusTone("neutral"))
+                    StatusBadge(if (due) "مستحقة" else "مجدولة", statusTone(if (due) "overdue" else "scheduled"))
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-            InfoRow("التكرار", "كل ${item.frequencyDays} يوم")
+            InfoRow("أساس الجدولة", pmScheduleTypeLabel(item.scheduleType))
+            if (item.isTimeScheduled) {
+                InfoRow("التكرار", "كل ${item.frequencyDays} يوم")
+                InfoRow("التنفيذ القادم", item.nextDueAt)
+            }
+            if (item.isCounterScheduled && point != null) {
+                InfoRow("العدّاد", "${point.name}: ${point.lastReading} ${point.unit}")
+                InfoRow("الاستحقاق القادم بالعدّاد", "${item.nextCounterReading} ${point.unit}")
+            }
             InfoRow("آخر تنفيذ", item.lastDoneAt)
-            InfoRow("التنفيذ القادم", item.nextDueAt)
             InfoRow("المدة المقدرة", "${item.estimatedDurationMinutes} دقيقة")
+            if (item.priority.isNotBlank()) InfoRow("الأولوية", item.priority)
             if (taskListName != null) InfoRow("قالب العمل", taskListName)
 
             Row(
@@ -392,5 +408,12 @@ internal fun PreventiveMaintenanceCard(
             onSave = { onSaveChecklistItem(it); showAddItem = false }
         )
     }
+}
+
+internal fun pmScheduleTypeLabel(type: String): String = when (type) {
+    "Time" -> "زمني"
+    "Counter" -> "بالعدّاد"
+    "Both" -> "زمني وبالعدّاد"
+    else -> type
 }
 

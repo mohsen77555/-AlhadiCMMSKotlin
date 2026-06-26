@@ -234,6 +234,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
     val workOrderHistory by viewModel.workOrderHistory.collectAsStateWithLifecycle()
     val workOrderMaterials by viewModel.workOrderMaterials.collectAsStateWithLifecycle()
+    val measuringPoints by viewModel.measuringPoints.collectAsStateWithLifecycle()
     val workPermits by viewModel.workPermits.collectAsStateWithLifecycle()
     val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
@@ -379,6 +380,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         canManage = canManage,
                         checklist = pmChecklist,
                         taskLists = taskLists,
+                        measuringPoints = measuringPoints,
                         onSave = viewModel::savePreventiveMaintenance,
                         onDelete = viewModel::deletePreventiveMaintenance,
                         onDone = viewModel::markPreventiveMaintenanceDone,
