@@ -7,6 +7,7 @@ import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.AssetInstallationEntity
+import com.alhadi.cmms.data.entity.AssetStatusHistoryEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
@@ -128,9 +129,26 @@ internal suspend fun CmmsRepository.deleteAsset(asset: AssetEntity, actor: Strin
     }
 
 internal suspend fun CmmsRepository.changeAssetStatus(asset: AssetEntity, status: String, reason: String = "", actor: String = "System") {
-        assetDao.insertAsset(asset.copy(status = status))
-        val reasonSuffix = if (reason.isNotBlank()) " — السبب: $reason" else ""
-        recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status$reasonSuffix", actor)
+        if (status == asset.status) return
+        // EQ-LIFE-010: only governed lifecycle transitions are permitted.
+        if (!AssetLifecycle.canTransition(asset.status, status)) {
+            throw IllegalStateException("انتقال غير مسموح: من ${asset.status} إلى $status")
+        }
+        database.withTransaction {
+            assetDao.insertAsset(asset.copy(status = status))
+            assetStatusHistoryDao.insert(
+                AssetStatusHistoryEntity(
+                    assetId = asset.id,
+                    fromStatus = asset.status,
+                    toStatus = status,
+                    reason = reason,
+                    changedBy = actor,
+                    changedAt = DateStrings.today()
+                )
+            )
+            val reasonSuffix = if (reason.isNotBlank()) " — السبب: $reason" else ""
+            recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status$reasonSuffix", actor)
+        }
     }
 
     // ---------------------------------------------------------------------

@@ -34,11 +34,13 @@ import com.alhadi.cmms.data.dao.SupplierDao
 import com.alhadi.cmms.data.dao.PurchaseOrderDao
 import com.alhadi.cmms.data.dao.PurchaseOrderLineDao
 import com.alhadi.cmms.data.dao.AssetInstallationDao
+import com.alhadi.cmms.data.dao.AssetStatusHistoryDao
 import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
 import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
 import com.alhadi.cmms.data.entity.AssetInstallationEntity
+import com.alhadi.cmms.data.entity.AssetStatusHistoryEntity
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
@@ -104,9 +106,10 @@ import com.alhadi.cmms.data.entity.OrgUnitEntity
         SupplierEntity::class,
         PurchaseOrderEntity::class,
         PurchaseOrderLineEntity::class,
-        AssetInstallationEntity::class
+        AssetInstallationEntity::class,
+        AssetStatusHistoryEntity::class
     ],
-    version = 45,
+    version = 46,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -140,6 +143,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun purchaseOrderDao(): PurchaseOrderDao
     abstract fun purchaseOrderLineDao(): PurchaseOrderLineDao
     abstract fun assetInstallationDao(): AssetInstallationDao
+    abstract fun assetStatusHistoryDao(): AssetStatusHistoryDao
 
     companion object {
         @Volatile

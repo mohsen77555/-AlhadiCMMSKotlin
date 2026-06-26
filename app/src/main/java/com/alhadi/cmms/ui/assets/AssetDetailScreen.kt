@@ -239,7 +239,8 @@ internal fun AssetDetailScreen(
     var showStatus by remember { mutableStateOf(false) }
     var showWoForm by remember { mutableStateOf(false) }
     var showMoveForm by remember { mutableStateOf(false) }
-    val lifecycle = listOf("Draft", "Active", "Running", "Warning", "Stopped", "Under Maintenance", "Standby", "Retired", "Disposed")
+    // EQ-LIFE-010: offer only governed next-statuses for the asset's current status.
+    val lifecycle = com.alhadi.cmms.data.AssetLifecycle.allowedNext(asset.status)
     val retired = asset.status.equals("Retired", ignoreCase = true) || asset.status.equals("Disposed", ignoreCase = true)
     val constructionDate = listOf(asset.constructionYear, asset.constructionMonth)
         .filter { it.isNotBlank() }
