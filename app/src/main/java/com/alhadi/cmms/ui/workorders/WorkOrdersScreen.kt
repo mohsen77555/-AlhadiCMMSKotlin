@@ -209,6 +209,7 @@ internal fun WorkOrdersScreen(
     bomHeaders: List<AssetBomHeaderEntity>,
     bom: List<AssetBomItemEntity>,
     canManage: Boolean,
+    canCreate: Boolean = true,
     defaultAssignee: String,
     onSavePlannedMaterial: (WorkOrderMaterialEntity) -> Unit = {},
     onIssuePlannedMaterial: (WorkOrderMaterialEntity, Int) -> Unit = { _, _ -> },
@@ -324,7 +325,7 @@ internal fun WorkOrdersScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (canManage) {
+            if (canManage && canCreate) {
                 item { AddButton("أمر عمل جديد") { editing = null; showForm = true } }
             }
             if (filtered.isEmpty()) {

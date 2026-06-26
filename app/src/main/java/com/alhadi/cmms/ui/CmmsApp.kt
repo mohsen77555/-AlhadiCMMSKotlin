@@ -197,7 +197,8 @@ internal enum class BottomTab(val label: String, val icon: ImageVector, val acce
     Supervision("الإشراف", Icons.Filled.Verified, AccentTeal),
     Assets("الأصول", Icons.Filled.PrecisionManufacturing, AccentGreen),
     More("المزيد", Icons.Filled.GridView, AccentBrown),
-    Requests("طلباتي", Icons.Filled.NotificationsActive, AccentRed)
+    Requests("طلباتي", Icons.Filled.NotificationsActive, AccentRed),
+    MyTasks("مهامي", Icons.Filled.Assignment, AccentBlue)
 }
 
 internal enum class MoreRoute { Notifications, Inventory, SerialNumbers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Warehouses, OrgUnits, Suppliers, PurchaseOrders, Capa, Failures }
@@ -249,14 +250,18 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val isAdmin = currentUser?.isAdmin == true
     val canManage = currentUser?.canManage == true
     val perms = com.alhadi.cmms.data.permissionsFor(currentUser)
-    val visibleTabs = if (perms.requesterMode) {
-        listOf(BottomTab.Requests)
-    } else buildList {
-        add(BottomTab.Home)
-        if (perms.seeWorkOrders) add(BottomTab.WorkOrders)
-        if (perms.seePreventive) add(BottomTab.Supervision)
-        if (perms.seeAssets) add(BottomTab.Assets)
-        add(BottomTab.More)
+    val visibleTabs = when {
+        // Requester: a single "my requests" experience.
+        perms.requesterMode -> listOf(BottomTab.Requests)
+        // Technician: a focused "my tasks" + "raise a request" experience.
+        perms.onlyMyWorkOrders -> listOf(BottomTab.MyTasks, BottomTab.Requests)
+        else -> buildList {
+            add(BottomTab.Home)
+            if (perms.seeWorkOrders) add(BottomTab.WorkOrders)
+            if (perms.seePreventive) add(BottomTab.Supervision)
+            if (perms.seeAssets) add(BottomTab.Assets)
+            add(BottomTab.More)
+        }
     }
     LaunchedEffect(visibleTabs, selectedTab) {
         if (selectedTab !in visibleTabs) selectedTab = visibleTabs.first()
@@ -351,7 +356,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onOpenMore = { selectedTab = BottomTab.More; moreRoute = it }
                     )
 
-                    BottomTab.WorkOrders -> WorkOrdersScreen(
+                    BottomTab.WorkOrders, BottomTab.MyTasks -> WorkOrdersScreen(
                         innerPadding = innerPadding,
                         workOrders = scopedWorkOrders,
                         assets = assets,
@@ -368,6 +373,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         bomHeaders = assetBomHeaders,
                         bom = assetBom,
                         canManage = canManage || perms.manageWorkOrders,
+                        canCreate = !perms.onlyMyWorkOrders,
                         defaultAssignee = actorName,
                         onSavePlannedMaterial = viewModel::savePlannedMaterial,
                         onIssuePlannedMaterial = viewModel::issuePlannedMaterial,
@@ -483,6 +489,7 @@ internal fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (t
     BottomTab.Supervision -> ScreenMeta("الإشراف والصيانة", "الصيانة الدورية والمتابعة", Icons.Filled.Verified, AccentTeal)
     BottomTab.Assets -> ScreenMeta("الأصول", "سجل الأصول والمعدات", Icons.Filled.PrecisionManufacturing, AccentGreen)
     BottomTab.Requests -> ScreenMeta("طلباتي", "طلبات الصيانة ومتابعتها", Icons.Filled.NotificationsActive, AccentRed)
+    BottomTab.MyTasks -> ScreenMeta("مهامي", "أوامر العمل الموكَّلة إليّ", Icons.Filled.Assignment, AccentBlue)
     BottomTab.More -> when (route) {
         null -> ScreenMeta("المزيد", "كل الوحدات والإعدادات", Icons.Filled.GridView, AccentBrown)
         MoreRoute.Notifications -> ScreenMeta("البلاغات", "بلاغات الصيانة وتحويلها لأوامر", Icons.Filled.NotificationsActive, AccentRed)
