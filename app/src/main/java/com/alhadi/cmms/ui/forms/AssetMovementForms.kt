@@ -240,7 +240,11 @@ internal fun NotificationFormSheet(
     var priority by remember { mutableStateOf(initial?.priority ?: "Medium") }
     var damageCode by remember { mutableStateOf(initial?.damageCode ?: "") }
     var causeCode by remember { mutableStateOf(initial?.causeCode ?: "") }
+    var effectCode by remember { mutableStateOf(initial?.effectCode ?: "") }
     var requiredEnd by remember { mutableStateOf(initial?.requiredEnd ?: "") }
+    var breakdown by remember { mutableStateOf(initial?.breakdown ?: false) }
+    var malfunctionStart by remember { mutableStateOf(initial?.malfunctionStart ?: "") }
+    var malfunctionEnd by remember { mutableStateOf(initial?.malfunctionEnd ?: "") }
     var linearStartPoint by remember { mutableStateOf(initial?.linearStartPoint?.let(::formatLinearNumber) ?: "") }
     var linearEndPoint by remember { mutableStateOf(initial?.linearEndPoint?.let(::formatLinearNumber) ?: "") }
     var linearMarker by remember { mutableStateOf(initial?.linearMarker ?: "") }
@@ -277,6 +281,15 @@ internal fun NotificationFormSheet(
         OptionDropdown("الأولوية", listOf("Low", "Medium", "High", "Critical"), priority) { priority = it }
         LabeledField("كود الضرر (اختياري)", damageCode, { damageCode = it })
         LabeledField("كود السبب (اختياري)", causeCode, { causeCode = it })
+        LabeledField("كود التأثير (اختياري)", effectCode, { effectCode = it })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("عطل/توقف (Breakdown)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = breakdown, onCheckedChange = { breakdown = it })
+        }
+        if (breakdown) {
+            DateField("بداية العطل", malfunctionStart) { malfunctionStart = it }
+            DateField("نهاية العطل (الاستعادة)", malfunctionEnd) { malfunctionEnd = it }
+        }
         DateField("مطلوب الإنجاز قبل", requiredEnd) { requiredEnd = it }
         SaveButton(title.isNotBlank() && linearReferenceValid) {
             onSave(
@@ -299,7 +312,15 @@ internal fun NotificationFormSheet(
                     linearEndPoint = if (selectedAsset?.isLinearAsset == true) linearEndPoint.toDoubleOrNull() else null,
                     linearMarker = if (selectedAsset?.isLinearAsset == true) linearMarker.trim() else "",
                     linearHorizontalOffset = if (selectedAsset?.isLinearAsset == true) linearHorizontalOffset.toDoubleOrNull() else null,
-                    linearVerticalOffset = if (selectedAsset?.isLinearAsset == true) linearVerticalOffset.toDoubleOrNull() else null
+                    linearVerticalOffset = if (selectedAsset?.isLinearAsset == true) linearVerticalOffset.toDoubleOrNull() else null,
+                    breakdown = breakdown,
+                    effectCode = effectCode.trim(),
+                    malfunctionStart = if (breakdown) malfunctionStart.trim() else "",
+                    malfunctionEnd = if (breakdown) malfunctionEnd.trim() else "",
+                    acknowledgedAt = initial?.acknowledgedAt ?: "",
+                    acknowledgedBy = initial?.acknowledgedBy ?: "",
+                    closedAt = initial?.closedAt ?: "",
+                    closedBy = initial?.closedBy ?: ""
                 )
             )
         }

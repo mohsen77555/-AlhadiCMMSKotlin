@@ -342,6 +342,8 @@ internal fun NotificationCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 StatusBadge(notification.type, statusTone("info"))
                 StatusBadge(notification.priority, priorityTone(notification.priority))
+                if (notification.breakdown) StatusBadge("عطل/توقف", statusTone("stopped"))
+                if (notification.isResponsePending()) StatusBadge("بانتظار الاستجابة", statusTone("warning"))
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             if (asset != null) InfoRow("الأصل", "${asset.code} • ${asset.name}")
@@ -350,7 +352,15 @@ internal fun NotificationCard(
             }
             if (notification.damageCode.isNotBlank()) InfoRow("كود الضرر", notification.damageCode)
             if (notification.causeCode.isNotBlank()) InfoRow("كود السبب", notification.causeCode)
+            if (notification.effectCode.isNotBlank()) InfoRow("كود التأثير", notification.effectCode)
+            if (notification.breakdown) {
+                if (notification.malfunctionStart.isNotBlank()) InfoRow("بداية العطل", notification.malfunctionStart)
+                if (notification.malfunctionEnd.isNotBlank()) InfoRow("نهاية العطل", notification.malfunctionEnd)
+            }
             InfoRow("المُبلِّغ", notification.reportedBy)
+            InfoRow("هدف الاستجابة (SLA)", "${notification.slaResponseHours()} ساعة")
+            if (notification.acknowledgedAt.isNotBlank()) InfoRow("أُقِرّ في", "${notification.acknowledgedAt} • ${notification.acknowledgedBy}")
+            if (notification.closedAt.isNotBlank()) InfoRow("أُغلِق في", "${notification.closedAt} • ${notification.closedBy}")
             if (notification.requiredEnd.isNotBlank()) InfoRow("مطلوب الإنجاز قبل", notification.requiredEnd)
             if (notification.linkedOrderId != null) {
                 StatusBadge("أمر عمل #${notification.linkedOrderId}", statusTone("running"))
