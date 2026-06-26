@@ -27,6 +27,7 @@ import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
+import com.alhadi.cmms.data.entity.WorkOrderMaterialEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
 import com.alhadi.cmms.data.entity.WorkPermitEntity
@@ -563,6 +564,62 @@ internal suspend fun CmmsRepository.createReorderPurchaseOrders(actor: String = 
         recordAudit("Create", "PurchaseOrder", "إنشاء $created أمر شراء تلقائي للنواقص", actor)
     }
     return created
+}
+
+// --- Work-order material planning (WO-MAT-*) ---
+
+internal suspend fun CmmsRepository.savePlannedMaterial(material: WorkOrderMaterialEntity, actor: String = "System") {
+    workOrderMaterialDao.insert(material)
+    recordAudit("Update", "WorkOrder", "مادة مخطّطة: ${material.description}", actor)
+}
+
+internal suspend fun CmmsRepository.deletePlannedMaterial(material: WorkOrderMaterialEntity, actor: String = "System") {
+    workOrderMaterialDao.deleteById(material.id)
+    recordAudit("Update", "WorkOrder", "حذف مادة مخطّطة: ${material.description}", actor)
+}
+
+/**
+ * WO-MAT-005: issue [quantity] of a planned material from stock against its work order.
+ * Decrements inventory, records an Issue transaction, advances issuedQty and rolls the cost
+ * into the order's partsCost — all atomically.
+ */
+internal suspend fun CmmsRepository.issuePlannedMaterial(
+    material: WorkOrderMaterialEntity,
+    quantity: Int,
+    actor: String = "System"
+) {
+    require(quantity > 0) { "الكمية يجب أن تكون أكبر من صفر" }
+    database.withTransaction {
+        val current = workOrderMaterialDao.getById(material.id)
+            ?: throw IllegalStateException("المادة المخطّطة غير موجودة")
+        val remaining = current.remainingQty
+        if (remaining <= 0) throw IllegalStateException("تم صرف هذه المادة بالكامل")
+        val issueQty = quantity.coerceAtMost(remaining)
+        val partId = current.partId
+            ?: throw IllegalStateException("هذه المادة غير مرتبطة بقطعة مخزون")
+        val part = sparePartDao.getById(partId)
+            ?: throw IllegalStateException("قطعة الغيار غير موجودة")
+        if (part.serializationActive) throw IllegalStateException("استخدم شاشة الأرقام التسلسلية لصرف هذه القطعة")
+        if (sparePartDao.adjustStockSafe(partId, -issueQty) == 0) {
+            throw IllegalStateException("الكمية المطلوبة ($issueQty) أكبر من المتوفر (${part.onHandQty})")
+        }
+        transactionDao.insert(
+            InventoryTransactionEntity(
+                partId = partId,
+                workOrderId = current.orderId,
+                transactionType = "Issue",
+                quantity = issueQty,
+                createdAt = DateStrings.today(),
+                createdBy = actor,
+                note = "صرف مادة مخطّطة لأمر العمل #${current.orderId}"
+            )
+        )
+        workOrderMaterialDao.insert(current.copy(issuedQty = current.issuedQty + issueQty))
+        workOrderDao.getById(current.orderId)?.let { order ->
+            workOrderDao.insertWorkOrder(order.copy(partsCost = order.partsCost + issueQty * part.lastPrice))
+        }
+        recordAudit("Issue", "WorkOrder", "صرف $issueQty من ${part.partNumber} لأمر العمل #${current.orderId}", actor)
+    }
 }
 
     // ---------------------------------------------------------------------

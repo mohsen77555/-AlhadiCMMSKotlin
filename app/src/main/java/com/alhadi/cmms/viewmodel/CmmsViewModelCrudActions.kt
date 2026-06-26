@@ -23,6 +23,7 @@ import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
+import com.alhadi.cmms.data.entity.WorkOrderMaterialEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
@@ -86,6 +87,9 @@ fun CmmsViewModel.deletePurchaseOrderLine(line: PurchaseOrderLineEntity) = launc
 fun CmmsViewModel.receivePurchaseOrderLine(line: PurchaseOrderLineEntity, quantity: Int) = launchAction("تم تسجيل الاستلام") { repository.receivePurchaseOrderLine(line, quantity, actor()) }
 fun CmmsViewModel.createReorderPurchaseOrders() = launchAction("تم إنشاء أوامر شراء للنواقص") { repository.createReorderPurchaseOrders(actor()) }
 fun CmmsViewModel.cycleCountPart(part: SparePartEntity, countedQty: Int) = launchAction("تم تسجيل الجرد") { repository.cycleCountPart(part, countedQty, actor()) }
+fun CmmsViewModel.savePlannedMaterial(material: WorkOrderMaterialEntity) = launchAction("تم حفظ المادة المخطّطة") { repository.savePlannedMaterial(material, actor()) }
+fun CmmsViewModel.deletePlannedMaterial(material: WorkOrderMaterialEntity) = launchAction("تم حذف المادة المخطّطة") { repository.deletePlannedMaterial(material, actor()) }
+fun CmmsViewModel.issuePlannedMaterial(material: WorkOrderMaterialEntity, quantity: Int) = launchAction("تم صرف المادة") { repository.issuePlannedMaterial(material, quantity, actor()) }
 
 fun CmmsViewModel.saveOrgUnit(unit: OrgUnitEntity) = launchAction("تم حفظ الوحدة التنظيمية") { repository.saveOrgUnit(unit, actor()) }
 fun CmmsViewModel.deleteOrgUnit(unit: OrgUnitEntity) = launchAction("تم حذف الوحدة التنظيمية") { repository.deleteOrgUnit(unit, actor()) }
