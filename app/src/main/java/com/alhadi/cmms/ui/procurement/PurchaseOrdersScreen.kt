@@ -55,7 +55,8 @@ internal fun PurchaseOrdersScreen(
     onCancelOrder: (PurchaseOrderEntity, String) -> Unit,
     onSetStatus: (PurchaseOrderEntity, String) -> Unit,
     onSaveLine: (PurchaseOrderLineEntity) -> Unit,
-    onDeleteLine: (PurchaseOrderLineEntity) -> Unit
+    onDeleteLine: (PurchaseOrderLineEntity) -> Unit,
+    onReceiveLine: (PurchaseOrderLineEntity, Int) -> Unit
 ) {
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<PurchaseOrderEntity?>(null) }
@@ -102,6 +103,7 @@ internal fun PurchaseOrdersScreen(
                     canManage = canManage,
                     onAddLine = { lineFormFor = order.id },
                     onDeleteLine = onDeleteLine,
+                    onReceiveLine = onReceiveLine,
                     onSetStatus = onSetStatus,
                     onEdit = { editing = order; showForm = true },
                     onCancel = { cancelTarget = order }
@@ -150,11 +152,14 @@ internal fun PurchaseOrderCard(
     canManage: Boolean,
     onAddLine: () -> Unit,
     onDeleteLine: (PurchaseOrderLineEntity) -> Unit,
+    onReceiveLine: (PurchaseOrderLineEntity, Int) -> Unit,
     onSetStatus: (PurchaseOrderEntity, String) -> Unit,
     onEdit: () -> Unit,
     onCancel: () -> Unit
 ) {
     val terminal = order.status == "Closed" || order.status == "Cancelled"
+    val receiving = order.status == "Ordered" || order.status == "PartiallyReceived"
+    var receiveTarget by remember { mutableStateOf<PurchaseOrderLineEntity?>(null) }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -179,9 +184,16 @@ internal fun PurchaseOrderCard(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(line.description, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                         Text("%.2f × %d = %.2f".format(line.unitPrice, line.quantity, line.lineTotal), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (line.receivedQty > 0 || receiving) {
+                            val tone = if (line.isFullyReceived) statusTone("running") else statusTone("info")
+                            Text("مستلم ${line.receivedQty}/${line.quantity}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = tone)
+                        }
                     }
                     if (canManage && order.status == "Draft") {
                         TextButton(onClick = { onDeleteLine(line) }) { Text("حذف", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+                    }
+                    if (canManage && receiving && !line.isFullyReceived) {
+                        TextButton(onClick = { receiveTarget = line }) { Text("استلام", color = AccentBrown, style = MaterialTheme.typography.labelSmall) }
                     }
                 }
             }
@@ -198,7 +210,11 @@ internal fun PurchaseOrderCard(
                     when (order.status) {
                         "Draft" -> Button(onClick = { onSetStatus(order, "Approved") }, enabled = lines.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("اعتماد") }
                         "Approved" -> Button(onClick = { onSetStatus(order, "Ordered") }, modifier = Modifier.weight(1f)) { Text("إرسال للمورّد") }
-                        "Ordered", "PartiallyReceived" -> Button(onClick = { onSetStatus(order, "Received") }, modifier = Modifier.weight(1f)) { Text("تسجيل الاستلام") }
+                        "Ordered", "PartiallyReceived" -> Button(
+                            onClick = { lines.filter { !it.isFullyReceived }.forEach { onReceiveLine(it, it.quantity - it.receivedQty) } },
+                            enabled = lines.any { !it.isFullyReceived },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("استلام الكل") }
                         "Received" -> Button(onClick = { onSetStatus(order, "Closed") }, modifier = Modifier.weight(1f)) { Text("إغلاق") }
                     }
                     OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("إلغاء") }
@@ -208,6 +224,30 @@ internal fun PurchaseOrderCard(
                 }
             }
         }
+    }
+
+    receiveTarget?.let { line ->
+        val remaining = line.quantity - line.receivedQty
+        var qty by remember(line.id) { mutableStateOf(remaining.toString()) }
+        val entered = qty.toIntOrNull() ?: 0
+        AlertDialog(
+            onDismissRequest = { receiveTarget = null },
+            title = { Text("استلام بند") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(line.description, fontWeight = FontWeight.Medium)
+                    Text("المتبقّي للاستلام: $remaining", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(value = qty, onValueChange = { qty = it.filter { c -> c.isDigit() } }, label = { Text("الكمية المستلمة") }, modifier = Modifier.fillMaxWidth())
+                    if (line.partId != null) {
+                        Text("سيُحدَّث رصيد المخزون تلقائياً عند الاستلام.", style = MaterialTheme.typography.labelSmall, color = AccentBrown)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = entered in 1..remaining, onClick = { onReceiveLine(line, entered); receiveTarget = null }) { Text("تأكيد الاستلام") }
+            },
+            dismissButton = { TextButton(onClick = { receiveTarget = null }) { Text("إلغاء") } }
+        )
     }
 }
 

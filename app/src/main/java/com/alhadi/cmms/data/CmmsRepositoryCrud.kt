@@ -362,6 +362,74 @@ internal suspend fun CmmsRepository.deletePurchaseOrderLine(line: PurchaseOrderL
     recordAudit("Update", "PurchaseOrder", "حذف بند شراء: ${line.description}", actor)
 }
 
+/**
+ * Goods receipt: receives [quantity] units against a purchase-order line.
+ * - Increments the line's receivedQty.
+ * - If the line is linked to a stock part, raises on-hand stock, refreshes the last price,
+ *   and records an inventory "Receive" transaction referencing the PO.
+ * - Re-derives the order status (PartiallyReceived / Received) from its lines.
+ * Everything runs in a single DB transaction so stock and the line stay consistent.
+ */
+internal suspend fun CmmsRepository.receivePurchaseOrderLine(
+    line: PurchaseOrderLineEntity,
+    quantity: Int,
+    actor: String = "System"
+) {
+    require(quantity > 0) { "الكمية يجب أن تكون أكبر من صفر" }
+    database.withTransaction {
+        val order = purchaseOrderDao.getById(line.poId)
+            ?: throw IllegalStateException("أمر الشراء غير موجود")
+        if (order.status == "Cancelled") throw IllegalStateException("أمر الشراء ملغى")
+        val current = purchaseOrderLineDao.forOrder(line.poId).firstOrNull { it.id == line.id }
+            ?: throw IllegalStateException("بند الشراء غير موجود")
+        val remaining = current.quantity - current.receivedQty
+        if (remaining <= 0) throw IllegalStateException("تم استلام هذا البند بالكامل")
+        val receiveQty = quantity.coerceAtMost(remaining)
+
+        // 1) advance the line
+        purchaseOrderLineDao.insert(current.copy(receivedQty = current.receivedQty + receiveQty))
+
+        // 2) raise stock + record inventory movement when linked to a part
+        current.partId?.let { partId ->
+            val part = sparePartDao.getById(partId)
+            if (part != null) {
+                sparePartDao.adjustStock(partId, receiveQty)
+                if (current.unitPrice > 0) sparePartDao.updateLastPrice(partId, current.unitPrice)
+                transactionDao.insert(
+                    InventoryTransactionEntity(
+                        partId = partId,
+                        workOrderId = null,
+                        transactionType = "Receive",
+                        quantity = receiveQty,
+                        createdAt = DateStrings.today(),
+                        createdBy = actor,
+                        note = "استلام أمر شراء ${order.poNumber}",
+                        storageLocation = order.warehouse
+                    )
+                )
+            }
+        }
+
+        // 3) re-derive the order status from its lines
+        val lines = purchaseOrderLineDao.forOrder(line.poId)
+        val allReceived = lines.isNotEmpty() && lines.all { it.isFullyReceived }
+        val anyReceived = lines.any { it.receivedQty > 0 }
+        val newStatus = when {
+            allReceived -> "Received"
+            anyReceived -> "PartiallyReceived"
+            else -> order.status
+        }
+        if (newStatus != order.status) purchaseOrderDao.insert(order.copy(status = newStatus))
+
+        recordAudit(
+            "Receive",
+            "PurchaseOrder",
+            "استلام $receiveQty من ${current.description} (أمر ${order.poNumber})",
+            actor
+        )
+    }
+}
+
     // ---------------------------------------------------------------------
     // Organizational units (Company / Plant / Work Center / Cost Center / Planner Group / Department)
     // ---------------------------------------------------------------------

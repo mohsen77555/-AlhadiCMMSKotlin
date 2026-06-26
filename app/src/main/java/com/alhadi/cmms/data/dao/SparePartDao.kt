@@ -36,6 +36,9 @@ interface SparePartDao {
     @Query("UPDATE spare_parts SET onHandQty = :quantity WHERE id = :id")
     suspend fun setStock(id: Long, quantity: Int)
 
+    @Query("UPDATE spare_parts SET lastPrice = :price WHERE id = :id")
+    suspend fun updateLastPrice(id: Long, price: Double)
+
     @Query("DELETE FROM spare_parts WHERE id = :id")
     suspend fun deleteById(id: Long)
 

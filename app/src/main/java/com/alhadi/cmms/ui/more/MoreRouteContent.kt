@@ -343,7 +343,8 @@ internal fun MoreRouteContent(
                             onCancelOrder = viewModel::cancelPurchaseOrder,
                             onSetStatus = viewModel::setPurchaseOrderStatus,
                             onSaveLine = viewModel::savePurchaseOrderLine,
-                            onDeleteLine = viewModel::deletePurchaseOrderLine
+                            onDeleteLine = viewModel::deletePurchaseOrderLine,
+                            onReceiveLine = viewModel::receivePurchaseOrderLine
                         )
                         MoreRoute.OrgUnits -> OrgUnitsScreen(
                             innerPadding = innerPadding,
