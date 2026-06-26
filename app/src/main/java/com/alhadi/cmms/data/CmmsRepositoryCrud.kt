@@ -6,6 +6,7 @@ import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetInstallationEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
@@ -47,9 +48,55 @@ internal suspend fun CmmsRepository.saveAsset(asset: AssetEntity, actor: String 
         validateLinearAssetMaster(asset)
         enforceSingleInstallation(asset)
         val isNew = asset.id == 0L
-        assetDao.insertAsset(asset)
+        val previous = if (isNew) null else assetDao.getAssetById(asset.id)
+        val savedId = assetDao.insertAsset(asset)
+        val effectiveId = if (isNew) savedId else asset.id
+        recordInstallationChange(previous, asset.copy(id = effectiveId), actor)
         recordAudit(if (isNew) "Create" else "Update", "Asset", "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code}", actor)
     }
+
+/**
+ * Install/dismantle history: whenever an asset's functional location changes, log a Dismantle
+ * event for the old location and an Install event for the new one (immutable timeline).
+ */
+private suspend fun CmmsRepository.recordInstallationChange(
+    previous: AssetEntity?,
+    current: AssetEntity,
+    actor: String
+) {
+    val oldLocation = previous?.locationId
+    val newLocation = current.locationId
+    if (oldLocation == newLocation) return
+    val today = DateStrings.today()
+    if (oldLocation != null) {
+        assetInstallationDao.insert(
+            AssetInstallationEntity(
+                assetId = current.id,
+                locationId = oldLocation,
+                locationCode = locationDao.getById(oldLocation)?.code ?: "",
+                eventType = "Dismantle",
+                eventDate = today,
+                performedBy = actor,
+                reason = "نقل الأصل ${current.code}",
+                createdAt = today
+            )
+        )
+    }
+    if (newLocation != null) {
+        assetInstallationDao.insert(
+            AssetInstallationEntity(
+                assetId = current.id,
+                locationId = newLocation,
+                locationCode = locationDao.getById(newLocation)?.code ?: "",
+                eventType = "Install",
+                eventDate = today,
+                performedBy = actor,
+                reason = "تركيب الأصل ${current.code}",
+                createdAt = today
+            )
+        )
+    }
+}
 
 /**
  * FLOC-031: a functional location flagged as a single-installation position may hold only one

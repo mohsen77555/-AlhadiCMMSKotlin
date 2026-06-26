@@ -434,7 +434,18 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41, MIGRATION_41_42, MIGRATION_42_43, MIGRATION_43_44)
+    /** Asset install / dismantle history table. */
+    val MIGRATION_44_45 = object : Migration(44, 45) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "CREATE TABLE IF NOT EXISTS asset_installations (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, assetId INTEGER NOT NULL, locationId INTEGER, locationCode TEXT NOT NULL DEFAULT '', eventType TEXT NOT NULL, eventDate TEXT NOT NULL, performedBy TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '', createdAt TEXT NOT NULL DEFAULT '')",
+                "CREATE INDEX IF NOT EXISTS index_asset_installations_assetId ON asset_installations (assetId)",
+                "CREATE INDEX IF NOT EXISTS index_asset_installations_locationId ON asset_installations (locationId)"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41, MIGRATION_41_42, MIGRATION_42_43, MIGRATION_43_44, MIGRATION_44_45)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */
