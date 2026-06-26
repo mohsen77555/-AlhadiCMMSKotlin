@@ -304,18 +304,39 @@ internal suspend fun CmmsRepository.saveUser(user: UserEntity, actor: String = "
             PasswordHasher.isHashed(user.password) -> user
             else -> user.copy(password = PasswordHasher.hash(user.password))
         }
-        userDao.insert(resolved)
+        // USR-LOG-001: stamp account creation and password-change times.
+        val now = DateStrings.now()
+        val passwordProvided = user.password.isNotBlank()
+        val stamped = resolved.copy(
+            createdAt = if (isNew) now else resolved.createdAt.ifBlank { now },
+            passwordChangedAt = if (isNew || passwordProvided) now else resolved.passwordChangedAt,
+            mustChangePassword = if (passwordProvided) false else resolved.mustChangePassword
+        )
+        userDao.insert(stamped)
         recordAudit(if (isNew) "Create" else "Update", "User", "${if (isNew) "إضافة" else "تعديل"} مستخدم: ${user.username}", actor)
     }
 
+/** USR-GOV-002: an inactive account is preserved; the last active admin cannot be deactivated. */
 internal suspend fun CmmsRepository.setUserActive(user: UserEntity, active: Boolean, actor: String = "System") {
+        if (!active && user.isAdmin && userDao.countActiveAdmins() <= 1) {
+            throw IllegalStateException("لا يمكن تعطيل آخر مدير نشط")
+        }
         userDao.setActive(user.id, active)
         recordAudit("Update", "User", "${if (active) "تفعيل" else "تعطيل"} المستخدم: ${user.username}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteUser(user: UserEntity, actor: String = "System") {
+        if (user.isAdmin && user.isActive && userDao.countActiveAdmins() <= 1) {
+            throw IllegalStateException("لا يمكن حذف آخر مدير نشط")
+        }
         userDao.deleteById(user.id)
         recordAudit("Delete", "User", "حذف المستخدم: ${user.username}", actor)
+    }
+
+/** USR-SEC-005: an admin clears a lockout and resets the failed-attempt counter. */
+internal suspend fun CmmsRepository.resetUserLock(user: UserEntity, actor: String = "System") {
+        userDao.insert(user.copy(locked = false, failedLoginCount = 0))
+        recordAudit("Unlock", "User", "إلغاء قفل المستخدم: ${user.username}", actor)
     }
 
     // ---------------------------------------------------------------------

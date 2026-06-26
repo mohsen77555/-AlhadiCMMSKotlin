@@ -27,6 +27,9 @@ interface UserDao {
     @Query("SELECT COUNT(*) FROM users")
     suspend fun countOnce(): Int
 
+    @Query("SELECT COUNT(*) FROM users WHERE isActive = 1 AND LOWER(role) = 'admin'")
+    suspend fun countActiveAdmins(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(users: List<UserEntity>)
 

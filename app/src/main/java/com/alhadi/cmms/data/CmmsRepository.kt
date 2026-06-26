@@ -130,13 +130,37 @@ class CmmsRepository(internal val database: AppDatabase) {
 
     suspend fun authenticate(username: String, password: String): UserEntity? {
         val user = userDao.findActiveByUsername(username.trim()) ?: return null
-        if (!PasswordHasher.verify(password, user.password)) return null
-        // Transparently upgrade any legacy plain-text password to a salted hash on first login.
-        if (!PasswordHasher.isHashed(user.password)) {
-            userDao.insert(user.copy(password = PasswordHasher.hash(password)))
+        // USR-SEC-004: a locked account cannot sign in until an admin resets it.
+        if (user.locked) {
+            recordAudit("LoginBlocked", "User", "محاولة دخول لحساب مقفل: ${user.username}", user.name)
+            return null
         }
+        if (!PasswordHasher.verify(password, user.password)) {
+            val count = user.failedLoginCount + 1
+            val nowLocked = count >= MAX_FAILED_LOGINS
+            userDao.insert(user.copy(failedLoginCount = count, locked = nowLocked))
+            recordAudit(
+                if (nowLocked) "LockAccount" else "LoginFailed",
+                "User",
+                if (nowLocked) "قفل الحساب بعد $count محاولات فاشلة" else "محاولة دخول فاشلة ($count)",
+                user.name
+            )
+            return null
+        }
+        // Success: stamp the login, reset the failure counter, and upgrade any legacy plain-text password.
+        val now = DateStrings.now()
+        var updated = user.copy(failedLoginCount = 0, locked = false, lastLoginAt = now)
+        if (!PasswordHasher.isHashed(user.password)) {
+            updated = updated.copy(password = PasswordHasher.hash(password))
+        }
+        userDao.insert(updated)
         recordAudit("Login", "User", "تسجيل دخول ناجح", user.name)
-        return user
+        return updated
+    }
+
+    companion object {
+        /** USR-SEC-003: lock an account after this many consecutive failed logins. */
+        const val MAX_FAILED_LOGINS = 5
     }
 
     internal suspend fun recordAudit(action: String, entityType: String, details: String, actor: String) {

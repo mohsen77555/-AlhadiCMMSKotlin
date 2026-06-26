@@ -57,6 +57,7 @@ fun CmmsViewModel.deletePreventiveMaintenance(item: PreventiveMaintenanceEntity)
 fun CmmsViewModel.saveUser(user: UserEntity) = launchAction("تم حفظ المستخدم") { repository.saveUser(user, actor()) }
 fun CmmsViewModel.setUserActive(user: UserEntity, active: Boolean) = launchAction("تم تحديث حالة المستخدم") { repository.setUserActive(user, active, actor()) }
 fun CmmsViewModel.deleteUser(user: UserEntity) = launchAction("تم حذف المستخدم") { repository.deleteUser(user, actor()) }
+fun CmmsViewModel.resetUserLock(user: UserEntity) = launchAction("تم إلغاء قفل المستخدم") { repository.resetUserLock(user, actor()) }
 
 // ----- Meters & readings -----
 fun CmmsViewModel.saveMeasuringPoint(point: MeasuringPointEntity) = launchAction("تم حفظ نقطة القياس") { repository.saveMeasuringPoint(point, actor()) }
