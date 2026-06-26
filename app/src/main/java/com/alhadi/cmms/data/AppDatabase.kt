@@ -103,7 +103,7 @@ import com.alhadi.cmms.data.entity.OrgUnitEntity
         PurchaseOrderEntity::class,
         PurchaseOrderLineEntity::class
     ],
-    version = 43,
+    version = 44,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -416,7 +416,25 @@ object DbMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41, MIGRATION_41_42, MIGRATION_42_43)
+    /** Functional-location governance columns (classification, lifecycle, installation, reference). */
+    val MIGRATION_43_44 = object : Migration(43, 44) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.exec(
+                "ALTER TABLE functional_locations ADD COLUMN category TEXT NOT NULL DEFAULT 'Standard'",
+                "ALTER TABLE functional_locations ADD COLUMN lifecycleStatus TEXT NOT NULL DEFAULT 'Created'",
+                "ALTER TABLE functional_locations ADD COLUMN abcIndicator TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN sortField TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN authorizationGroup TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN singleInstallation INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE functional_locations ADD COLUMN isReference INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE functional_locations ADD COLUMN referenceCode TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN room TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE functional_locations ADD COLUMN plantSection TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41, MIGRATION_41_42, MIGRATION_42_43, MIGRATION_43_44)
 }
 
 /** Tiny helper so migration SQL reads a little cleaner. */
