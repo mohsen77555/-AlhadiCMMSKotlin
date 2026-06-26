@@ -263,6 +263,33 @@ internal suspend fun CmmsRepository.receivePart(part: SparePartEntity, quantity:
         }
     }
 
+/**
+ * INV-CNT-001: physical stock count (جرد). Sets the on-hand quantity to the counted value and
+ * records the difference as an Adjustment inventory transaction so the variance is auditable.
+ */
+internal suspend fun CmmsRepository.cycleCountPart(part: SparePartEntity, countedQty: Int, actor: String = "System") {
+        require(countedQty >= 0) { "الكمية لا يمكن أن تكون سالبة" }
+        val current = sparePartDao.getById(part.id) ?: throw IllegalStateException("قطعة الغيار غير موجودة")
+        if (current.serializationActive) throw IllegalStateException("استخدم شاشة الأرقام التسلسلية لجرد هذه القطعة")
+        val delta = countedQty - current.onHandQty
+        if (delta == 0) return
+        database.withTransaction {
+            sparePartDao.setStock(current.id, countedQty)
+            transactionDao.insert(
+                InventoryTransactionEntity(
+                    partId = current.id,
+                    workOrderId = null,
+                    transactionType = "Adjustment",
+                    quantity = delta,
+                    createdAt = DateStrings.today(),
+                    createdBy = actor,
+                    note = "جرد: من ${current.onHandQty} إلى $countedQty"
+                )
+            )
+            recordAudit("Adjust", "Inventory", "جرد ${current.partNumber}: ${current.onHandQty} ← $countedQty", actor)
+        }
+    }
+
     // ---------------------------------------------------------------------
     // Users
     // ---------------------------------------------------------------------

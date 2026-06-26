@@ -262,6 +262,8 @@ internal fun MoreRouteContent(
                             onOpenSerialNumbers = { onNavigate(MoreRoute.SerialNumbers) },
                             onIssue = viewModel::issuePart,
                             onReceive = viewModel::receivePart,
+                            onCycleCount = viewModel::cycleCountPart,
+                            onReorder = viewModel::createReorderPurchaseOrders,
                             onSave = viewModel::savePart,
                             onDelete = viewModel::deletePart
                         )

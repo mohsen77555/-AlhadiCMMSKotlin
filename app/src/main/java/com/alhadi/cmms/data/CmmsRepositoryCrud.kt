@@ -513,6 +513,58 @@ internal suspend fun CmmsRepository.receivePurchaseOrderLine(
     }
 }
 
+/**
+ * INV-REO-010: automatic replenishment. Scans for low-stock parts that have a preferred supplier
+ * and a positive suggested order quantity, then raises one draft purchase order per supplier with
+ * a line for each part. Returns the number of purchase orders created.
+ */
+internal suspend fun CmmsRepository.createReorderPurchaseOrders(actor: String = "System"): Int {
+    val lowStock = spareParts.first().filter {
+        it.isLowStock && it.preferredSupplierId != null && it.suggestedOrderQty() > 0
+    }
+    if (lowStock.isEmpty()) return 0
+    val suppliersById = supplierDao.dumpAll().associateBy { it.id }
+    val today = DateStrings.today()
+    var created = 0
+    database.withTransaction {
+        lowStock.groupBy { it.preferredSupplierId!! }.forEach { (supplierId, parts) ->
+            val supplier = suppliersById[supplierId]
+            val poId = purchaseOrderDao.insert(
+                PurchaseOrderEntity(
+                    poNumber = "PO-RO-${today.replace("-", "")}-$supplierId",
+                    supplierId = supplierId,
+                    supplierName = supplier?.name ?: "",
+                    status = "Draft",
+                    orderDate = today,
+                    currency = "SAR",
+                    notes = "أمر شراء تلقائي للنواقص",
+                    createdBy = actor
+                )
+            )
+            var total = 0.0
+            parts.forEach { p ->
+                val qty = p.suggestedOrderQty()
+                purchaseOrderLineDao.insert(
+                    PurchaseOrderLineEntity(
+                        poId = poId,
+                        partId = p.id,
+                        partNumber = p.partNumber,
+                        description = p.name,
+                        quantity = qty,
+                        unitPrice = p.lastPrice,
+                        receivedQty = 0
+                    )
+                )
+                total += qty * p.lastPrice
+            }
+            purchaseOrderDao.updateTotal(poId, total)
+            created++
+        }
+        recordAudit("Create", "PurchaseOrder", "إنشاء $created أمر شراء تلقائي للنواقص", actor)
+    }
+    return created
+}
+
     // ---------------------------------------------------------------------
     // Organizational units (Company / Plant / Work Center / Cost Center / Planner Group / Department)
     // ---------------------------------------------------------------------

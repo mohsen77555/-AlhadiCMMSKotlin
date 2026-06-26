@@ -203,6 +203,7 @@ internal fun SparePartCard(
     canManage: Boolean,
     onIssue: (SparePartEntity, Int) -> Unit,
     onReceive: (SparePartEntity, Int) -> Unit,
+    onCycleCount: (SparePartEntity, Int) -> Unit = { _, _ -> },
     onEdit: () -> Unit,
     onOpenSerialNumbers: () -> Unit,
     onDelete: () -> Unit
@@ -261,23 +262,43 @@ internal fun SparePartCard(
                         }
                     }
                 }
+                if (canManage) {
+                    OutlinedButton(onClick = { moveMode = "count" }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("جرد")
+                    }
+                }
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
     }
 
     if (!part.serializationActive) moveMode?.let { mode ->
-        val isIssue = mode == "issue"
-        QuantityDialog(
-            title = if (isIssue) "صرف ${part.partNumber}" else "استلام ${part.partNumber}",
-            label = if (isIssue) "الكمية المصروفة (المتوفر ${part.onHandQty})" else "الكمية المستلمة",
-            maxValue = if (isIssue) part.onHandQty else null,
-            onConfirm = { qty ->
-                if (isIssue) onIssue(part, qty) else onReceive(part, qty)
-                moveMode = null
-            },
-            onDismiss = { moveMode = null }
-        )
+        when (mode) {
+            "count" -> QuantityDialog(
+                title = "جرد ${part.partNumber}",
+                label = "الكمية الفعلية المعدودة (المسجّل ${part.onHandQty})",
+                maxValue = null,
+                allowZero = true,
+                initial = part.onHandQty.toString(),
+                onConfirm = { qty -> onCycleCount(part, qty); moveMode = null },
+                onDismiss = { moveMode = null }
+            )
+            else -> {
+                val isIssue = mode == "issue"
+                QuantityDialog(
+                    title = if (isIssue) "صرف ${part.partNumber}" else "استلام ${part.partNumber}",
+                    label = if (isIssue) "الكمية المصروفة (المتوفر ${part.onHandQty})" else "الكمية المستلمة",
+                    maxValue = if (isIssue) part.onHandQty else null,
+                    onConfirm = { qty ->
+                        if (isIssue) onIssue(part, qty) else onReceive(part, qty)
+                        moveMode = null
+                    },
+                    onDismiss = { moveMode = null }
+                )
+            }
+        }
     }
 }
 
@@ -287,11 +308,13 @@ internal fun QuantityDialog(
     label: String,
     maxValue: Int?,
     onConfirm: (Int) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    allowZero: Boolean = false,
+    initial: String = "1"
 ) {
-    var text by remember { mutableStateOf("1") }
+    var text by remember { mutableStateOf(initial) }
     val qty = text.toIntOrNull()
-    val valid = qty != null && qty > 0 && (maxValue == null || qty <= maxValue)
+    val valid = qty != null && (qty > 0 || (allowZero && qty == 0)) && (maxValue == null || qty <= maxValue)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },

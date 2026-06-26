@@ -84,6 +84,8 @@ fun CmmsViewModel.setPurchaseOrderStatus(order: PurchaseOrderEntity, status: Str
 fun CmmsViewModel.savePurchaseOrderLine(line: PurchaseOrderLineEntity) = launchAction("تم حفظ البند") { repository.savePurchaseOrderLine(line, actor()) }
 fun CmmsViewModel.deletePurchaseOrderLine(line: PurchaseOrderLineEntity) = launchAction("تم حذف البند") { repository.deletePurchaseOrderLine(line, actor()) }
 fun CmmsViewModel.receivePurchaseOrderLine(line: PurchaseOrderLineEntity, quantity: Int) = launchAction("تم تسجيل الاستلام") { repository.receivePurchaseOrderLine(line, quantity, actor()) }
+fun CmmsViewModel.createReorderPurchaseOrders() = launchAction("تم إنشاء أوامر شراء للنواقص") { repository.createReorderPurchaseOrders(actor()) }
+fun CmmsViewModel.cycleCountPart(part: SparePartEntity, countedQty: Int) = launchAction("تم تسجيل الجرد") { repository.cycleCountPart(part, countedQty, actor()) }
 
 fun CmmsViewModel.saveOrgUnit(unit: OrgUnitEntity) = launchAction("تم حفظ الوحدة التنظيمية") { repository.saveOrgUnit(unit, actor()) }
 fun CmmsViewModel.deleteOrgUnit(unit: OrgUnitEntity) = launchAction("تم حذف الوحدة التنظيمية") { repository.deleteOrgUnit(unit, actor()) }

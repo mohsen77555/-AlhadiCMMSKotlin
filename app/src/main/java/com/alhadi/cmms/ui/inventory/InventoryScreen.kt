@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -202,6 +203,8 @@ internal fun InventoryScreen(
     onOpenSerialNumbers: () -> Unit,
     onIssue: (SparePartEntity, Int) -> Unit,
     onReceive: (SparePartEntity, Int) -> Unit,
+    onCycleCount: (SparePartEntity, Int) -> Unit = { _, _ -> },
+    onReorder: () -> Unit = {},
     onSave: (SparePartEntity) -> Unit,
     onDelete: (SparePartEntity) -> Unit
 ) {
@@ -262,6 +265,16 @@ internal fun InventoryScreen(
             }
             if (canManage) {
                 item { AddButton("قطعة غيار جديدة") { editing = null; showForm = true } }
+                val reorderable = parts.count { it.isLowStock && it.preferredSupplierId != null && it.suggestedOrderQty() > 0 }
+                if (reorderable > 0) {
+                    item {
+                        Button(onClick = onReorder, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.ShoppingCart, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("طلب شراء النواقص ($reorderable)")
+                        }
+                    }
+                }
             }
             item { SectionHeader("قطع الغيار (${filtered.size})") }
             if (filtered.isEmpty()) {
@@ -284,6 +297,7 @@ internal fun InventoryScreen(
                         canManage = canManage,
                         onIssue = onIssue,
                         onReceive = onReceive,
+                        onCycleCount = onCycleCount,
                         onEdit = { editing = part; showForm = true },
                         onOpenSerialNumbers = onOpenSerialNumbers,
                         onDelete = { deleteTarget = part }
