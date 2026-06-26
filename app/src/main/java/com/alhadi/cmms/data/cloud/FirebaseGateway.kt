@@ -13,4 +13,8 @@ object FirebaseGateway {
     /** True only when a real google-services.json has initialized the default Firebase app. */
     fun isAvailable(context: Context): Boolean =
         runCatching { FirebaseApp.getApps(context).isNotEmpty() }.getOrDefault(false)
+
+    /** Context-free check: succeeds only when a default FirebaseApp exists. */
+    fun isAvailable(): Boolean =
+        runCatching { FirebaseApp.getInstance() }.isSuccess
 }

@@ -1,6 +1,7 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.cloud.UserCloudSync
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
@@ -312,7 +313,9 @@ internal suspend fun CmmsRepository.saveUser(user: UserEntity, actor: String = "
             passwordChangedAt = if (isNew || passwordProvided) now else resolved.passwordChangedAt,
             mustChangePassword = if (passwordProvided) false else resolved.mustChangePassword
         )
-        userDao.insert(stamped)
+        val savedId = userDao.insert(stamped)
+        // Mirror the user to Firebase (no-op when Firebase isn't configured). Password never leaves the device.
+        UserCloudSync.upsert(stamped.copy(id = if (isNew) savedId else stamped.id))
         recordAudit(if (isNew) "Create" else "Update", "User", "${if (isNew) "إضافة" else "تعديل"} مستخدم: ${user.username}", actor)
     }
 
@@ -322,6 +325,7 @@ internal suspend fun CmmsRepository.setUserActive(user: UserEntity, active: Bool
             throw IllegalStateException("لا يمكن تعطيل آخر مدير نشط")
         }
         userDao.setActive(user.id, active)
+        UserCloudSync.upsert(user.copy(isActive = active))
         recordAudit("Update", "User", "${if (active) "تفعيل" else "تعطيل"} المستخدم: ${user.username}", actor)
     }
 
@@ -330,12 +334,15 @@ internal suspend fun CmmsRepository.deleteUser(user: UserEntity, actor: String =
             throw IllegalStateException("لا يمكن حذف آخر مدير نشط")
         }
         userDao.deleteById(user.id)
+        UserCloudSync.remove(user)
         recordAudit("Delete", "User", "حذف المستخدم: ${user.username}", actor)
     }
 
 /** USR-SEC-005: an admin clears a lockout and resets the failed-attempt counter. */
 internal suspend fun CmmsRepository.resetUserLock(user: UserEntity, actor: String = "System") {
-        userDao.insert(user.copy(locked = false, failedLoginCount = 0))
+        val unlocked = user.copy(locked = false, failedLoginCount = 0)
+        userDao.insert(unlocked)
+        UserCloudSync.upsert(unlocked)
         recordAudit("Unlock", "User", "إلغاء قفل المستخدم: ${user.username}", actor)
     }
 
