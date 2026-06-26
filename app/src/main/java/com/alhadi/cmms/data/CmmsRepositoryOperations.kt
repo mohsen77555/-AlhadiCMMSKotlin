@@ -143,12 +143,17 @@ internal suspend fun CmmsRepository.updateWorkOrderStatus(id: Long, status: Stri
 
 internal suspend fun CmmsRepository.markPreventiveMaintenanceDone(item: PreventiveMaintenanceEntity, actor: String = "System") {
         val today = DateStrings.today()
-        pmDao.markDone(
-            id = item.id,
-            status = "Scheduled",
-            doneAt = today,
-            nextDueAt = DateStrings.addDays(today, item.frequencyDays)
-        )
+        // PM-SCH-030: floating plans count from the completion date, fixed from the planned due date.
+        val baseDate = if (item.floatingSchedule) today else item.nextDueAt.ifBlank { today }
+        val nextDue = if (item.isTimeScheduled) DateStrings.addDays(baseDate, item.frequencyDays) else item.nextDueAt
+        var updated = item.copy(status = "Scheduled", lastDoneAt = today, nextDueAt = nextDue)
+        // Counter-based plans capture the current reading and project the next trigger.
+        val pointId = item.measuringPointId
+        if (item.isCounterScheduled && pointId != null && item.counterInterval > 0) {
+            val reading = measurementDao.getPointById(pointId)?.lastReading ?: item.lastCounterReading
+            updated = updated.copy(lastCounterReading = reading, nextCounterReading = reading + item.counterInterval)
+        }
+        pmDao.insert(updated)
         checklistDao.resetResults(item.id)
         recordAudit("Complete", "PreventiveMaintenance", "تنفيذ صيانة دورية: ${item.title}", actor)
     }
