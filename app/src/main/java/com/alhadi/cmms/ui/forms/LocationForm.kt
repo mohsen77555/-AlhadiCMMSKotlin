@@ -104,6 +104,16 @@ internal fun LocationFormSheet(
     var workCenterCode by remember { mutableStateOf(initial?.workCenterCode ?: "") }
     var costCenterCode by remember { mutableStateOf(initial?.costCenterCode ?: "") }
     var plannerGroupCode by remember { mutableStateOf(initial?.plannerGroupCode ?: "") }
+    var category by remember { mutableStateOf(initial?.category ?: "Standard") }
+    var lifecycleStatus by remember { mutableStateOf(initial?.lifecycleStatus ?: "Created") }
+    var abcIndicator by remember { mutableStateOf(initial?.abcIndicator ?: "") }
+    var sortField by remember { mutableStateOf(initial?.sortField ?: "") }
+    var authorizationGroup by remember { mutableStateOf(initial?.authorizationGroup ?: "") }
+    var singleInstallation by remember { mutableStateOf(initial?.singleInstallation ?: false) }
+    var isReference by remember { mutableStateOf(initial?.isReference ?: false) }
+    var referenceCode by remember { mutableStateOf(initial?.referenceCode ?: "") }
+    var room by remember { mutableStateOf(initial?.room ?: "") }
+    var plantSection by remember { mutableStateOf(initial?.plantSection ?: "") }
 
     // FLOC-004: a location cannot become its own ancestor — exclude self and all descendants.
     val descendantIds = remember(allLocations, initial?.id) { locationDescendantIds(initial?.id, allLocations) }
@@ -115,6 +125,26 @@ internal fun LocationFormSheet(
         LabeledField("الوصف", description, { description = it }, singleLine = false)
         LocationDropdown("الموقع الأعلى (Parent)", parentChoices, parentId, excludeId = initial?.id) { parentId = it }
         OptionDropdown("الحالة", listOf("Active", "Inactive"), status) { status = it }
+
+        Text("التصنيف ودورة الحياة (الحوكمة)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        OptionDropdown("الفئة (Category)", listOf("Standard", "Production", "Building", "Utility", "Storage", "Outdoor"), category) { category = it }
+        OptionDropdown("حالة دورة الحياة", listOf("Planned", "Created", "Installed", "Inactive"), lifecycleStatus) { lifecycleStatus = it }
+        OptionDropdown("مؤشر الأهمية (ABC)", listOf("", "A", "B", "C"), abcIndicator) { abcIndicator = it }
+        LabeledField("حقل الفرز (Sort Field)", sortField, { sortField = it })
+        LabeledField("مجموعة التفويض", authorizationGroup, { authorizationGroup = it })
+        LabeledField("القسم (Plant Section)", plantSection, { plantSection = it })
+        LabeledField("الغرفة/الموضع (Room)", room, { room = it })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("موضع تركيب مفرد (أصل واحد فقط)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = singleInstallation, onCheckedChange = { singleInstallation = it })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("موقع مرجعي (قالب)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = isReference, onCheckedChange = { isReference = it })
+        }
+        if (!isReference) {
+            LabeledField("كود الموقع المرجعي", referenceCode, { referenceCode = it })
+        }
 
         Text("الربط التنظيمي (يورَّث للأصول)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         OrgUnitDropdown("المصنع (Plant)", "Plant", orgUnits, plantCode) { plantCode = it }
@@ -134,7 +164,17 @@ internal fun LocationFormSheet(
                     plantCode = plantCode,
                     workCenterCode = workCenterCode,
                     costCenterCode = costCenterCode,
-                    plannerGroupCode = plannerGroupCode
+                    plannerGroupCode = plannerGroupCode,
+                    category = category,
+                    lifecycleStatus = lifecycleStatus,
+                    abcIndicator = abcIndicator,
+                    sortField = sortField.trim(),
+                    authorizationGroup = authorizationGroup.trim(),
+                    singleInstallation = singleInstallation,
+                    isReference = isReference,
+                    referenceCode = if (isReference) "" else referenceCode.trim(),
+                    room = room.trim(),
+                    plantSection = plantSection.trim()
                 )
             )
         }

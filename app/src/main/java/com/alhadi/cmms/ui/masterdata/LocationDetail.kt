@@ -189,6 +189,24 @@ import kotlinx.coroutines.launch
 // Location card & detail screen (moved out of LocationsScreen.kt)
 // ------------------------------------------------------------------------
 
+internal fun locationCategoryLabel(category: String): String = when (category) {
+    "Standard" -> "قياسي"
+    "Production" -> "إنتاج"
+    "Building" -> "مبنى"
+    "Utility" -> "مرافق"
+    "Storage" -> "تخزين"
+    "Outdoor" -> "خارجي"
+    else -> category
+}
+
+internal fun locationLifecycleLabel(status: String): String = when (status) {
+    "Planned" -> "مخطط"
+    "Created" -> "منشأ"
+    "Installed" -> "مركّب"
+    "Inactive" -> "معطّل"
+    else -> status
+}
+
 @Composable
 internal fun LocationCard(
     location: FunctionalLocationEntity,
@@ -219,6 +237,8 @@ internal fun LocationCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusBadge("أصول: $assetCount", statusTone("info"))
                 StatusBadge("فرعية: $childCount", statusTone("neutral"))
+                if (location.isReference) StatusBadge("مرجعي", statusTone("scheduled"))
+                if (location.singleInstallation) StatusBadge("تركيب مفرد", statusTone("warning"))
             }
             if (canManage) EditDeleteRow(onEdit, onDelete)
         }
@@ -261,6 +281,28 @@ internal fun LocationDetailScreen(
             item {
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Text(location.description, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+
+        item { SectionHeader("الحوكمة والتصنيف") }
+        item {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    InfoRow("الفئة", locationCategoryLabel(location.category))
+                    InfoRow("دورة الحياة", locationLifecycleLabel(location.lifecycleStatus))
+                    if (location.abcIndicator.isNotBlank()) InfoRow("مؤشر الأهمية", location.abcIndicator)
+                    InfoRow("موضع تركيب مفرد", if (location.singleInstallation) "نعم" else "لا")
+                    if (location.isReference) InfoRow("النوع", "موقع مرجعي (قالب)")
+                    if (location.referenceCode.isNotBlank()) InfoRow("منشأ من مرجع", location.referenceCode)
+                    if (location.plantSection.isNotBlank()) InfoRow("القسم", location.plantSection)
+                    if (location.room.isNotBlank()) InfoRow("الغرفة/الموضع", location.room)
+                    if (location.authorizationGroup.isNotBlank()) InfoRow("مجموعة التفويض", location.authorizationGroup)
+                    if (location.sortField.isNotBlank()) InfoRow("حقل الفرز", location.sortField)
+                    if (location.plantCode.isNotBlank()) InfoRow("المصنع", location.plantCode)
+                    if (location.workCenterCode.isNotBlank()) InfoRow("مركز العمل", location.workCenterCode)
+                    if (location.costCenterCode.isNotBlank()) InfoRow("مركز التكلفة", location.costCenterCode)
+                    if (location.plannerGroupCode.isNotBlank()) InfoRow("مجموعة التخطيط", location.plannerGroupCode)
                 }
             }
         }
