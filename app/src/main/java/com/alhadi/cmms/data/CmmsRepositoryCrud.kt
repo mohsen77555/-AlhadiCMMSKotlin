@@ -1,6 +1,7 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.cloud.EntityCloudSync
 import com.alhadi.cmms.data.cloud.UserCloudSync
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
@@ -54,7 +55,9 @@ internal suspend fun CmmsRepository.saveAsset(asset: AssetEntity, actor: String 
         val previous = if (isNew) null else assetDao.getAssetById(asset.id)
         val savedId = assetDao.insertAsset(asset)
         val effectiveId = if (isNew) savedId else asset.id
-        recordInstallationChange(previous, asset.copy(id = effectiveId), actor)
+        val saved = asset.copy(id = effectiveId)
+        recordInstallationChange(previous, saved, actor)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ASSETS, effectiveId.toString(), AssetEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "Asset", "${if (isNew) "إضافة" else "تعديل"} أصل: ${asset.code}", actor)
     }
 
@@ -128,6 +131,7 @@ internal suspend fun CmmsRepository.deleteAsset(asset: AssetEntity, actor: Strin
             assetDao.deleteById(asset.id)
             recordAudit("Delete", "Asset", "حذف أصل: ${asset.code}", actor)
         }
+        EntityCloudSync.remove(EntityCloudSync.Collections.ASSETS, asset.id.toString())
     }
 
 internal suspend fun CmmsRepository.changeAssetStatus(asset: AssetEntity, status: String, reason: String = "", actor: String = "System") {
@@ -151,6 +155,7 @@ internal suspend fun CmmsRepository.changeAssetStatus(asset: AssetEntity, status
             val reasonSuffix = if (reason.isNotBlank()) " — السبب: $reason" else ""
             recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status$reasonSuffix", actor)
         }
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ASSETS, asset.id.toString(), AssetEntity.serializer(), asset.copy(status = status))
     }
 
     // ---------------------------------------------------------------------
@@ -208,7 +213,9 @@ internal suspend fun CmmsRepository.saveWorkOrder(workOrder: WorkOrderEntity, ac
         } else {
             inherited.copy(approvalStatus = if (inherited.needsApproval()) "Pending" else "NotRequired")
         }
-        workOrderDao.insertWorkOrder(toSave)
+        val savedWoId = workOrderDao.insertWorkOrder(toSave)
+        val effectiveWoId = if (isNew) savedWoId else toSave.id
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDERS, effectiveWoId.toString(), WorkOrderEntity.serializer(), toSave.copy(id = effectiveWoId))
         recordAudit(if (isNew) "Create" else "Update", "WorkOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر عمل: ${workOrder.title}", actor)
         // AST-WAR-010: persist the warranty decision/review outcome into the asset history.
         if (workOrder.repairType.isNotBlank()) {
@@ -237,7 +244,9 @@ internal suspend fun CmmsRepository.setWorkOrderApproval(workOrder: WorkOrderEnt
 internal suspend fun CmmsRepository.deleteWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
         // WO-GOV-003/004 & WO-LC-005/006: work orders are never hard-deleted — cancel and keep the record.
         val current = workOrderDao.getById(workOrder.id) ?: workOrder
-        workOrderDao.insertWorkOrder(current.copy(status = "Cancelled", cancelledReason = current.cancelledReason.ifBlank { "أُلغي بدل الحذف" }))
+        val cancelled = current.copy(status = "Cancelled", cancelledReason = current.cancelledReason.ifBlank { "أُلغي بدل الحذف" })
+        workOrderDao.insertWorkOrder(cancelled)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDERS, cancelled.id.toString(), WorkOrderEntity.serializer(), cancelled)
         recordWoHistory(workOrder.id, "status", current.status, "Cancelled", actor)
         recordAudit("Cancel", "WorkOrder", "إلغاء أمر عمل: ${workOrder.title}", actor)
     }
@@ -245,7 +254,9 @@ internal suspend fun CmmsRepository.deleteWorkOrder(workOrder: WorkOrderEntity, 
 /** WO-GOV-004: cancel a work order with a reason instead of deleting it. */
 internal suspend fun CmmsRepository.cancelWorkOrder(workOrder: WorkOrderEntity, reason: String, actor: String = "System") {
     val current = workOrderDao.getById(workOrder.id) ?: workOrder
-    workOrderDao.insertWorkOrder(current.copy(status = "Cancelled", cancelledReason = reason.ifBlank { "ملغى" }))
+    val cancelled = current.copy(status = "Cancelled", cancelledReason = reason.ifBlank { "ملغى" })
+    workOrderDao.insertWorkOrder(cancelled)
+    EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDERS, cancelled.id.toString(), WorkOrderEntity.serializer(), cancelled)
     recordWoHistory(workOrder.id, "status", current.status, "Cancelled", actor)
     recordAudit("Cancel", "WorkOrder", "إلغاء أمر عمل: ${workOrder.title} — ${reason.ifBlank { "بدون سبب" }}", actor)
 }
@@ -253,7 +264,9 @@ internal suspend fun CmmsRepository.cancelWorkOrder(workOrder: WorkOrderEntity, 
 /** WO-CLS-008: reopen a closed/cancelled order (Admin only, enforced in the UI). */
 internal suspend fun CmmsRepository.reopenWorkOrder(workOrder: WorkOrderEntity, actor: String = "System") {
     val current = workOrderDao.getById(workOrder.id) ?: workOrder
-    workOrderDao.insertWorkOrder(current.copy(status = "In Progress", closedAt = "", closedBy = ""))
+    val reopened = current.copy(status = "In Progress", closedAt = "", closedBy = "")
+    workOrderDao.insertWorkOrder(reopened)
+    EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDERS, reopened.id.toString(), WorkOrderEntity.serializer(), reopened)
     recordWoHistory(workOrder.id, "status", current.status, "In Progress", actor)
     recordAudit("Reopen", "WorkOrder", "إعادة فتح أمر عمل: ${workOrder.title}", actor)
 }

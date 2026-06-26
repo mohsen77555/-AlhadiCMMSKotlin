@@ -1,6 +1,7 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.cloud.EntityCloudSync
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
@@ -238,7 +239,9 @@ internal suspend fun CmmsRepository.saveNotification(notification: MaintenanceNo
         } else {
             notification
         }
-        notificationDao.insert(toSave)
+        val savedId = notificationDao.insert(toSave)
+        val effectiveId = if (isNew) savedId else toSave.id
+        EntityCloudSync.upsert(EntityCloudSync.Collections.NOTIFICATIONS, effectiveId.toString(), MaintenanceNotificationEntity.serializer(), toSave.copy(id = effectiveId))
         recordAudit(if (isNew) "Create" else "Update", "Notification", "${if (isNew) "إنشاء" else "تعديل"} بلاغ: ${notification.title}", actor)
     }
 
@@ -255,6 +258,7 @@ internal suspend fun CmmsRepository.setNotificationStatus(notification: Maintena
             closedBy = if (status == "Closed") actor else notification.closedBy
         )
         notificationDao.insert(stamped)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.NOTIFICATIONS, stamped.id.toString(), MaintenanceNotificationEntity.serializer(), stamped)
         recordAudit("Status", "Notification", "تغيير حالة البلاغ ${notification.number} إلى $status", actor)
     }
 
@@ -307,6 +311,7 @@ internal suspend fun CmmsRepository.createOrderFromNotification(
 
 internal suspend fun CmmsRepository.deleteNotification(notification: MaintenanceNotificationEntity, actor: String = "System") {
         notificationDao.deleteById(notification.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.NOTIFICATIONS, notification.id.toString())
         recordAudit("Delete", "Notification", "حذف بلاغ: ${notification.title}", actor)
     }
 

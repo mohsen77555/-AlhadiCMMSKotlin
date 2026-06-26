@@ -1,6 +1,7 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.cloud.EntityCloudSync
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
@@ -134,6 +135,9 @@ internal suspend fun CmmsRepository.updateWorkOrderStatus(id: Long, status: Stri
         }
         // WO-HIS-001..004 & WO-STAT-006: record the status transition (old -> new).
         recordWoHistory(id, "status", current?.status ?: "", status, actor)
+        workOrderDao.getById(id)?.let {
+            EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDERS, id.toString(), WorkOrderEntity.serializer(), it)
+        }
         recordAudit("Update", "WorkOrder", "تحديث حالة أمر العمل #$id إلى $status", actor)
     }
 
