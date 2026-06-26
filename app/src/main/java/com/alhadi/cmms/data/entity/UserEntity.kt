@@ -44,17 +44,28 @@ data class UserEntity(
     val failedLoginCount: Int = 0,
     /** Account locked after too many failed attempts (USR-SEC-004). */
     @ColumnInfo(defaultValue = "0")
-    val locked: Boolean = false
+    val locked: Boolean = false,
+    // --- Role-based access (chapter 11) ---
+    /** Technician craft/trade: Electrical / Mechanical / Welding / Lathe (display + filtering). */
+    @ColumnInfo(defaultValue = "''")
+    val craft: String = "",
+    /** Comma-separated asset group names this user is responsible for (scoping). Blank = unrestricted. */
+    @ColumnInfo(defaultValue = "''")
+    val assignedGroups: String = ""
 ) {
     val isAdmin: Boolean
-        get() = role.equals("Admin", ignoreCase = true)
+        get() = role.equals("Admin", ignoreCase = true) || role.equals("SystemAdmin", ignoreCase = true)
 
     val isSupervisor: Boolean
-        get() = role.equals("Supervisor", ignoreCase = true)
+        get() = role.equals("Supervisor", ignoreCase = true) || role.equals("MaintenanceManager", ignoreCase = true)
 
-    /** Admins and supervisors may create work orders and manage inventory / PM. */
+    /** Admins and maintenance managers may create work orders and manage inventory / PM. */
     val canManage: Boolean
         get() = isAdmin || isSupervisor
+
+    /** The asset group names this user is scoped to (empty = unrestricted). */
+    val assignedGroupSet: Set<String>
+        get() = assignedGroups.split(',').map { it.trim() }.filter { it.isNotBlank() }.toSet()
 
     val initials: String
         get() = name.trim()
