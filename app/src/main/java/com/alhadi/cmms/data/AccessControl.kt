@@ -7,7 +7,7 @@ import com.alhadi.cmms.data.entity.UserEntity
  * Role-based access control (chapter 11). Five governed roles, each with a tailored set of
  * screen/feature permissions, plus asset-group scoping for maintenance roles.
  */
-enum class AppRole { SystemAdmin, MaintenanceManager, Technician, Procurement, Warehouse }
+enum class AppRole { SystemAdmin, MaintenanceManager, Technician, Procurement, Warehouse, Requester }
 
 object Roles {
     const val SYSTEM_ADMIN = "SystemAdmin"
@@ -15,9 +15,10 @@ object Roles {
     const val TECHNICIAN = "Technician"
     const val PROCUREMENT = "Procurement"
     const val WAREHOUSE = "Warehouse"
+    const val REQUESTER = "Requester"
 
     /** Canonical role values offered in the user form. */
-    val ALL = listOf(SYSTEM_ADMIN, MAINTENANCE_MANAGER, TECHNICIAN, PROCUREMENT, WAREHOUSE)
+    val ALL = listOf(SYSTEM_ADMIN, MAINTENANCE_MANAGER, TECHNICIAN, PROCUREMENT, WAREHOUSE, REQUESTER)
 
     fun label(role: String): String = when (roleOf(role)) {
         AppRole.SystemAdmin -> "مدير النظام"
@@ -25,6 +26,7 @@ object Roles {
         AppRole.Technician -> "فني صيانة"
         AppRole.Procurement -> "مشتريات"
         AppRole.Warehouse -> "مخازن"
+        AppRole.Requester -> "طالب خدمة"
     }
 }
 
@@ -45,6 +47,7 @@ fun roleOf(role: String?): AppRole = when (role?.lowercase()) {
     "maintenancemanager", "supervisor", "manager" -> AppRole.MaintenanceManager
     "procurement", "purchasing" -> AppRole.Procurement
     "warehouse", "stores", "store" -> AppRole.Warehouse
+    "requester", "request" -> AppRole.Requester
     "technician", "tech" -> AppRole.Technician
     else -> AppRole.Technician // least-privilege default
 }
@@ -74,7 +77,9 @@ data class Permissions(
     val seeWarehouses: Boolean,
     /** Master data: locations, org units, task lists, suppliers, etc. */
     val seeMasterData: Boolean,
-    val seeAdmin: Boolean
+    val seeAdmin: Boolean,
+    /** Requester: a tailored "my requests" experience only (raise and track requests). */
+    val requesterMode: Boolean = false
 )
 
 fun permissionsFor(user: UserEntity?): Permissions = when (roleOf(user)) {
@@ -117,6 +122,14 @@ fun permissionsFor(user: UserEntity?): Permissions = when (roleOf(user)) {
         seeNotifications = false, createNotifications = false, seePreventive = false, seeMeters = false,
         seeInventory = true, manageInventory = true, seeProcurement = false, seeReports = false,
         seeWarehouses = true, seeMasterData = false, seeAdmin = false
+    )
+    AppRole.Requester -> Permissions(
+        role = AppRole.Requester,
+        seeHome = false, seeWorkOrders = false, onlyMyWorkOrders = false, manageWorkOrders = false,
+        seeAssets = false, manageAssets = false, scopedAssets = false,
+        seeNotifications = false, createNotifications = true, seePreventive = false, seeMeters = false,
+        seeInventory = false, manageInventory = false, seeProcurement = false, seeReports = false,
+        seeWarehouses = false, seeMasterData = false, seeAdmin = false, requesterMode = true
     )
 }
 

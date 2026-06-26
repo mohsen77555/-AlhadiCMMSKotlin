@@ -196,7 +196,8 @@ internal enum class BottomTab(val label: String, val icon: ImageVector, val acce
     WorkOrders("أوامر العمل", Icons.Filled.Assignment, AccentBlue),
     Supervision("الإشراف", Icons.Filled.Verified, AccentTeal),
     Assets("الأصول", Icons.Filled.PrecisionManufacturing, AccentGreen),
-    More("المزيد", Icons.Filled.GridView, AccentBrown)
+    More("المزيد", Icons.Filled.GridView, AccentBrown),
+    Requests("طلباتي", Icons.Filled.NotificationsActive, AccentRed)
 }
 
 internal enum class MoreRoute { Notifications, Inventory, SerialNumbers, Reports, Audit, Admin, PreventiveMaintenance, TaskLists, Meters, Locations, Warehouses, OrgUnits, Suppliers, PurchaseOrders, Capa, Failures }
@@ -248,7 +249,9 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val isAdmin = currentUser?.isAdmin == true
     val canManage = currentUser?.canManage == true
     val perms = com.alhadi.cmms.data.permissionsFor(currentUser)
-    val visibleTabs = buildList {
+    val visibleTabs = if (perms.requesterMode) {
+        listOf(BottomTab.Requests)
+    } else buildList {
         add(BottomTab.Home)
         if (perms.seeWorkOrders) add(BottomTab.WorkOrders)
         if (perms.seePreventive) add(BottomTab.Supervision)
@@ -256,7 +259,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
         add(BottomTab.More)
     }
     LaunchedEffect(visibleTabs, selectedTab) {
-        if (selectedTab !in visibleTabs) selectedTab = BottomTab.Home
+        if (selectedTab !in visibleTabs) selectedTab = visibleTabs.first()
     }
     // RBAC scoping: maintenance roles only see their assigned asset groups; technicians only their own work orders.
     val scopedAssets = if (perms.scopedAssets) assets.filter { com.alhadi.cmms.data.isAssetVisible(currentUser, it) } else assets
@@ -459,6 +462,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         onImportBackup = { backupImportLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
                         onRunReminders = { Reminders.runNow(appContext) }
                     )
+
+                    BottomTab.Requests -> RequesterScreen(
+                        innerPadding = innerPadding,
+                        myRequests = notifications.filter { it.reportedBy == actorName },
+                        assets = assets,
+                        assetMap = assetMap,
+                        onSave = viewModel::saveNotification
+                    )
                 }
             }
         }
@@ -471,6 +482,7 @@ internal fun screenMeta(tab: BottomTab, route: MoreRoute?): ScreenMeta = when (t
     BottomTab.WorkOrders -> ScreenMeta("أوامر العمل", "إنشاء، إصدار، متابعة، وإغلاق", Icons.Filled.Assignment, AccentBlue)
     BottomTab.Supervision -> ScreenMeta("الإشراف والصيانة", "الصيانة الدورية والمتابعة", Icons.Filled.Verified, AccentTeal)
     BottomTab.Assets -> ScreenMeta("الأصول", "سجل الأصول والمعدات", Icons.Filled.PrecisionManufacturing, AccentGreen)
+    BottomTab.Requests -> ScreenMeta("طلباتي", "طلبات الصيانة ومتابعتها", Icons.Filled.NotificationsActive, AccentRed)
     BottomTab.More -> when (route) {
         null -> ScreenMeta("المزيد", "كل الوحدات والإعدادات", Icons.Filled.GridView, AccentBrown)
         MoreRoute.Notifications -> ScreenMeta("البلاغات", "بلاغات الصيانة وتحويلها لأوامر", Icons.Filled.NotificationsActive, AccentRed)
