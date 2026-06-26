@@ -142,10 +142,17 @@ internal fun CapaFormSheet(
 }
 
 @Composable
-internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: (UserEntity) -> Unit) {
+internal fun UserFormSheet(
+    initial: UserEntity?,
+    assetGroups: List<String> = emptyList(),
+    onDismiss: () -> Unit,
+    onSave: (UserEntity) -> Unit
+) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var username by remember { mutableStateOf(initial?.username ?: "") }
-    var role by remember { mutableStateOf(initial?.role ?: "Technician") }
+    var role by remember { mutableStateOf(initial?.role ?: com.alhadi.cmms.data.Roles.TECHNICIAN) }
+    var craft by remember { mutableStateOf(initial?.craft ?: "") }
+    var assignedGroups by remember { mutableStateOf(initial?.assignedGroups ?: "") }
     // Never pre-fill the stored (hashed) password. Blank means "keep current" when editing.
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
@@ -159,7 +166,17 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
     FormSheet(if (initial == null) "إضافة مستخدم" else "تعديل المستخدم", onDismiss) {
         LabeledField("الاسم", name, { name = it })
         LabeledField("اسم المستخدم", username, { username = it })
-        OptionDropdown("الدور", listOf("Admin", "Supervisor", "Technician"), role) { role = it }
+        OptionDropdown("الدور", com.alhadi.cmms.data.Roles.ALL, role, display = { com.alhadi.cmms.data.Roles.label(it) }) { role = it }
+        val roleKind = com.alhadi.cmms.data.roleOf(role)
+        if (roleKind == com.alhadi.cmms.data.AppRole.Technician) {
+            OptionDropdown("التخصص", com.alhadi.cmms.data.CRAFTS, craft, display = { if (it.isBlank()) "غير محدد" else com.alhadi.cmms.data.craftLabel(it) }) { craft = it }
+        }
+        if (roleKind == com.alhadi.cmms.data.AppRole.MaintenanceManager || roleKind == com.alhadi.cmms.data.AppRole.Technician) {
+            LabeledField("مجموعات الأصول الموكَّلة (افصل بفاصلة)", assignedGroups, { assignedGroups = it })
+            if (assetGroups.isNotEmpty()) {
+                Text("المجموعات المتاحة: ${assetGroups.joinToString("، ")}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         LabeledField("البريد الإلكتروني", email, { email = it })
         LabeledField("الهاتف", phone, { phone = it })
         LabeledField("القسم", department, { department = it })
@@ -205,7 +222,9 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
                     createdAt = initial?.createdAt ?: "",
                     passwordChangedAt = initial?.passwordChangedAt ?: "",
                     failedLoginCount = initial?.failedLoginCount ?: 0,
-                    locked = initial?.locked ?: false
+                    locked = initial?.locked ?: false,
+                    craft = if (com.alhadi.cmms.data.roleOf(role) == com.alhadi.cmms.data.AppRole.Technician) craft else "",
+                    assignedGroups = assignedGroups.trim()
                 )
             )
         }

@@ -229,6 +229,13 @@ internal fun MoreRouteContent(
     val taskListOperations by viewModel.taskListOperations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val perms = com.alhadi.cmms.data.permissionsFor(currentUser)
+    // RBAC: maintenance roles only see notifications for assets within their assigned groups.
+    val scopedAssetIdSet = if (perms.scopedAssets) {
+        assets.filter { com.alhadi.cmms.data.isAssetVisible(currentUser, it) }.mapTo(mutableSetOf()) { it.id }
+    } else null
+    val scopedNotifications = if (scopedAssetIdSet != null) {
+        notifications.filter { it.assetId == null || it.assetId in scopedAssetIdSet }
+    } else notifications
     val assetMap = assets.associateBy { it.id }
     when (route) {
                         null -> MoreGrid(
@@ -241,7 +248,7 @@ internal fun MoreRouteContent(
                         )
                         MoreRoute.Notifications -> NotificationsScreen(
                             innerPadding = innerPadding,
-                            notifications = notifications,
+                            notifications = scopedNotifications,
                             assets = assets,
                             assetMap = assetMap,
                             canManage = canManage,
@@ -257,8 +264,8 @@ internal fun MoreRouteContent(
                             serials = serialNumbers,
                             transactions = transactions,
                             warehouses = warehouses,
-                            canReceive = canManage,
-                            canManage = canManage,
+                            canReceive = canManage || perms.manageInventory,
+                            canManage = canManage || perms.manageInventory,
                             onOpenSerialNumbers = { onNavigate(MoreRoute.SerialNumbers) },
                             onIssue = viewModel::issuePart,
                             onReceive = viewModel::receivePart,
@@ -333,7 +340,7 @@ internal fun MoreRouteContent(
                         MoreRoute.Suppliers -> SuppliersScreen(
                             innerPadding = innerPadding,
                             suppliers = suppliers,
-                            canManage = canManage,
+                            canManage = canManage || perms.seeProcurement,
                             onSave = viewModel::saveSupplier,
                             onDelete = viewModel::deleteSupplier
                         )
@@ -343,7 +350,7 @@ internal fun MoreRouteContent(
                             lines = purchaseOrderLines,
                             suppliers = suppliers,
                             parts = spareParts,
-                            canManage = canManage,
+                            canManage = canManage || perms.seeProcurement,
                             onSaveOrder = viewModel::savePurchaseOrder,
                             onCancelOrder = viewModel::cancelPurchaseOrder,
                             onSetStatus = viewModel::setPurchaseOrderStatus,
@@ -379,6 +386,7 @@ internal fun MoreRouteContent(
                             innerPadding = innerPadding,
                             users = users,
                             currentUser = currentUser,
+                            assetGroups = assets.map { it.groupName }.filter { it.isNotBlank() }.distinct().sorted(),
                             onAddTechnician = viewModel::addTechnician,
                             onResetSampleData = viewModel::resetSampleData,
                             onExportBackup = onExportBackup,

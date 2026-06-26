@@ -258,6 +258,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     LaunchedEffect(visibleTabs, selectedTab) {
         if (selectedTab !in visibleTabs) selectedTab = BottomTab.Home
     }
+    // RBAC scoping: maintenance roles only see their assigned asset groups; technicians only their own work orders.
+    val scopedAssets = if (perms.scopedAssets) assets.filter { com.alhadi.cmms.data.isAssetVisible(currentUser, it) } else assets
+    val scopedAssetIds = scopedAssets.mapTo(mutableSetOf()) { it.id }
+    val scopedWorkOrders = when {
+        perms.onlyMyWorkOrders -> workOrders.filter { it.assignedTo == currentUser?.name }
+        perms.scopedAssets -> workOrders.filter { it.assetId in scopedAssetIds }
+        else -> workOrders
+    }
 
     val appContext = LocalContext.current
     val excelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -342,7 +350,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
 
                     BottomTab.WorkOrders -> WorkOrdersScreen(
                         innerPadding = innerPadding,
-                        workOrders = workOrders,
+                        workOrders = scopedWorkOrders,
                         assets = assets,
                         assetMap = assetMap,
                         operations = workOrderOperations,
@@ -356,7 +364,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         plannedMaterials = workOrderMaterials,
                         bomHeaders = assetBomHeaders,
                         bom = assetBom,
-                        canManage = canManage,
+                        canManage = canManage || perms.manageWorkOrders,
                         defaultAssignee = actorName,
                         onSavePlannedMaterial = viewModel::savePlannedMaterial,
                         onIssuePlannedMaterial = viewModel::issuePlannedMaterial,
@@ -404,8 +412,8 @@ fun CmmsApp(viewModel: CmmsViewModel) {
 
                     BottomTab.Assets -> AssetsScreen(
                         innerPadding = innerPadding,
-                        assets = assets,
-                        workOrders = workOrders,
+                        assets = scopedAssets,
+                        workOrders = scopedWorkOrders,
                         pmItems = preventiveMaintenance,
                         locations = locations,
                         documents = assetDocuments,

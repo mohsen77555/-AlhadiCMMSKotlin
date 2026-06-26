@@ -191,6 +191,7 @@ internal fun AdminScreen(
     innerPadding: PaddingValues,
     users: List<UserEntity>,
     currentUser: UserEntity?,
+    assetGroups: List<String> = emptyList(),
     onAddTechnician: () -> Unit,
     onResetSampleData: () -> Unit,
     onExportBackup: () -> Unit,
@@ -318,7 +319,7 @@ internal fun AdminScreen(
     }
 
     if (showForm) {
-        UserFormSheet(initial = editing, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
+        UserFormSheet(initial = editing, assetGroups = assetGroups, onDismiss = { showForm = false }, onSave = { onSave(it); showForm = false })
     }
     deleteTarget?.let { target ->
         ConfirmDialog(
