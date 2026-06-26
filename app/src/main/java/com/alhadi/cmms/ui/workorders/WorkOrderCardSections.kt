@@ -144,6 +144,7 @@ import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.WorkOrderMaterialEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
@@ -300,6 +301,54 @@ internal fun WorkOrderMaterialsSection(
                         Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("صرف قطعة للأمر")
+                    }
+                }
+}
+
+@Composable
+internal fun WorkOrderPlannedMaterialsSection(
+    planned: List<WorkOrderMaterialEntity>,
+    canManage: Boolean,
+    workOrderStatus: String,
+    onAddPlanned: () -> Unit,
+    onIssuePlanned: (WorkOrderMaterialEntity) -> Unit,
+    onDeletePlanned: (WorkOrderMaterialEntity) -> Unit
+) {
+                val plannedCost = planned.sumOf { it.plannedTotal }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(18.dp), tint = AccentBlue)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("المواد المخطّطة (${planned.size})", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (plannedCost > 0) Text(money(plannedCost), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = AccentBlue)
+                }
+                planned.forEach { material ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "${material.issuedQty}/${material.plannedQty}",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (material.isFullyIssued) AccentGreen else AccentOrange
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            LtrText(material.partNumber.ifBlank { material.description }, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            if (material.partNumber.isNotBlank()) Text(material.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (canManage && workOrderStatus != "Closed") {
+                            if (!material.isFullyIssued && material.partId != null) {
+                                TextButton(onClick = { onIssuePlanned(material) }) { Text("صرف", color = AccentPurple, style = MaterialTheme.typography.labelSmall) }
+                            }
+                            if (material.issuedQty == 0) {
+                                TextButton(onClick = { onDeletePlanned(material) }) { Text("حذف", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+                            }
+                        }
+                    }
+                }
+                if (canManage && workOrderStatus != "Closed") {
+                    OutlinedButton(onClick = onAddPlanned, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إضافة مادة مخطّطة")
                     }
                 }
 }

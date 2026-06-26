@@ -159,6 +159,7 @@ import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.UserEntity
 import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
+import com.alhadi.cmms.data.entity.WorkOrderMaterialEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
 import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
@@ -200,6 +201,10 @@ internal fun WorkOrderCard(
     catalog: List<SparePartEntity>,
     bomPartIds: Set<Long>,
     partMap: Map<Long, SparePartEntity>,
+    plannedMaterials: List<WorkOrderMaterialEntity> = emptyList(),
+    onSavePlannedMaterial: (WorkOrderMaterialEntity) -> Unit = {},
+    onIssuePlannedMaterial: (WorkOrderMaterialEntity, Int) -> Unit = { _, _ -> },
+    onDeletePlannedMaterial: (WorkOrderMaterialEntity) -> Unit = {},
     onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
     onExportPdf: (WorkOrderEntity) -> Unit,
     canManage: Boolean,
@@ -223,6 +228,8 @@ internal fun WorkOrderCard(
     val today = DateStrings.today()
     var showMaterialPicker by remember { mutableStateOf(false) }
     var materialTarget by remember { mutableStateOf<SparePartEntity?>(null) }
+    var showPlannedForm by remember { mutableStateOf(false) }
+    var issuePlannedTarget by remember { mutableStateOf<WorkOrderMaterialEntity?>(null) }
     val pending = workOrder.approvalStatus == "Pending"
     val rejected = workOrder.approvalStatus == "Rejected"
     val blocked = workOrder.isBlockedByApproval()
@@ -280,6 +287,15 @@ internal fun WorkOrderCard(
                 onDeleteOperation = onDeleteOperation,
                 onConfirm = { confirmTarget = it },
                 onAddOperation = { showAddOp = true }
+            )
+
+            WorkOrderPlannedMaterialsSection(
+                planned = plannedMaterials,
+                canManage = canManage,
+                workOrderStatus = workOrder.status,
+                onAddPlanned = { showPlannedForm = true },
+                onIssuePlanned = { issuePlannedTarget = it },
+                onDeletePlanned = onDeletePlannedMaterial
             )
 
             WorkOrderMaterialsSection(
@@ -414,6 +430,24 @@ internal fun WorkOrderCard(
             maxValue = part.onHandQty,
             onConfirm = { qty -> onIssueMaterial(workOrder, part, qty); materialTarget = null },
             onDismiss = { materialTarget = null }
+        )
+    }
+    if (showPlannedForm) {
+        PlannedMaterialFormSheet(
+            orderId = workOrder.id,
+            catalog = catalog,
+            onDismiss = { showPlannedForm = false },
+            onSave = { onSavePlannedMaterial(it); showPlannedForm = false }
+        )
+    }
+    issuePlannedTarget?.let { material ->
+        QuantityDialog(
+            title = "صرف ${material.description}",
+            label = "المتبقّي للصرف ${material.remainingQty}",
+            maxValue = material.remainingQty,
+            initial = material.remainingQty.coerceAtLeast(1).toString(),
+            onConfirm = { qty -> onIssuePlannedMaterial(material, qty); issuePlannedTarget = null },
+            onDismiss = { issuePlannedTarget = null }
         )
     }
 }

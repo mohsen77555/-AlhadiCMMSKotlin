@@ -144,6 +144,7 @@ import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.WorkOrderMaterialEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
@@ -222,6 +223,48 @@ internal fun MaterialPickerSheet(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun PlannedMaterialFormSheet(
+    orderId: Long,
+    catalog: List<SparePartEntity>,
+    onDismiss: () -> Unit,
+    onSave: (WorkOrderMaterialEntity) -> Unit
+) {
+    var partId by remember { mutableStateOf(catalog.firstOrNull()?.id) }
+    var plannedQty by remember { mutableStateOf("1") }
+    val selectedPart = catalog.firstOrNull { it.id == partId }
+
+    FormSheet("إضافة مادة مخطّطة", onDismiss) {
+        if (catalog.isEmpty()) {
+            Text("لا توجد قطع غيار في الكتالوج.", color = MaterialTheme.colorScheme.error)
+        } else {
+            OptionDropdown(
+                label = "القطعة",
+                options = catalog.map { it.id.toString() },
+                selected = partId?.toString() ?: "",
+                display = { idStr -> catalog.firstOrNull { it.id.toString() == idStr }?.let { "${it.partNumber} • ${it.name}" } ?: idStr }
+            ) { partId = it.toLongOrNull() }
+        }
+        LabeledField("الكمية المخطّطة", plannedQty, { plannedQty = it }, numeric = true)
+        selectedPart?.let { Text("المتوفر في المخزون: ${it.onHandQty} ${it.unit}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        SaveButton(selectedPart != null && (plannedQty.toIntOrNull() ?: 0) > 0) {
+            val part = selectedPart!!
+            onSave(
+                WorkOrderMaterialEntity(
+                    id = 0,
+                    orderId = orderId,
+                    partId = part.id,
+                    partNumber = part.partNumber,
+                    description = part.name,
+                    plannedQty = plannedQty.toIntOrNull() ?: 1,
+                    issuedQty = 0,
+                    unitPrice = part.lastPrice
+                )
+            )
         }
     }
 }

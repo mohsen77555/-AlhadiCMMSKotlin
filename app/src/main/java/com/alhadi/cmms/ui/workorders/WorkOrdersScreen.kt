@@ -144,6 +144,7 @@ import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.entity.WorkOrderMaterialEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
@@ -204,10 +205,14 @@ internal fun WorkOrdersScreen(
     currentUser: UserEntity?,
     parts: List<SparePartEntity>,
     transactions: List<InventoryTransactionEntity>,
+    plannedMaterials: List<WorkOrderMaterialEntity> = emptyList(),
     bomHeaders: List<AssetBomHeaderEntity>,
     bom: List<AssetBomItemEntity>,
     canManage: Boolean,
     defaultAssignee: String,
+    onSavePlannedMaterial: (WorkOrderMaterialEntity) -> Unit = {},
+    onIssuePlannedMaterial: (WorkOrderMaterialEntity, Int) -> Unit = { _, _ -> },
+    onDeletePlannedMaterial: (WorkOrderMaterialEntity) -> Unit = {},
     onIssueMaterial: (WorkOrderEntity, SparePartEntity, Int) -> Unit,
     onExportPdf: (WorkOrderEntity) -> Unit,
     onSave: (WorkOrderEntity) -> Unit,
@@ -344,6 +349,10 @@ internal fun WorkOrdersScreen(
                             .mapTo(mutableSetOf()) { it.partId }
                     } ?: emptySet(),
                     partMap = partMap,
+                    plannedMaterials = plannedMaterials.filter { it.orderId == workOrder.id },
+                    onSavePlannedMaterial = onSavePlannedMaterial,
+                    onIssuePlannedMaterial = onIssuePlannedMaterial,
+                    onDeletePlannedMaterial = onDeletePlannedMaterial,
                     onIssueMaterial = onIssueMaterial,
                     onExportPdf = onExportPdf,
                     canManage = canManage,

@@ -233,6 +233,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
     val workOrderConfirmations by viewModel.workOrderConfirmations.collectAsStateWithLifecycle()
     val workOrderPhotos by viewModel.workOrderPhotos.collectAsStateWithLifecycle()
     val workOrderHistory by viewModel.workOrderHistory.collectAsStateWithLifecycle()
+    val workOrderMaterials by viewModel.workOrderMaterials.collectAsStateWithLifecycle()
     val workPermits by viewModel.workPermits.collectAsStateWithLifecycle()
     val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
@@ -340,10 +341,14 @@ fun CmmsApp(viewModel: CmmsViewModel) {
                         currentUser = currentUser,
                         parts = spareParts,
                         transactions = transactions,
+                        plannedMaterials = workOrderMaterials,
                         bomHeaders = assetBomHeaders,
                         bom = assetBom,
                         canManage = canManage,
                         defaultAssignee = actorName,
+                        onSavePlannedMaterial = viewModel::savePlannedMaterial,
+                        onIssuePlannedMaterial = viewModel::issuePlannedMaterial,
+                        onDeletePlannedMaterial = viewModel::deletePlannedMaterial,
                         onIssueMaterial = viewModel::issuePartToWorkOrder,
                         onExportPdf = { order ->
                             pendingPdfOrder = order
