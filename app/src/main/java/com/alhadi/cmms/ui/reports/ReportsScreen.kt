@@ -144,6 +144,7 @@ import com.alhadi.cmms.data.entity.AuditLogEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
+import com.alhadi.cmms.data.computeMaintenanceKpis
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
@@ -196,8 +197,10 @@ internal fun ReportsScreen(
     assets: List<AssetEntity>,
     workOrders: List<WorkOrderEntity>,
     parts: List<SparePartEntity>,
-    pmItems: List<PreventiveMaintenanceEntity>
+    pmItems: List<PreventiveMaintenanceEntity>,
+    notifications: List<MaintenanceNotificationEntity> = emptyList()
 ) {
+    val kpis = computeMaintenanceKpis(assets, workOrders, pmItems, notifications)
     val today = DateStrings.today()
     val soon = DateStrings.daysFromToday(30)
     val openCost = workOrders.filter { it.status != "Closed" }.sumOf { it.estimatedCost }
@@ -285,6 +288,28 @@ internal fun ReportsScreen(
                 "عدد الأعطال: ${failures.size}",
                 "إجمالي زمن التوقف: ${"%.1f".format(totalDowntime)} ساعة",
                 "متوسط زمن الإصلاح MTTR: ${"%.1f".format(mttr)} ساعة"
+            ))
+        }
+        item {
+            ReportCard("مؤشرات الموثوقية", listOf(
+                "متوسط الزمن بين الأعطال MTBF: ${"%.1f".format(kpis.mtbfHours)} ساعة",
+                "متوسط زمن الإصلاح MTTR: ${"%.1f".format(kpis.mttrHours)} ساعة",
+                "التوفّر: ${"%.1f".format(kpis.availability)}%",
+                "بلاغات الأعطال: ${kpis.breakdownCount}"
+            ))
+        }
+        item {
+            ReportCard("امتثال الصيانة الوقائية", listOf(
+                "نسبة الامتثال: ${"%.0f".format(kpis.pmCompliance)}%",
+                "خطط مستحقة: ${kpis.duePmCount} من ${kpis.totalPmCount}",
+                "ملتزمة في الموعد: ${kpis.totalPmCount - kpis.duePmCount}"
+            ))
+        }
+        item {
+            ReportCard("التزام البلاغات (SLA)", listOf(
+                "نسبة الاستجابة: ${"%.0f".format(kpis.notificationResponseRate)}%",
+                "بانتظار الاستجابة: ${kpis.pendingResponseCount}",
+                "بلاغات أعطال/توقف: ${kpis.breakdownCount}"
             ))
         }
         item {

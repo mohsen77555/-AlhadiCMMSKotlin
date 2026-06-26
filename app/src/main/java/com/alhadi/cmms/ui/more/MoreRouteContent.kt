@@ -293,7 +293,8 @@ internal fun MoreRouteContent(
                             assets = assets,
                             workOrders = workOrders,
                             parts = spareParts,
-                            pmItems = preventiveMaintenance
+                            pmItems = preventiveMaintenance,
+                            notifications = notifications
                         )
                         MoreRoute.Audit -> if (WorkOrderAuthority.canViewAudit(currentUser)) {
                             AuditScreen(innerPadding = innerPadding, auditLog = auditLog)
