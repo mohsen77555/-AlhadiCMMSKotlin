@@ -221,7 +221,7 @@ internal fun MetersScreen(
             }
             if (points.isNotEmpty()) {
                 item {
-                    val over = points.count { it.upperLimit != null && it.lastReading > it.upperLimit }
+                    val over = points.count { it.readingStatus(it.lastReading) == "Alarm" }
                     val seg = listOf(
                         ChartSegment("ضمن الحد", points.size - over, AccentGreen),
                         ChartSegment("متجاوزة الحد", over, AccentRed)
@@ -270,6 +270,9 @@ internal fun MetersScreen(
                             Text("${point?.name ?: "Point #${reading.pointId}"}: ${reading.value} ${point?.unit ?: ""}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                             Text("${reading.createdAt} • ${reading.createdBy}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        if (reading.status != "Normal") {
+                            StatusBadge(meterStatusLabel(reading.status), statusTone(meterStatusTone(reading.status)))
+                        }
                     }
                 }
             }
@@ -301,7 +304,8 @@ internal fun MeterCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val overLimit = point.upperLimit != null && point.lastReading > point.upperLimit
+    val pointStatus = point.readingStatus(point.lastReading)
+    val overLimit = pointStatus == "Alarm"
     // recentReadings come newest-first; the previous reading is index 1.
     val previous = recentReadings.getOrNull(1)?.value
     val delta = previous?.let { point.lastReading - it }
@@ -329,11 +333,18 @@ internal fun MeterCard(
                         }
                     }
                 }
-                StatusBadge(if (point.isCounter) "عداد" else "قراءة", statusTone("info"))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (pointStatus != "Normal") StatusBadge(meterStatusLabel(pointStatus), statusTone(meterStatusTone(pointStatus)))
+                    StatusBadge(if (point.isCounter) "عداد" else "قراءة", statusTone("info"))
+                }
             }
             if (point.upperLimit != null) {
                 InfoRow("الحد الأعلى", "${point.upperLimit} ${point.unit}")
             }
+            if (point.lowerLimit != null) {
+                InfoRow("الحد الأدنى", "${point.lowerLimit} ${point.unit}")
+            }
+            if (point.autoNotifyOnAlarm) InfoRow("البلاغ التلقائي", "مفعّل عند الإنذار")
             InfoRow("آخر تحديث", point.lastReadingAt)
             if (recentReadings.size >= 2) {
                 Text("اتجاه آخر القراءات", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -355,3 +366,16 @@ internal fun MeterCard(
     }
 }
 
+
+internal fun meterStatusLabel(status: String): String = when (status) {
+    "Alarm" -> "إنذار"
+    "Warning" -> "تحذير"
+    "Normal" -> "طبيعي"
+    else -> status
+}
+
+internal fun meterStatusTone(status: String): String = when (status) {
+    "Alarm" -> "stopped"
+    "Warning" -> "warning"
+    else -> "running"
+}

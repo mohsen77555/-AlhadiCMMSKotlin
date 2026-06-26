@@ -107,6 +107,9 @@ internal fun MeterFormSheet(
     var assetId by remember { mutableStateOf(initial?.assetId ?: assets.firstOrNull()?.id ?: 0L) }
     var isCounter by remember { mutableStateOf(initial?.isCounter ?: false) }
     var limit by remember { mutableStateOf(initial?.upperLimit?.toString() ?: "") }
+    var lowerLimit by remember { mutableStateOf(initial?.lowerLimit?.toString() ?: "") }
+    var warningMargin by remember { mutableStateOf((initial?.warningMargin ?: 0.0).toString()) }
+    var autoNotifyOnAlarm by remember { mutableStateOf(initial?.autoNotifyOnAlarm ?: false) }
 
     FormSheet(if (initial == null) "إضافة نقطة قياس" else "تعديل نقطة القياس", onDismiss) {
         LabeledField("اسم النقطة", name, { name = it })
@@ -117,6 +120,12 @@ internal fun MeterFormSheet(
             Switch(checked = isCounter, onCheckedChange = { isCounter = it })
         }
         LabeledField("الحد الأعلى للتنبيه (اختياري)", limit, { limit = it }, numeric = true)
+        LabeledField("الحد الأدنى للتنبيه (اختياري)", lowerLimit, { lowerLimit = it }, numeric = true)
+        LabeledField("هامش التحذير قبل الحد (0 = معطّل)", warningMargin, { warningMargin = it }, numeric = true)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("إنشاء بلاغ تلقائي عند الإنذار", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = autoNotifyOnAlarm, onCheckedChange = { autoNotifyOnAlarm = it })
+        }
         SaveButton(name.isNotBlank() && unit.isNotBlank() && assetId != 0L) {
             val today = DateStrings.today()
             onSave(
@@ -128,7 +137,10 @@ internal fun MeterFormSheet(
                     isCounter = isCounter,
                     upperLimit = limit.toDoubleOrNull(),
                     lastReading = initial?.lastReading ?: 0.0,
-                    lastReadingAt = initial?.lastReadingAt ?: today
+                    lastReadingAt = initial?.lastReadingAt ?: today,
+                    lowerLimit = lowerLimit.toDoubleOrNull(),
+                    warningMargin = warningMargin.toDoubleOrNull() ?: 0.0,
+                    autoNotifyOnAlarm = autoNotifyOnAlarm
                 )
             )
         }
