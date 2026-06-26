@@ -247,6 +247,17 @@ fun CmmsApp(viewModel: CmmsViewModel) {
 
     val isAdmin = currentUser?.isAdmin == true
     val canManage = currentUser?.canManage == true
+    val perms = com.alhadi.cmms.data.permissionsFor(currentUser)
+    val visibleTabs = buildList {
+        add(BottomTab.Home)
+        if (perms.seeWorkOrders) add(BottomTab.WorkOrders)
+        if (perms.seePreventive) add(BottomTab.Supervision)
+        if (perms.seeAssets) add(BottomTab.Assets)
+        add(BottomTab.More)
+    }
+    LaunchedEffect(visibleTabs, selectedTab) {
+        if (selectedTab !in visibleTabs) selectedTab = BottomTab.Home
+    }
 
     val appContext = LocalContext.current
     val excelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -299,7 +310,7 @@ fun CmmsApp(viewModel: CmmsViewModel) {
             bottomBar = {
                 AppBottomBar(
                     selected = selectedTab,
-                    isAdmin = isAdmin,
+                    tabs = visibleTabs,
                     onSelect = {
                         selectedTab = it
                         if (it != BottomTab.More) moreRoute = null

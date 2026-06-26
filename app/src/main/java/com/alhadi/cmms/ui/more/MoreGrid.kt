@@ -191,16 +191,43 @@ import kotlinx.coroutines.launch
 // "More" grid
 // ---------------------------------------------------------------------------
 
+private data class MoreTile(
+    val route: MoreRoute,
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val accent: Color
+)
+
 @Composable
 internal fun MoreGrid(
     innerPadding: PaddingValues,
-    isAdmin: Boolean,
-    canManage: Boolean,
+    perms: com.alhadi.cmms.data.Permissions,
     onOpen: (MoreRoute) -> Unit,
     onImportBundled: () -> Unit,
     onPickExcel: () -> Unit,
     onLogout: () -> Unit
 ) {
+    // Build the visible module tiles from the user's permissions.
+    val tiles = buildList {
+        if (perms.seeNotifications || perms.createNotifications) add(MoreTile(MoreRoute.Notifications, "البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed))
+        if (perms.seeInventory) add(MoreTile(MoreRoute.Inventory, "المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple))
+        if (perms.seeReports) add(MoreTile(MoreRoute.Reports, "التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue))
+        if (perms.seePreventive) add(MoreTile(MoreRoute.PreventiveMaintenance, "الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal))
+        if (perms.seePreventive || perms.seeMasterData) add(MoreTile(MoreRoute.TaskLists, "قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue))
+        if (perms.seeMeters) add(MoreTile(MoreRoute.Meters, "العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple))
+        if (perms.seeInventory) add(MoreTile(MoreRoute.SerialNumbers, "الأرقام التسلسلية", "تتبّع الوحدات والحركات", Icons.Filled.QrCodeScanner, AccentTeal))
+        if (perms.seeMasterData) add(MoreTile(MoreRoute.Locations, "المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen))
+        if (perms.seeReports) add(MoreTile(MoreRoute.Capa, "الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange))
+        if (perms.seeWarehouses) add(MoreTile(MoreRoute.Warehouses, "المستودعات", "المخازن وأمناء العهدة", Icons.Filled.Warehouse, AccentPurple))
+        if (perms.seeMasterData) add(MoreTile(MoreRoute.OrgUnits, "الوحدات التنظيمية", "مراكز العمل والتكلفة", Icons.Filled.CorporateFare, AccentNavy))
+        if (perms.seeProcurement) add(MoreTile(MoreRoute.Suppliers, "الموردون", "المشتريات والموردون", Icons.Filled.LocalShipping, AccentBrown))
+        if (perms.seeProcurement) add(MoreTile(MoreRoute.PurchaseOrders, "أوامر الشراء", "إنشاء ومتابعة المشتريات", Icons.Filled.ShoppingCart, AccentBrown))
+        if (perms.seeReports) add(MoreTile(MoreRoute.Failures, "تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed))
+        if (perms.seeAdmin) add(MoreTile(MoreRoute.Audit, "سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy))
+        if (perms.seeAdmin) add(MoreTile(MoreRoute.Admin, "الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange))
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -208,7 +235,7 @@ internal fun MoreGrid(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (canManage) {
+        if (perms.manageAssets) {
             item {
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -227,67 +254,18 @@ internal fun MoreGrid(
                 }
             }
         }
-        item {
+        items(tiles.chunked(2)) { rowTiles ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("البلاغات", "بلاغات الصيانة", Icons.Filled.NotificationsActive, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Notifications) }
-                ModuleCard("المخزون", "قطع الغيار والحركات", Icons.Filled.Inventory2, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Inventory) }
+                rowTiles.forEach { tile ->
+                    ModuleCard(tile.title, tile.subtitle, tile.icon, tile.accent, Modifier.weight(1f)) { onOpen(tile.route) }
+                }
+                if (rowTiles.size == 1) Spacer(modifier = Modifier.weight(1f))
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("التقارير", "مؤشرات وتحليلات", Icons.Filled.Analytics, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.Reports) }
-                ModuleCard("الصيانة الدورية", "جدول المهام الوقائية", Icons.Filled.EventRepeat, AccentTeal, Modifier.weight(1f)) { onOpen(MoreRoute.PreventiveMaintenance) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("قوالب العمل", "قوالب العمليات", Icons.AutoMirrored.Filled.List, AccentBlue, Modifier.weight(1f)) { onOpen(MoreRoute.TaskLists) }
-                ModuleCard("العدّادات", "القراءات والقياسات", Icons.Filled.Speed, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Meters) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("الأرقام التسلسلية", "تتبّع الوحدات والحركات", Icons.Filled.QrCodeScanner, AccentTeal, Modifier.weight(1f)) { onOpen(MoreRoute.SerialNumbers) }
-                ModuleCard("المواقع الفنية", "هرمية المواقع", Icons.Filled.AccountTree, AccentGreen, Modifier.weight(1f)) { onOpen(MoreRoute.Locations) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("الإجراءات CAPA", "تصحيحية ووقائية", Icons.Filled.FactCheck, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Capa) }
-                ModuleCard("المستودعات", "المخازن وأمناء العهدة", Icons.Filled.Warehouse, AccentPurple, Modifier.weight(1f)) { onOpen(MoreRoute.Warehouses) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("الوحدات التنظيمية", "مراكز العمل والتكلفة", Icons.Filled.CorporateFare, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.OrgUnits) }
-                ModuleCard("الموردون", "المشتريات والموردون", Icons.Filled.LocalShipping, AccentBrown, Modifier.weight(1f)) { onOpen(MoreRoute.Suppliers) }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("أوامر الشراء", "إنشاء ومتابعة المشتريات", Icons.Filled.ShoppingCart, AccentBrown, Modifier.weight(1f)) { onOpen(MoreRoute.PurchaseOrders) }
+                ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
                 Spacer(modifier = Modifier.weight(1f))
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                ModuleCard("تحليل الأعطال", "MTTR / MTBF", Icons.Filled.TrendingUp, AccentRed, Modifier.weight(1f)) { onOpen(MoreRoute.Failures) }
-                ModuleCard("سجل الحوكمة", "من فعل ماذا ومتى", Icons.Filled.History, AccentNavy, Modifier.weight(1f)) { onOpen(MoreRoute.Audit) }
-            }
-        }
-        if (isAdmin) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    ModuleCard("الإدارة", "المستخدمون والصلاحيات", Icons.Filled.AdminPanelSettings, AccentOrange, Modifier.weight(1f)) { onOpen(MoreRoute.Admin) }
-                    ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
-                }
-            }
-        } else {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    ModuleCard("تسجيل الخروج", "إنهاء الجلسة الحالية", Icons.AutoMirrored.Filled.Logout, AccentNavy, Modifier.weight(1f)) { onLogout() }
-                    Spacer(modifier = Modifier.weight(1f))
-                }
             }
         }
     }

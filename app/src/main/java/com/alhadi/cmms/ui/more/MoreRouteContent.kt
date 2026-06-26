@@ -228,12 +228,12 @@ internal fun MoreRouteContent(
     val taskLists by viewModel.taskLists.collectAsStateWithLifecycle()
     val taskListOperations by viewModel.taskListOperations.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
+    val perms = com.alhadi.cmms.data.permissionsFor(currentUser)
     val assetMap = assets.associateBy { it.id }
     when (route) {
                         null -> MoreGrid(
                             innerPadding = innerPadding,
-                            isAdmin = isAdmin,
-                            canManage = canManage,
+                            perms = perms,
                             onOpen = { onNavigate(it) },
                             onImportBundled = onImportBundled,
                             onPickExcel = onPickExcel,

@@ -302,7 +302,7 @@ internal fun AppHeader(
 // ---------------------------------------------------------------------------
 
 @Composable
-internal fun AppBottomBar(selected: BottomTab, isAdmin: Boolean, onSelect: (BottomTab) -> Unit) {
+internal fun AppBottomBar(selected: BottomTab, tabs: List<BottomTab>, onSelect: (BottomTab) -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
         Row(
             modifier = Modifier
@@ -311,7 +311,7 @@ internal fun AppBottomBar(selected: BottomTab, isAdmin: Boolean, onSelect: (Bott
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BottomTab.entries.forEach { tab ->
+            tabs.forEach { tab ->
                 val isSel = tab == selected
                 Column(
                     modifier = Modifier
