@@ -243,7 +243,18 @@ internal suspend fun CmmsRepository.saveNotification(notification: MaintenanceNo
     }
 
 internal suspend fun CmmsRepository.setNotificationStatus(notification: MaintenanceNotificationEntity, status: String, actor: String = "System") {
-        notificationDao.insert(notification.copy(status = status))
+        val now = DateStrings.now()
+        // NTF-SLA-002: stamp the first response, and the closure when the notification is closed.
+        val acknowledged = notification.acknowledgedAt.isBlank() &&
+            status in setOf("Screened", "Approved", "Rejected", "OrderCreated", "InProgress")
+        val stamped = notification.copy(
+            status = status,
+            acknowledgedAt = if (acknowledged) now else notification.acknowledgedAt,
+            acknowledgedBy = if (acknowledged) actor else notification.acknowledgedBy,
+            closedAt = if (status == "Closed") now else notification.closedAt,
+            closedBy = if (status == "Closed") actor else notification.closedBy
+        )
+        notificationDao.insert(stamped)
         recordAudit("Status", "Notification", "تغيير حالة البلاغ ${notification.number} إلى $status", actor)
     }
 

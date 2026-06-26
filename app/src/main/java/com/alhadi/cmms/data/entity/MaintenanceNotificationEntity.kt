@@ -41,9 +41,46 @@ data class MaintenanceNotificationEntity(
     @ColumnInfo(defaultValue = "''")
     val linearMarker: String = "",
     val linearHorizontalOffset: Double? = null,
-    val linearVerticalOffset: Double? = null
+    val linearVerticalOffset: Double? = null,
+    // --- Breakdown & response governance (chapter 07) ---
+    /** Flags a breakdown/downtime event (NTF-BRK-001). */
+    @ColumnInfo(defaultValue = "0")
+    val breakdown: Boolean = false,
+    /** Effect/consequence code, completing the damage → cause → effect catalog (NTF-CAT-003). */
+    @ColumnInfo(defaultValue = "''")
+    val effectCode: String = "",
+    /** When the malfunction began. */
+    @ColumnInfo(defaultValue = "''")
+    val malfunctionStart: String = "",
+    /** When the asset was restored to service. */
+    @ColumnInfo(defaultValue = "''")
+    val malfunctionEnd: String = "",
+    /** First-response stamp (NTF-SLA-002). */
+    @ColumnInfo(defaultValue = "''")
+    val acknowledgedAt: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val acknowledgedBy: String = "",
+    /** Closure stamp. */
+    @ColumnInfo(defaultValue = "''")
+    val closedAt: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val closedBy: String = ""
 ) {
     fun hasLinearReference(): Boolean =
         linearStartPoint != null || linearEndPoint != null || linearMarker.isNotBlank() ||
             linearHorizontalOffset != null || linearVerticalOffset != null
+
+    /** Still open (not closed or rejected). */
+    fun isOpen(): Boolean = !status.equals("Closed", true) && !status.equals("Rejected", true)
+
+    /** NTF-SLA-001: target first-response window (hours) derived from priority. */
+    fun slaResponseHours(): Int = when (priority.lowercase()) {
+        "critical" -> 2
+        "high" -> 8
+        "medium" -> 24
+        else -> 48
+    }
+
+    /** Awaiting first response: still open and never acknowledged. */
+    fun isResponsePending(): Boolean = isOpen() && acknowledgedAt.isBlank()
 }
