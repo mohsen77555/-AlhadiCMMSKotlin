@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material.icons.filled.CorporateFare
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Assignment
@@ -197,7 +198,8 @@ internal fun AdminScreen(
     onRunReminders: () -> Unit,
     onSave: (UserEntity) -> Unit,
     onSetActive: (UserEntity, Boolean) -> Unit,
-    onDelete: (UserEntity) -> Unit
+    onDelete: (UserEntity) -> Unit,
+    onResetLock: (UserEntity) -> Unit = {}
 ) {
     if (currentUser?.isAdmin != true) {
         Box(
@@ -308,7 +310,8 @@ internal fun AdminScreen(
                     isSelf = user.id == currentUser.id,
                     onEdit = { editing = user; showForm = true },
                     onToggleActive = { onSetActive(user, !user.isActive) },
-                    onDelete = { deleteTarget = user }
+                    onDelete = { deleteTarget = user },
+                    onResetLock = { onResetLock(user) }
                 )
             }
         }
@@ -341,7 +344,8 @@ internal fun UserCard(
     isSelf: Boolean,
     onEdit: () -> Unit,
     onToggleActive: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onResetLock: () -> Unit = {}
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -354,7 +358,27 @@ internal fun UserCard(
                     Text(user.name, fontWeight = FontWeight.Bold)
                     LtrText("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                StatusBadge(if (user.isActive) roleLabel(user.role) else "معطّل", statusTone(if (!user.isActive) "neutral" else if (user.isAdmin) "info" else "running"))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (user.locked) StatusBadge("مقفل", statusTone("stopped"))
+                    StatusBadge(if (user.isActive) roleLabel(user.role) else "معطّل", statusTone(if (!user.isActive) "neutral" else if (user.isAdmin) "info" else "running"))
+                }
+            }
+            if (user.department.isNotBlank() || user.email.isNotBlank() || user.employeeId.isNotBlank()) {
+                Text(
+                    listOfNotNull(
+                        user.department.ifBlank { null },
+                        user.employeeId.ifBlank { null }?.let { "رقم وظيفي: $it" },
+                        user.email.ifBlank { null }
+                    ).joinToString(" • "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (user.lastLoginAt.isNotBlank()) {
+                Text("آخر دخول: ${user.lastLoginAt}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (user.locked) {
+                Text("الحساب مقفل بعد محاولات دخول فاشلة (${user.failedLoginCount}).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
@@ -369,6 +393,13 @@ internal fun UserCard(
                     TextButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
                         Text("حذف", color = MaterialTheme.colorScheme.error)
                     }
+                }
+            }
+            if (user.locked) {
+                Button(onClick = onResetLock, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.LockOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("إلغاء قفل الحساب")
                 }
             }
         }

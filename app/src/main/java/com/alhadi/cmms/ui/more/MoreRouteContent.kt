@@ -386,7 +386,8 @@ internal fun MoreRouteContent(
                             onRunReminders = onRunReminders,
                             onSave = viewModel::saveUser,
                             onSetActive = viewModel::setUserActive,
-                            onDelete = viewModel::deleteUser
+                            onDelete = viewModel::deleteUser,
+                            onResetLock = viewModel::resetUserLock
                         )
                         MoreRoute.PreventiveMaintenance -> PreventiveMaintenanceScreen(
                             innerPadding = innerPadding,

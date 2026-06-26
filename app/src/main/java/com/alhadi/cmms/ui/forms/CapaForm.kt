@@ -150,11 +150,20 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var active by remember { mutableStateOf(initial?.isActive ?: true) }
+    var email by remember { mutableStateOf(initial?.email ?: "") }
+    var phone by remember { mutableStateOf(initial?.phone ?: "") }
+    var department by remember { mutableStateOf(initial?.department ?: "") }
+    var employeeId by remember { mutableStateOf(initial?.employeeId ?: "") }
+    var mustChangePassword by remember { mutableStateOf(initial?.mustChangePassword ?: false) }
 
     FormSheet(if (initial == null) "إضافة مستخدم" else "تعديل المستخدم", onDismiss) {
         LabeledField("الاسم", name, { name = it })
         LabeledField("اسم المستخدم", username, { username = it })
         OptionDropdown("الدور", listOf("Admin", "Supervisor", "Technician"), role) { role = it }
+        LabeledField("البريد الإلكتروني", email, { email = it })
+        LabeledField("الهاتف", phone, { phone = it })
+        LabeledField("القسم", department, { department = it })
+        LabeledField("الرقم الوظيفي", employeeId, { employeeId = it })
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -172,6 +181,10 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
             Text("مفعّل", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = active, onCheckedChange = { active = it })
         }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("إجبار تغيير كلمة المرور", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = mustChangePassword, onCheckedChange = { mustChangePassword = it })
+        }
         SaveButton(name.isNotBlank() && username.isNotBlank()) {
             onSave(
                 UserEntity(
@@ -181,7 +194,18 @@ internal fun UserFormSheet(initial: UserEntity?, onDismiss: () -> Unit, onSave: 
                     role = role,
                     isActive = active,
                     // Blank is resolved by the repository (kept on edit, defaulted on create).
-                    password = password
+                    password = password,
+                    email = email.trim(),
+                    phone = phone.trim(),
+                    department = department.trim(),
+                    employeeId = employeeId.trim(),
+                    mustChangePassword = mustChangePassword,
+                    // Preserve governance/login state so editing never wipes it.
+                    lastLoginAt = initial?.lastLoginAt ?: "",
+                    createdAt = initial?.createdAt ?: "",
+                    passwordChangedAt = initial?.passwordChangedAt ?: "",
+                    failedLoginCount = initial?.failedLoginCount ?: 0,
+                    locked = initial?.locked ?: false
                 )
             )
         }
