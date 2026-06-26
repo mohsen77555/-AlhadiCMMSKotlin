@@ -10,11 +10,19 @@ import com.google.firebase.firestore.FirebaseFirestore
  */
 object EntityCloudSync {
 
-    /** Firestore collection names, kept in one place. */
+    /** Firestore collection names (match the Room table names), kept in one place. */
     object Collections {
         const val ASSETS = "assets"
         const val WORK_ORDERS = "work_orders"
         const val NOTIFICATIONS = "notifications"
+        const val SPARE_PARTS = "spare_parts"
+        const val SUPPLIERS = "suppliers"
+        const val PURCHASE_ORDERS = "purchase_orders"
+        const val PURCHASE_ORDER_LINES = "purchase_order_lines"
+        const val WAREHOUSES = "warehouses"
+        const val FUNCTIONAL_LOCATIONS = "functional_locations"
+        const val ORG_UNITS = "org_units"
+        const val PREVENTIVE_MAINTENANCE = "preventive_maintenance"
     }
 
     fun <T> upsert(collection: String, docId: String, serializer: KSerializer<T>, value: T) {

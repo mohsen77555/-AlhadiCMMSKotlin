@@ -158,6 +158,7 @@ internal suspend fun CmmsRepository.markPreventiveMaintenanceDone(item: Preventi
             updated = updated.copy(lastCounterReading = reading, nextCounterReading = reading + item.counterInterval)
         }
         pmDao.insert(updated)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.PREVENTIVE_MAINTENANCE, updated.id.toString(), PreventiveMaintenanceEntity.serializer(), updated)
         checklistDao.resetResults(item.id)
         recordAudit("Complete", "PreventiveMaintenance", "تنفيذ صيانة دورية: ${item.title}", actor)
     }

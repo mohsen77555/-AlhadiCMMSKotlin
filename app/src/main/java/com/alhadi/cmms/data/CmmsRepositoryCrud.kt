@@ -165,13 +165,15 @@ internal suspend fun CmmsRepository.changeAssetStatus(asset: AssetEntity, status
 internal suspend fun CmmsRepository.savePart(part: SparePartEntity, actor: String = "System") {
         serialService.validatePartChange(part)
         val isNew = part.id == 0L
-        sparePartDao.insert(part)
+        val savedId = sparePartDao.insert(part)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, (if (isNew) savedId else part.id).toString(), SparePartEntity.serializer(), part.copy(id = if (isNew) savedId else part.id))
         recordAudit(if (isNew) "Create" else "Update", "Inventory", "${if (isNew) "إضافة" else "تعديل"} قطعة: ${part.partNumber}", actor)
     }
 
 internal suspend fun CmmsRepository.deletePart(part: SparePartEntity, actor: String = "System") {
         serialService.ensurePartDeletable(part.id)
         sparePartDao.deleteById(part.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.SPARE_PARTS, part.id.toString())
         recordAudit("Delete", "Inventory", "حذف قطعة: ${part.partNumber}", actor)
     }
 
@@ -293,12 +295,14 @@ internal fun WorkOrderEntity.inheritOrgFrom(asset: AssetEntity?): WorkOrderEntit
 
 internal suspend fun CmmsRepository.savePreventiveMaintenance(item: PreventiveMaintenanceEntity, actor: String = "System") {
         val isNew = item.id == 0L
-        pmDao.insert(item)
+        val savedId = pmDao.insert(item)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.PREVENTIVE_MAINTENANCE, (if (isNew) savedId else item.id).toString(), PreventiveMaintenanceEntity.serializer(), item.copy(id = if (isNew) savedId else item.id))
         recordAudit(if (isNew) "Create" else "Update", "PreventiveMaintenance", "${if (isNew) "إضافة" else "تعديل"} صيانة دورية: ${item.title}", actor)
     }
 
 internal suspend fun CmmsRepository.deletePreventiveMaintenance(item: PreventiveMaintenanceEntity, actor: String = "System") {
         pmDao.deleteById(item.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.PREVENTIVE_MAINTENANCE, item.id.toString())
         recordAudit("Delete", "PreventiveMaintenance", "حذف صيانة دورية: ${item.title}", actor)
     }
 
@@ -429,12 +433,14 @@ internal suspend fun CmmsRepository.addReading(point: MeasuringPointEntity, valu
 
 internal suspend fun CmmsRepository.saveFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
         val isNew = location.id == 0L
-        locationDao.insert(location)
+        val savedId = locationDao.insert(location)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.FUNCTIONAL_LOCATIONS, (if (isNew) savedId else location.id).toString(), FunctionalLocationEntity.serializer(), location.copy(id = if (isNew) savedId else location.id))
         recordAudit(if (isNew) "Create" else "Update", "Location", "${if (isNew) "إضافة" else "تعديل"} موقع فني: ${location.code}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteFunctionalLocation(location: FunctionalLocationEntity, actor: String = "System") {
         locationDao.deleteById(location.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.FUNCTIONAL_LOCATIONS, location.id.toString())
         recordAudit("Delete", "Location", "حذف موقع فني: ${location.code}", actor)
     }
 
@@ -444,23 +450,27 @@ internal suspend fun CmmsRepository.deleteFunctionalLocation(location: Functiona
 
 internal suspend fun CmmsRepository.saveWarehouse(warehouse: WarehouseEntity, actor: String = "System") {
         val isNew = warehouse.id == 0L
-        warehouseDao.insert(warehouse)
+        val savedId = warehouseDao.insert(warehouse)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WAREHOUSES, (if (isNew) savedId else warehouse.id).toString(), WarehouseEntity.serializer(), warehouse.copy(id = if (isNew) savedId else warehouse.id))
         recordAudit(if (isNew) "Create" else "Update", "Warehouse", "${if (isNew) "إضافة" else "تعديل"} مستودع: ${warehouse.code}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteWarehouse(warehouse: WarehouseEntity, actor: String = "System") {
         warehouseDao.deleteById(warehouse.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.WAREHOUSES, warehouse.id.toString())
         recordAudit("Delete", "Warehouse", "حذف مستودع: ${warehouse.code}", actor)
     }
 
 internal suspend fun CmmsRepository.saveSupplier(supplier: SupplierEntity, actor: String = "System") {
     val isNew = supplier.id == 0L
-    supplierDao.insert(supplier)
+    val savedId = supplierDao.insert(supplier)
+    EntityCloudSync.upsert(EntityCloudSync.Collections.SUPPLIERS, (if (isNew) savedId else supplier.id).toString(), SupplierEntity.serializer(), supplier.copy(id = if (isNew) savedId else supplier.id))
     recordAudit(if (isNew) "Create" else "Update", "Supplier", "${if (isNew) "إضافة" else "تعديل"} مورّد: ${supplier.code}", actor)
 }
 
 internal suspend fun CmmsRepository.deleteSupplier(supplier: SupplierEntity, actor: String = "System") {
     supplierDao.deleteById(supplier.id)
+    EntityCloudSync.remove(EntityCloudSync.Collections.SUPPLIERS, supplier.id.toString())
     recordAudit("Delete", "Supplier", "حذف مورّد: ${supplier.code}", actor)
 }
 
@@ -479,14 +489,21 @@ internal suspend fun CmmsRepository.savePurchaseOrder(order: PurchaseOrderEntity
         createdBy = if (isNew) actor else order.createdBy
     )
     val id = purchaseOrderDao.insert(toSave)
+    val effectiveId = if (isNew) id else order.id
     if (!isNew) recalcPoTotal(order.id)
+    purchaseOrderDao.getById(effectiveId)?.let { pushPurchaseOrder(it) }
     recordAudit(if (isNew) "Create" else "Update", "PurchaseOrder", "${if (isNew) "إنشاء" else "تعديل"} أمر شراء: ${order.poNumber}", actor)
 }
+
+private fun pushPurchaseOrder(po: PurchaseOrderEntity) =
+    EntityCloudSync.upsert(EntityCloudSync.Collections.PURCHASE_ORDERS, po.id.toString(), PurchaseOrderEntity.serializer(), po)
 
 /** Procurement governance: orders are cancelled, never hard-deleted. */
 internal suspend fun CmmsRepository.cancelPurchaseOrder(order: PurchaseOrderEntity, reason: String, actor: String = "System") {
     val current = purchaseOrderDao.getById(order.id) ?: order
-    purchaseOrderDao.insert(current.copy(status = "Cancelled", cancelledReason = reason.ifBlank { "ملغى" }))
+    val cancelled = current.copy(status = "Cancelled", cancelledReason = reason.ifBlank { "ملغى" })
+    purchaseOrderDao.insert(cancelled)
+    pushPurchaseOrder(cancelled)
     recordAudit("Cancel", "PurchaseOrder", "إلغاء أمر شراء: ${order.poNumber}", actor)
 }
 
@@ -494,18 +511,24 @@ internal suspend fun CmmsRepository.setPurchaseOrderStatus(order: PurchaseOrderE
     val current = purchaseOrderDao.getById(order.id) ?: order
     val stamped = if (status == "Approved") current.copy(status = status, approvedBy = actor) else current.copy(status = status)
     purchaseOrderDao.insert(stamped)
+    pushPurchaseOrder(stamped)
     recordAudit("Update", "PurchaseOrder", "تحديث حالة أمر الشراء ${order.poNumber} إلى $status", actor)
 }
 
 internal suspend fun CmmsRepository.savePurchaseOrderLine(line: PurchaseOrderLineEntity, actor: String = "System") {
-    purchaseOrderLineDao.insert(line)
+    val savedId = purchaseOrderLineDao.insert(line)
+    val effectiveId = if (line.id == 0L) savedId else line.id
     recalcPoTotal(line.poId)
+    EntityCloudSync.upsert(EntityCloudSync.Collections.PURCHASE_ORDER_LINES, effectiveId.toString(), PurchaseOrderLineEntity.serializer(), line.copy(id = effectiveId))
+    purchaseOrderDao.getById(line.poId)?.let { pushPurchaseOrder(it) }
     recordAudit("Update", "PurchaseOrder", "بند شراء: ${line.description}", actor)
 }
 
 internal suspend fun CmmsRepository.deletePurchaseOrderLine(line: PurchaseOrderLineEntity, actor: String = "System") {
     purchaseOrderLineDao.deleteById(line.id)
     recalcPoTotal(line.poId)
+    EntityCloudSync.remove(EntityCloudSync.Collections.PURCHASE_ORDER_LINES, line.id.toString())
+    purchaseOrderDao.getById(line.poId)?.let { pushPurchaseOrder(it) }
     recordAudit("Update", "PurchaseOrder", "حذف بند شراء: ${line.description}", actor)
 }
 
@@ -691,12 +714,14 @@ internal suspend fun CmmsRepository.issuePlannedMaterial(
 
 internal suspend fun CmmsRepository.saveOrgUnit(unit: OrgUnitEntity, actor: String = "System") {
         val isNew = unit.id == 0L
-        orgUnitDao.insert(unit)
+        val savedId = orgUnitDao.insert(unit)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ORG_UNITS, (if (isNew) savedId else unit.id).toString(), OrgUnitEntity.serializer(), unit.copy(id = if (isNew) savedId else unit.id))
         recordAudit(if (isNew) "Create" else "Update", "OrgUnit", "${if (isNew) "إضافة" else "تعديل"} وحدة تنظيمية: ${unit.type}/${unit.code}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteOrgUnit(unit: OrgUnitEntity, actor: String = "System") {
         orgUnitDao.deleteById(unit.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.ORG_UNITS, unit.id.toString())
         recordAudit("Delete", "OrgUnit", "حذف وحدة تنظيمية: ${unit.type}/${unit.code}", actor)
     }
 

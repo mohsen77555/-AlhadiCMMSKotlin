@@ -2,7 +2,15 @@ package com.alhadi.cmms.data.cloud
 
 import com.alhadi.cmms.data.AppDatabase
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
+import com.alhadi.cmms.data.entity.OrgUnitEntity
+import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderEntity
+import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
+import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.SupplierEntity
+import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
@@ -43,6 +51,46 @@ class CloudSyncService(
         registrations += listen(db, EntityCloudSync.Collections.NOTIFICATIONS, MaintenanceNotificationEntity.serializer(),
             upsert = { database.maintenanceNotificationDao().insert(it) },
             deleteById = { database.maintenanceNotificationDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.SPARE_PARTS, SparePartEntity.serializer(),
+            upsert = { database.sparePartDao().insert(it) },
+            deleteById = { database.sparePartDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.SUPPLIERS, SupplierEntity.serializer(),
+            upsert = { database.supplierDao().insert(it) },
+            deleteById = { database.supplierDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.PURCHASE_ORDERS, PurchaseOrderEntity.serializer(),
+            upsert = { database.purchaseOrderDao().insert(it) },
+            deleteById = { database.purchaseOrderDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.PURCHASE_ORDER_LINES, PurchaseOrderLineEntity.serializer(),
+            upsert = { database.purchaseOrderLineDao().insert(it) },
+            deleteById = { database.purchaseOrderLineDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.WAREHOUSES, WarehouseEntity.serializer(),
+            upsert = { database.warehouseDao().insert(it) },
+            deleteById = { database.warehouseDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.FUNCTIONAL_LOCATIONS, FunctionalLocationEntity.serializer(),
+            upsert = { database.functionalLocationDao().insert(it) },
+            deleteById = { database.functionalLocationDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.ORG_UNITS, OrgUnitEntity.serializer(),
+            upsert = { database.orgUnitDao().insert(it) },
+            deleteById = { database.orgUnitDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.PREVENTIVE_MAINTENANCE, PreventiveMaintenanceEntity.serializer(),
+            upsert = { database.preventiveMaintenanceDao().insert(it) },
+            deleteById = { database.preventiveMaintenanceDao().deleteById(it) },
             idOf = { it.id })
     }
 
