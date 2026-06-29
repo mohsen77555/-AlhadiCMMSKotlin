@@ -7,6 +7,7 @@
  * matching the client's UserCloudSync.
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 import { FieldValue } from "firebase-admin/firestore";
 import {
@@ -17,6 +18,9 @@ import {
   isValidRole,
   requireAdmin,
 } from "./common";
+
+/** Bootstrap secret for the first admin, read from Secret Manager (set via CI or the CLI). */
+const adminBootstrapSecret = defineSecret("ADMIN_BOOTSTRAP_SECRET");
 
 interface CreateUserData {
   username: string;
@@ -160,9 +164,9 @@ export const adminDeleteUser = onCall(async (req) => {
  * Protected by a shared secret set via:  firebase functions:config / env ADMIN_BOOTSTRAP_SECRET.
  * Call once, then it should be considered disabled (rotate the secret).
  */
-export const setupAdminClaim = onCall(async (req) => {
+export const setupAdminClaim = onCall({ secrets: [adminBootstrapSecret] }, async (req) => {
   const { username, secret } = (req.data ?? {}) as { username?: string; secret?: string };
-  const expected = process.env.ADMIN_BOOTSTRAP_SECRET;
+  const expected = adminBootstrapSecret.value();
   if (!expected || !secret || secret !== expected) {
     throw new HttpsError("permission-denied", "secret غير صحيح أو غير مهيأ.");
   }

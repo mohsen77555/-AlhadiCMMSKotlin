@@ -1,0 +1,71 @@
+name: Deploy Firebase Backend
+
+# Deploys Cloud Functions + Firestore rules/indexes to Firebase.
+# Run it manually from the GitHub "Actions" tab (Run workflow), or it runs automatically
+# when backend files change on this branch.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/switch-to-branch-app3-85kkzp", "main", "master"]
+    paths:
+      - "functions/**"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - "firebase.json"
+      - ".firebaserc"
+      - ".github/workflows/deploy-firebase.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_PROJECT: al-hadi-maintenance
+      SA_PATH: ${{ github.workspace }}/gcp-sa.json
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-sa.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install & build functions
+        working-directory: functions
+        run: |
+          npm ci
+          npm run build
+
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Missing repository secret FIREBASE_SERVICE_ACCOUNT."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$SA_PATH"
+
+      - name: Set bootstrap secret (optional)
+        env:
+          ADMIN_BOOTSTRAP_SECRET: ${{ secrets.ADMIN_BOOTSTRAP_SECRET }}
+        run: |
+          if [ -n "$ADMIN_BOOTSTRAP_SECRET" ]; then
+            printf '%s' "$ADMIN_BOOTSTRAP_SECRET" \
+              | npx firebase-tools functions:secrets:set ADMIN_BOOTSTRAP_SECRET \
+                  --project "$FIREBASE_PROJECT" --data-file - --force
+          else
+            echo "ADMIN_BOOTSTRAP_SECRET not set — skipping (setupAdminClaim won't be usable until it is)."
+          fi
+
+      - name: Deploy functions, rules, and indexes
+        run: |
+          npx firebase-tools deploy \
+            --only functions,firestore:rules,firestore:indexes \
+            --project "$FIREBASE_PROJECT" \
+            --non-interactive --force
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -f "$SA_PATH"
