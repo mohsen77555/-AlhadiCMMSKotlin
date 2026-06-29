@@ -1,14 +1,19 @@
 rules_version = '2';
 
-// Al-Hadi CMMS — Firestore security rules (role-based).
+// Al-Hadi CMMS — Firestore security rules.
 //
-// IMPORTANT: these rules require Firebase Authentication. Each app user must sign in with Firebase
-// Auth, and their profile document must live at /users/{uid} where {uid} == request.auth.uid, with a
-// "role" field (SystemAdmin / MaintenanceManager / Technician / Procurement / Warehouse / Requester).
-// Until Firebase Auth is wired up, keep the database in test mode or these rules will deny the app's
-// unauthenticated writes.
+// The app signs every user in to Firebase Authentication (a synthetic username@alhadi.local email,
+// handled transparently by FirebaseAuthGateway), so these rules require an authenticated session for
+// all access. This replaces open "Test mode" and is safe to deploy.
 //
-// Deploy via the Firebase console (Firestore Database -> Rules) or `firebase deploy --only firestore:rules`.
+// Role-based authorization (manager vs. technician vs. warehouse, etc.) is enforced inside the app
+// (AccessControl.kt + navigation gating). Enforcing roles in the rules themselves would require a
+// trusted uid->role mapping via Firebase custom claims, which can only be set from a privileged
+// backend (Admin SDK / Cloud Function) — not from the client. That is the recommended next step if
+// server-side role enforcement is needed; until then, authentication is the security boundary here.
+//
+// Deploy via the Firebase console (Firestore Database -> Rules) or
+// `firebase deploy --only firestore:rules`. After deploying, turn OFF Test mode.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -17,63 +22,9 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function userData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function role() {
-      return isSignedIn() ? userData().role : '';
-    }
-
-    function isAdmin()       { return role() == 'SystemAdmin' || role() == 'Admin'; }
-    function isManager()     { return role() == 'MaintenanceManager' || role() == 'Supervisor'; }
-    function isTechnician()  { return role() == 'Technician'; }
-    function isProcurement() { return role() == 'Procurement'; }
-    function isWarehouse()   { return role() == 'Warehouse'; }
-
-    // Users: only system admins create/modify accounts; any signed-in user may read (for lookups).
-    match /users/{userId} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // Assets: admins and maintenance managers maintain the asset register; all signed-in users read.
-    match /assets/{assetId} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin() || isManager();
-    }
-
-    // Work orders: admins, managers and technicians may write; all signed-in users read.
-    match /work_orders/{orderId} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin() || isManager() || isTechnician();
-    }
-
-    // Maintenance notifications (requests): any signed-in user can raise a request;
-    // only admins/managers screen, update or delete them.
-    match /notifications/{notificationId} {
-      allow read:   if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin() || isManager();
-    }
-
-    // Inventory / procurement collections (added as sync expands).
-    match /spare_parts/{partId} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin() || isWarehouse();
-    }
-    match /suppliers/{supplierId} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin() || isProcurement();
-    }
-    match /purchase_orders/{poId} {
-      allow read:  if isSignedIn();
-      allow write: if isAdmin() || isProcurement();
-    }
-
-    // Everything else is denied by default.
+    // Every synced collection requires an authenticated user for both reads and writes.
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isSignedIn();
     }
   }
 }

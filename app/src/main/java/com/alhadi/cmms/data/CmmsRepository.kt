@@ -163,9 +163,15 @@ class CmmsRepository(internal val database: AppDatabase) {
             updated = updated.copy(password = PasswordHasher.hash(password))
         }
         userDao.insert(updated)
+        // Mirror the session to Firebase Auth so Firestore rules can require an authenticated user.
+        // Best-effort and offline-first: never blocks the local login above.
+        com.alhadi.cmms.data.cloud.FirebaseAuthGateway.ensureSignedIn(username.trim(), password)
         recordAudit("Login", "User", "تسجيل دخول ناجح", user.name)
         return updated
     }
+
+    /** Clears the Firebase Auth session on logout (best-effort, no-op without Firebase). */
+    fun signOutCloud() = com.alhadi.cmms.data.cloud.FirebaseAuthGateway.signOut()
 
     companion object {
         /** USR-SEC-003: lock an account after this many consecutive failed logins. */

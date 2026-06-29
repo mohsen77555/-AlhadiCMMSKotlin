@@ -249,6 +249,7 @@ class CmmsViewModel(internal val repository: CmmsRepository) : ViewModel() {
     fun logout() {
         _sessionUserId.value = null
         _loginError.value = null
+        repository.signOutCloud()
     }
 
     fun clearLoginError() {
