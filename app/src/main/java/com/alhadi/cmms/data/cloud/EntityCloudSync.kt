@@ -23,6 +23,14 @@ object EntityCloudSync {
         const val FUNCTIONAL_LOCATIONS = "functional_locations"
         const val ORG_UNITS = "org_units"
         const val PREVENTIVE_MAINTENANCE = "preventive_maintenance"
+        const val CAPA = "capa_actions"
+        const val WO_OPERATIONS = "work_order_operations"
+        const val WO_CONFIRMATIONS = "work_order_confirmations"
+        const val WO_PHOTOS = "work_order_photos"
+        const val WORK_PERMITS = "work_permits"
+        const val PM_CHECKLIST = "pm_checklist_items"
+        const val MEASURING_POINTS = "measuring_points"
+        const val MEASUREMENT_READINGS = "measurement_readings"
     }
 
     fun <T> upsert(collection: String, docId: String, serializer: KSerializer<T>, value: T) {

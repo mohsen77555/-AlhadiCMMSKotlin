@@ -369,12 +369,15 @@ internal suspend fun CmmsRepository.resetUserLock(user: UserEntity, actor: Strin
 
 internal suspend fun CmmsRepository.saveMeasuringPoint(point: MeasuringPointEntity, actor: String = "System") {
         val isNew = point.id == 0L
-        measurementDao.insertPoint(point)
+        val savedId = measurementDao.insertPoint(point)
+        val saved = point.copy(id = if (isNew) savedId else point.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.MEASURING_POINTS, saved.id.toString(), MeasuringPointEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "Meter", "${if (isNew) "إضافة" else "تعديل"} نقطة قياس: ${point.name}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteMeasuringPoint(point: MeasuringPointEntity, actor: String = "System") {
         measurementDao.deletePointById(point.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.MEASURING_POINTS, point.id.toString())
         recordAudit("Delete", "Meter", "حذف نقطة قياس: ${point.name}", actor)
     }
 
@@ -388,19 +391,20 @@ internal suspend fun CmmsRepository.addReading(point: MeasuringPointEntity, valu
         }
         val now = DateStrings.now()
         val status = point.readingStatus(value)
+        val reading = MeasurementReadingEntity(
+            pointId = point.id,
+            assetId = point.assetId,
+            value = value,
+            createdAt = now,
+            createdBy = actor,
+            note = note,
+            status = status
+        )
         database.withTransaction {
-            measurementDao.insertReading(
-                MeasurementReadingEntity(
-                    pointId = point.id,
-                    assetId = point.assetId,
-                    value = value,
-                    createdAt = now,
-                    createdBy = actor,
-                    note = note,
-                    status = status
-                )
-            )
+            val readingId = measurementDao.insertReading(reading)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.MEASUREMENT_READINGS, readingId.toString(), MeasurementReadingEntity.serializer(), reading.copy(id = readingId))
             measurementDao.updateLastReading(point.id, value, now)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.MEASURING_POINTS, point.id.toString(), MeasuringPointEntity.serializer(), point.copy(lastReading = value, lastReadingAt = now))
             recordAudit("Reading", "Meter", "قراءة ${point.name}: $value ${point.unit} ($status)", actor)
             // MEAS-ALM-010: an alarm breach can raise a maintenance notification automatically.
             if (status == "Alarm" && point.autoNotifyOnAlarm) {
@@ -736,17 +740,21 @@ internal suspend fun CmmsRepository.saveCapa(item: CapaEntity, actor: String = "
         } else {
             item
         }
-        capaDao.insert(toSave)
+        val savedId = capaDao.insert(toSave)
+        val saved = toSave.copy(id = if (isNew) savedId else toSave.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.CAPA, saved.id.toString(), CapaEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "CAPA", "${if (isNew) "إنشاء" else "تعديل"} إجراء: ${toSave.title}", actor)
     }
 
 internal suspend fun CmmsRepository.updateCapaStatus(item: CapaEntity, status: String, actor: String = "System") {
         capaDao.updateStatus(item.id, status)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.CAPA, item.id.toString(), CapaEntity.serializer(), item.copy(status = status))
         recordAudit("Update", "CAPA", "تحديث حالة الإجراء ${item.code} إلى $status", actor)
     }
 
 internal suspend fun CmmsRepository.deleteCapa(item: CapaEntity, actor: String = "System") {
         capaDao.deleteById(item.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.CAPA, item.id.toString())
         recordAudit("Delete", "CAPA", "حذف إجراء: ${item.title}", actor)
     }
 

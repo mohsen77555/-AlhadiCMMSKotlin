@@ -200,17 +200,22 @@ internal suspend fun CmmsRepository.deleteAssetMovement(movement: AssetMovementE
 
 internal suspend fun CmmsRepository.saveChecklistItem(item: PmChecklistItemEntity, actor: String = "System") {
         val isNew = item.id == 0L
-        checklistDao.insert(item)
+        val savedId = checklistDao.insert(item)
+        val saved = item.copy(id = if (isNew) savedId else item.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.PM_CHECKLIST, saved.id.toString(), PmChecklistItemEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "Checklist", "${if (isNew) "إضافة" else "تعديل"} بند فحص: ${item.text}", actor)
     }
 
 internal suspend fun CmmsRepository.setChecklistResult(item: PmChecklistItemEntity, result: String, actor: String = "System") {
-        checklistDao.insert(item.copy(result = result))
+        val updated = item.copy(result = result)
+        checklistDao.insert(updated)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.PM_CHECKLIST, updated.id.toString(), PmChecklistItemEntity.serializer(), updated)
         recordAudit("Update", "Checklist", "نتيجة بند الفحص \"${item.text}\": $result", actor)
     }
 
 internal suspend fun CmmsRepository.deleteChecklistItem(item: PmChecklistItemEntity, actor: String = "System") {
         checklistDao.deleteById(item.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.PM_CHECKLIST, item.id.toString())
         recordAudit("Delete", "Checklist", "حذف بند فحص: ${item.text}", actor)
     }
 
@@ -321,19 +326,24 @@ internal suspend fun CmmsRepository.deleteNotification(notification: Maintenance
 
 internal suspend fun CmmsRepository.saveOperation(operation: WorkOrderOperationEntity, actor: String = "System") {
         val isNew = operation.id == 0L
-        operationDao.insert(operation)
+        val savedId = operationDao.insert(operation)
+        val saved = operation.copy(id = if (isNew) savedId else operation.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WO_OPERATIONS, saved.id.toString(), WorkOrderOperationEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "Operation", "${if (isNew) "إضافة" else "تعديل"} عملية ${operation.operationNumber}: ${operation.description}", actor)
     }
 
 internal suspend fun CmmsRepository.setOperationStatus(operation: WorkOrderOperationEntity, status: String, actor: String = "System") {
         // Confirming with no recorded actual hours falls back to the planned estimate.
         val actual = if (status == "Confirmed" && operation.actualHours == 0.0) operation.plannedHours else operation.actualHours
-        operationDao.insert(operation.copy(status = status, actualHours = actual))
+        val updated = operation.copy(status = status, actualHours = actual)
+        operationDao.insert(updated)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WO_OPERATIONS, updated.id.toString(), WorkOrderOperationEntity.serializer(), updated)
         recordAudit("Status", "Operation", "عملية ${operation.operationNumber} → $status", actor)
     }
 
 internal suspend fun CmmsRepository.deleteOperation(operation: WorkOrderOperationEntity, actor: String = "System") {
         operationDao.deleteById(operation.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.WO_OPERATIONS, operation.id.toString())
         recordAudit("Delete", "Operation", "حذف عملية ${operation.operationNumber}", actor)
     }
 
@@ -351,19 +361,20 @@ internal suspend fun CmmsRepository.addConfirmation(
         actor: String = "System"
     ) {
         database.withTransaction {
-            confirmationDao.insert(
-                confirmation.copy(
-                    technician = confirmation.technician.ifBlank { actor },
-                    workDate = confirmation.workDate.ifBlank { DateStrings.today() },
-                    createdAt = DateStrings.now()
-                )
+            val toSave = confirmation.copy(
+                technician = confirmation.technician.ifBlank { actor },
+                workDate = confirmation.workDate.ifBlank { DateStrings.today() },
+                createdAt = DateStrings.now()
             )
-            operationDao.insert(
-                operation.copy(
-                    actualHours = operation.actualHours + confirmation.actualWork,
-                    status = if (confirmation.finalConfirmation) "Confirmed" else "In Progress"
-                )
+            val confId = confirmationDao.insert(toSave)
+            val savedConf = toSave.copy(id = if (confirmation.id == 0L) confId else confirmation.id)
+            val updatedOp = operation.copy(
+                actualHours = operation.actualHours + confirmation.actualWork,
+                status = if (confirmation.finalConfirmation) "Confirmed" else "In Progress"
             )
+            operationDao.insert(updatedOp)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.WO_CONFIRMATIONS, savedConf.id.toString(), WorkOrderConfirmationEntity.serializer(), savedConf)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.WO_OPERATIONS, updatedOp.id.toString(), WorkOrderOperationEntity.serializer(), updatedOp)
             recordAudit(
                 if (confirmation.finalConfirmation) "Confirm" else "PartialConfirm",
                 "Operation",
@@ -375,6 +386,7 @@ internal suspend fun CmmsRepository.addConfirmation(
 
 internal suspend fun CmmsRepository.deleteConfirmation(confirmation: WorkOrderConfirmationEntity, actor: String = "System") {
         confirmationDao.deleteById(confirmation.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.WO_CONFIRMATIONS, confirmation.id.toString())
         recordAudit("Delete", "Confirmation", "حذف تأكيد عملية #${confirmation.operationId}", actor)
     }
 
@@ -383,14 +395,15 @@ internal suspend fun CmmsRepository.deleteConfirmation(confirmation: WorkOrderCo
     // ---------------------------------------------------------------------
 
 internal suspend fun CmmsRepository.addWorkOrderPhoto(orderId: Long, path: String, actor: String = "System") {
-        photoDao.insert(
-            WorkOrderPhotoEntity(orderId = orderId, path = path, addedBy = actor, addedAt = DateStrings.now())
-        )
+        val photo = WorkOrderPhotoEntity(orderId = orderId, path = path, addedBy = actor, addedAt = DateStrings.now())
+        val savedId = photoDao.insert(photo)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WO_PHOTOS, savedId.toString(), WorkOrderPhotoEntity.serializer(), photo.copy(id = savedId))
         recordAudit("Attach", "WorkOrder", "إرفاق صورة دليل لأمر العمل #$orderId", actor)
     }
 
 internal suspend fun CmmsRepository.deleteWorkOrderPhoto(photo: WorkOrderPhotoEntity, actor: String = "System") {
         photoDao.deleteById(photo.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.WO_PHOTOS, photo.id.toString())
         recordAudit("Delete", "WorkOrder", "حذف صورة دليل لأمر العمل #${photo.orderId}", actor)
     }
 
@@ -401,18 +414,23 @@ internal suspend fun CmmsRepository.deleteWorkOrderPhoto(photo: WorkOrderPhotoEn
 internal suspend fun CmmsRepository.savePermit(permit: WorkPermitEntity, actor: String = "System") {
         val isNew = permit.id == 0L
         val toSave = if (isNew) permit.copy(createdBy = actor, createdAt = DateStrings.now(), status = "Pending") else permit
-        permitDao.insert(toSave)
+        val savedId = permitDao.insert(toSave)
+        val saved = toSave.copy(id = if (isNew) savedId else permit.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_PERMITS, saved.id.toString(), WorkPermitEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "Permit", "${if (isNew) "إصدار" else "تعديل"} تصريح (${permit.type}) لأمر العمل #${permit.orderId}", actor)
     }
 
 internal suspend fun CmmsRepository.setPermitStatus(permit: WorkPermitEntity, approved: Boolean, actor: String = "System") {
         val status = if (approved) "Approved" else "Rejected"
-        permitDao.insert(permit.copy(status = status, approvedBy = actor))
+        val updated = permit.copy(status = status, approvedBy = actor)
+        permitDao.insert(updated)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_PERMITS, updated.id.toString(), WorkPermitEntity.serializer(), updated)
         recordAudit("Approval", "Permit", "${if (approved) "اعتماد" else "رفض"} تصريح العمل #${permit.id}", actor)
     }
 
 internal suspend fun CmmsRepository.deletePermit(permit: WorkPermitEntity, actor: String = "System") {
         permitDao.deleteById(permit.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.WORK_PERMITS, permit.id.toString())
         recordAudit("Delete", "Permit", "حذف تصريح عمل #${permit.id}", actor)
     }
 

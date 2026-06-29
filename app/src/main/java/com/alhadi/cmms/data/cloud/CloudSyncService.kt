@@ -2,7 +2,15 @@ package com.alhadi.cmms.data.cloud
 
 import com.alhadi.cmms.data.AppDatabase
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.MeasurementReadingEntity
+import com.alhadi.cmms.data.entity.MeasuringPointEntity
+import com.alhadi.cmms.data.entity.PmChecklistItemEntity
+import com.alhadi.cmms.data.entity.WorkOrderConfirmationEntity
+import com.alhadi.cmms.data.entity.WorkOrderOperationEntity
+import com.alhadi.cmms.data.entity.WorkOrderPhotoEntity
+import com.alhadi.cmms.data.entity.WorkPermitEntity
 import com.alhadi.cmms.data.entity.MaintenanceNotificationEntity
 import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
@@ -91,6 +99,46 @@ class CloudSyncService(
         registrations += listen(db, EntityCloudSync.Collections.PREVENTIVE_MAINTENANCE, PreventiveMaintenanceEntity.serializer(),
             upsert = { database.preventiveMaintenanceDao().insert(it) },
             deleteById = { database.preventiveMaintenanceDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.CAPA, CapaEntity.serializer(),
+            upsert = { database.capaDao().insert(it) },
+            deleteById = { database.capaDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.WO_OPERATIONS, WorkOrderOperationEntity.serializer(),
+            upsert = { database.workOrderOperationDao().insert(it) },
+            deleteById = { database.workOrderOperationDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.WO_CONFIRMATIONS, WorkOrderConfirmationEntity.serializer(),
+            upsert = { database.workOrderConfirmationDao().insert(it) },
+            deleteById = { database.workOrderConfirmationDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.WO_PHOTOS, WorkOrderPhotoEntity.serializer(),
+            upsert = { database.workOrderPhotoDao().insert(it) },
+            deleteById = { database.workOrderPhotoDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.WORK_PERMITS, WorkPermitEntity.serializer(),
+            upsert = { database.workPermitDao().insert(it) },
+            deleteById = { database.workPermitDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.PM_CHECKLIST, PmChecklistItemEntity.serializer(),
+            upsert = { database.pmChecklistDao().insert(it) },
+            deleteById = { database.pmChecklistDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.MEASURING_POINTS, MeasuringPointEntity.serializer(),
+            upsert = { database.measurementDao().insertPoint(it) },
+            deleteById = { database.measurementDao().deletePointById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.MEASUREMENT_READINGS, MeasurementReadingEntity.serializer(),
+            upsert = { database.measurementDao().insertReading(it) },
+            deleteById = { /* readings are append-only locally */ },
             idOf = { it.id })
     }
 
