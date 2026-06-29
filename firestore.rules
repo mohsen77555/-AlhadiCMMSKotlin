@@ -1,30 +1,100 @@
 rules_version = '2';
 
-// Al-Hadi CMMS — Firestore security rules.
+// Al-Hadi CMMS — Firestore security rules (role-based).
 //
-// The app signs every user in to Firebase Authentication (a synthetic username@alhadi.local email,
-// handled transparently by FirebaseAuthGateway), so these rules require an authenticated session for
-// all access. This replaces open "Test mode" and is safe to deploy.
+// Every user signs in to Firebase Authentication (synthetic username@alhadi.local email, handled by
+// the app). The Cloud Functions backend stamps each user's role into a custom claim
+// (request.auth.token.role) via the claims triggers, so these rules authorize by role server-side.
 //
-// Role-based authorization (manager vs. technician vs. warehouse, etc.) is enforced inside the app
-// (AccessControl.kt + navigation gating). Enforcing roles in the rules themselves would require a
-// trusted uid->role mapping via Firebase custom claims, which can only be set from a privileged
-// backend (Admin SDK / Cloud Function) — not from the client. That is the recommended next step if
-// server-side role enforcement is needed; until then, authentication is the security boundary here.
+// Roles: SystemAdmin, MaintenanceManager, Technician, Procurement, Warehouse, Requester.
 //
-// Deploy via the Firebase console (Firestore Database -> Rules) or
-// `firebase deploy --only firestore:rules`. After deploying, turn OFF Test mode.
+// The write rules mirror what each role can actually do in the app (AccessControl.kt), including
+// cross-domain writes — e.g. a warehouse goods-receipt updates purchase orders and stock — so
+// legitimate offline writes are never silently rejected on sync.
+//
+// Deploy: Firestore Database -> Rules (paste) or `firebase deploy --only firestore:rules`, then
+// turn OFF Test mode. Bootstrap the first SystemAdmin claim with the setupAdminClaim callable.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
+    function isSignedIn() { return request.auth != null; }
+    function role()       { return isSignedIn() ? request.auth.token.role : ''; }
+
+    function isAdmin()       { return role() == 'SystemAdmin'; }
+    function isManager()     { return role() == 'MaintenanceManager'; }
+    function isTechnician()  { return role() == 'Technician'; }
+    function isProcurement() { return role() == 'Procurement'; }
+    function isWarehouse()   { return role() == 'Warehouse'; }
+
+    function maintenanceTeam() { return isAdmin() || isManager() || isTechnician(); }
+
+    // ---- Identity & devices -------------------------------------------------
+    // User profiles: any signed-in user may read (lookups); only admins write (also via backend).
+    match /users/{userId} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
+    }
+    // Each device registers its own push token.
+    match /device_tokens/{token} {
+      allow read, write: if isSignedIn();
     }
 
-    // Every synced collection requires an authenticated user for both reads and writes.
+    // ---- Assets & their master data ----------------------------------------
+    match /assets/{id}                  { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /asset_documents/{id}         { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /asset_characteristics/{id}   { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /asset_bom_headers/{id}       { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /asset_bom_items/{id}         { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /asset_movements/{id}         { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /asset_installations/{id}     { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /asset_status_history/{id}    { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+
+    // ---- Work orders & execution -------------------------------------------
+    match /work_orders/{id}               { allow read: if isSignedIn(); allow write: if maintenanceTeam(); }
+    match /work_order_operations/{id}     { allow read: if isSignedIn(); allow write: if maintenanceTeam(); }
+    match /work_order_confirmations/{id}  { allow read: if isSignedIn(); allow write: if maintenanceTeam(); }
+    match /work_order_photos/{id}         { allow read: if isSignedIn(); allow write: if maintenanceTeam(); }
+    match /work_order_materials/{id}      { allow read: if isSignedIn(); allow write: if maintenanceTeam() || isWarehouse(); }
+    match /work_order_history/{id}        { allow read: if isSignedIn(); allow write: if maintenanceTeam(); }
+    match /work_permits/{id}              { allow read: if isSignedIn(); allow write: if maintenanceTeam(); }
+
+    // ---- Maintenance requests (بلاغات): anyone authorized may raise; managers screen ----
+    match /notifications/{id} {
+      allow read:           if isSignedIn();
+      allow create:         if isAdmin() || isManager() || isTechnician() || role() == 'Requester';
+      allow update, delete: if isAdmin() || isManager();
+    }
+
+    // ---- Preventive maintenance & metering ---------------------------------
+    match /preventive_maintenance/{id} { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /pm_checklist_items/{id}     { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /measuring_points/{id}       { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /measurement_readings/{id}   { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+    match /capa_actions/{id}           { allow read: if isSignedIn(); allow write: if isAdmin() || isManager(); }
+
+    // ---- Inventory & serialization (warehouse) -----------------------------
+    match /spare_parts/{id}             { allow read: if isSignedIn(); allow write: if isAdmin() || isWarehouse(); }
+    match /inventory_transactions/{id}  { allow read: if isSignedIn(); allow write: if isAdmin() || isWarehouse() || maintenanceTeam(); }
+    match /warehouses/{id}              { allow read: if isSignedIn(); allow write: if isAdmin() || isWarehouse(); }
+    match /serial_number_profiles/{id}  { allow read: if isSignedIn(); allow write: if isAdmin() || isWarehouse(); }
+    match /serial_numbers/{id}          { allow read: if isSignedIn(); allow write: if isAdmin() || isWarehouse(); }
+    match /serial_number_movements/{id} { allow read: if isSignedIn(); allow write: if isAdmin() || isWarehouse(); }
+
+    // ---- Procurement (suppliers/POs); warehouse also writes on goods receipt ----
+    match /suppliers/{id}            { allow read: if isSignedIn(); allow write: if isAdmin() || isProcurement(); }
+    match /purchase_orders/{id}      { allow read: if isSignedIn(); allow write: if isAdmin() || isProcurement() || isWarehouse(); }
+    match /purchase_order_lines/{id} { allow read: if isSignedIn(); allow write: if isAdmin() || isProcurement() || isWarehouse(); }
+
+    // ---- Master data (admin only) ------------------------------------------
+    match /functional_locations/{id}  { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /org_units/{id}             { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /task_lists/{id}            { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /task_list_operations/{id}  { allow read: if isSignedIn(); allow write: if isAdmin(); }
+
+    // Everything else is denied by default.
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if false;
     }
   }
 }

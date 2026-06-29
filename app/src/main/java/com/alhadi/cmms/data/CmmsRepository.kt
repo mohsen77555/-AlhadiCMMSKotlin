@@ -166,6 +166,8 @@ class CmmsRepository(internal val database: AppDatabase) {
         // Mirror the session to Firebase Auth so Firestore rules can require an authenticated user.
         // Best-effort and offline-first: never blocks the local login above.
         com.alhadi.cmms.data.cloud.FirebaseAuthGateway.ensureSignedIn(username.trim(), password)
+        // Register this device for push notifications targeted by username/role (backend FCM).
+        com.alhadi.cmms.data.cloud.FcmGateway.registerDeviceToken(updated.username, updated.role)
         recordAudit("Login", "User", "تسجيل دخول ناجح", user.name)
         return updated
     }
