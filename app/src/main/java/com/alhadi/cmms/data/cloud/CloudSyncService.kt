@@ -1,9 +1,15 @@
 package com.alhadi.cmms.data.cloud
 
 import com.alhadi.cmms.data.AppDatabase
+import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
+import com.alhadi.cmms.data.entity.AssetBomItemEntity
+import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
+import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetMovementEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
+import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.MeasurementReadingEntity
 import com.alhadi.cmms.data.entity.MeasuringPointEntity
 import com.alhadi.cmms.data.entity.PmChecklistItemEntity
@@ -18,8 +24,11 @@ import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.SupplierEntity
+import com.alhadi.cmms.data.entity.TaskListEntity
+import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
+import com.alhadi.cmms.data.entity.WorkOrderMaterialEntity
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -139,6 +148,51 @@ class CloudSyncService(
         registrations += listen(db, EntityCloudSync.Collections.MEASUREMENT_READINGS, MeasurementReadingEntity.serializer(),
             upsert = { database.measurementDao().insertReading(it) },
             deleteById = { /* readings are append-only locally */ },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.ASSET_DOCUMENTS, AssetDocumentEntity.serializer(),
+            upsert = { database.assetDocumentDao().insert(it) },
+            deleteById = { database.assetDocumentDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.ASSET_CHARACTERISTICS, AssetCharacteristicEntity.serializer(),
+            upsert = { database.assetCharacteristicDao().insert(it) },
+            deleteById = { database.assetCharacteristicDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.ASSET_BOM_HEADERS, AssetBomHeaderEntity.serializer(),
+            upsert = { database.assetBomHeaderDao().insert(it) },
+            deleteById = { database.assetBomHeaderDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.ASSET_BOM_ITEMS, AssetBomItemEntity.serializer(),
+            upsert = { database.assetBomDao().insert(it) },
+            deleteById = { database.assetBomDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.ASSET_MOVEMENTS, AssetMovementEntity.serializer(),
+            upsert = { database.assetMovementDao().insert(it) },
+            deleteById = { database.assetMovementDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.TASK_LISTS, TaskListEntity.serializer(),
+            upsert = { database.taskListDao().insertTaskList(it) },
+            deleteById = { database.taskListDao().deleteTaskListById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.TASK_LIST_OPERATIONS, TaskListOperationEntity.serializer(),
+            upsert = { database.taskListDao().insertOperation(it) },
+            deleteById = { database.taskListDao().deleteOperationById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.WO_MATERIALS, WorkOrderMaterialEntity.serializer(),
+            upsert = { database.workOrderMaterialDao().insert(it) },
+            deleteById = { database.workOrderMaterialDao().deleteById(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, InventoryTransactionEntity.serializer(),
+            upsert = { database.inventoryTransactionDao().insert(it) },
+            deleteById = { /* inventory transactions are append-only locally */ },
             idOf = { it.id })
     }
 

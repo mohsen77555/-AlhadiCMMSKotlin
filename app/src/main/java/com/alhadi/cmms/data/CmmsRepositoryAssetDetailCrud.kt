@@ -40,12 +40,15 @@ import kotlinx.serialization.json.Json
 internal suspend fun CmmsRepository.saveAssetDocument(doc: AssetDocumentEntity, actor: String = "System") {
         val isNew = doc.id == 0L
         val toSave = if (isNew) doc.copy(uploadedBy = actor, uploadedAt = DateStrings.now()) else doc
-        documentDao.insert(toSave)
+        val savedId = documentDao.insert(toSave)
+        val saved = toSave.copy(id = if (isNew) savedId else doc.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ASSET_DOCUMENTS, saved.id.toString(), AssetDocumentEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "Document", "${if (isNew) "إضافة" else "تعديل"} مستند: ${doc.title}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteAssetDocument(doc: AssetDocumentEntity, actor: String = "System") {
         documentDao.deleteById(doc.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.ASSET_DOCUMENTS, doc.id.toString())
         recordAudit("Delete", "Document", "حذف مستند: ${doc.title}", actor)
     }
 
@@ -55,12 +58,15 @@ internal suspend fun CmmsRepository.deleteAssetDocument(doc: AssetDocumentEntity
 
 internal suspend fun CmmsRepository.saveCharacteristic(item: AssetCharacteristicEntity, actor: String = "System") {
         val isNew = item.id == 0L
-        characteristicDao.insert(item)
+        val savedId = characteristicDao.insert(item)
+        val saved = item.copy(id = if (isNew) savedId else item.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ASSET_CHARACTERISTICS, saved.id.toString(), AssetCharacteristicEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "Characteristic", "${if (isNew) "إضافة" else "تعديل"} خاصية: ${item.name}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteCharacteristic(item: AssetCharacteristicEntity, actor: String = "System") {
         characteristicDao.deleteById(item.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.ASSET_CHARACTERISTICS, item.id.toString())
         recordAudit("Delete", "Characteristic", "حذف خاصية: ${item.name}", actor)
     }
 
@@ -87,7 +93,9 @@ internal suspend fun CmmsRepository.saveBomHeader(header: AssetBomHeaderEntity, 
             description = header.description.trim()
         )
         val isNew = normalized.id == 0L
-        if (isNew) bomHeaderDao.insert(normalized) else bomHeaderDao.update(normalized)
+        val savedId = if (isNew) bomHeaderDao.insert(normalized) else { bomHeaderDao.update(normalized); normalized.id }
+        val saved = normalized.copy(id = savedId)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ASSET_BOM_HEADERS, saved.id.toString(), AssetBomHeaderEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "BOM", "${if (isNew) "إنشاء" else "تعديل"} قائمة مكونات: ${normalized.code}", actor)
     }
 
@@ -97,6 +105,7 @@ internal suspend fun CmmsRepository.deleteBomHeader(header: AssetBomHeaderEntity
             bomHeaderDao.deleteById(header.id)
             recordAudit("Delete", "BOM", "حذف قائمة مكونات: ${header.code}", actor)
         }
+        EntityCloudSync.remove(EntityCloudSync.Collections.ASSET_BOM_HEADERS, header.id.toString())
     }
 
 internal suspend fun CmmsRepository.saveBomItem(item: AssetBomItemEntity, actor: String = "System") {
@@ -129,7 +138,9 @@ internal suspend fun CmmsRepository.saveBomItem(item: AssetBomItemEntity, actor:
         }
 
         val isNew = normalized.id == 0L
-        bomDao.insert(normalized)
+        val savedId = bomDao.insert(normalized)
+        val saved = normalized.copy(id = if (isNew) savedId else normalized.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ASSET_BOM_ITEMS, saved.id.toString(), AssetBomItemEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "BOM", "${if (isNew) "إضافة" else "تعديل"} بند ${normalized.itemNumber} في ${header.code}", actor)
     }
 
@@ -139,6 +150,7 @@ internal suspend fun CmmsRepository.deleteBomItem(item: AssetBomItemEntity, acto
             bomDao.deleteById(item.id)
             recordAudit("Delete", "BOM", "حذف بند مكونات رقم ${item.itemNumber}", actor)
         }
+        EntityCloudSync.remove(EntityCloudSync.Collections.ASSET_BOM_ITEMS, item.id.toString())
     }
 
     // ---------------------------------------------------------------------
@@ -172,25 +184,27 @@ internal suspend fun CmmsRepository.performAssetMovement(
                 else -> asset
             }
             assetDao.insertAsset(updated)
-            movementDao.insert(
-                AssetMovementEntity(
-                    assetId = asset.id,
-                    eventType = eventType,
-                    fromLocationId = asset.locationId,
-                    toLocationId = if (eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) null else toLocationId,
-                    fromLocationName = asset.location,
-                    toLocationName = if (eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) "" else toLocationName,
-                    notes = notes,
-                    performedBy = actor,
-                    occurredAt = now
-                )
+            val movement = AssetMovementEntity(
+                assetId = asset.id,
+                eventType = eventType,
+                fromLocationId = asset.locationId,
+                toLocationId = if (eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) null else toLocationId,
+                fromLocationName = asset.location,
+                toLocationName = if (eventType == MovementType.DISMANTLE || eventType == MovementType.RETIRE) "" else toLocationName,
+                notes = notes,
+                performedBy = actor,
+                occurredAt = now
             )
+            val movementId = movementDao.insert(movement)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.ASSET_MOVEMENTS, movementId.toString(), AssetMovementEntity.serializer(), movement.copy(id = movementId))
+            EntityCloudSync.upsert(EntityCloudSync.Collections.ASSETS, updated.id.toString(), AssetEntity.serializer(), updated)
             recordAudit("Movement", "Asset", "${MovementType.label(eventType)} للأصل: ${asset.code}", actor)
         }
     }
 
 internal suspend fun CmmsRepository.deleteAssetMovement(movement: AssetMovementEntity, actor: String = "System") {
         movementDao.deleteById(movement.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.ASSET_MOVEMENTS, movement.id.toString())
         recordAudit("Delete", "Movement", "حذف حركة (${MovementType.label(movement.eventType)})", actor)
     }
 
@@ -440,24 +454,30 @@ internal suspend fun CmmsRepository.deletePermit(permit: WorkPermitEntity, actor
 
 internal suspend fun CmmsRepository.saveTaskList(taskList: TaskListEntity, actor: String = "System") {
         val isNew = taskList.id == 0L
-        taskListDao.insertTaskList(taskList)
+        val savedId = taskListDao.insertTaskList(taskList)
+        val saved = taskList.copy(id = if (isNew) savedId else taskList.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.TASK_LISTS, saved.id.toString(), TaskListEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "TaskList", "${if (isNew) "إضافة" else "تعديل"} قالب عمل: ${taskList.name}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteTaskList(taskList: TaskListEntity, actor: String = "System") {
         taskListDao.deleteOperationsForList(taskList.id)
         taskListDao.deleteTaskListById(taskList.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.TASK_LISTS, taskList.id.toString())
         recordAudit("Delete", "TaskList", "حذف قالب عمل: ${taskList.name}", actor)
     }
 
 internal suspend fun CmmsRepository.saveTaskListOperation(operation: TaskListOperationEntity, actor: String = "System") {
         val isNew = operation.id == 0L
-        taskListDao.insertOperation(operation)
+        val savedId = taskListDao.insertOperation(operation)
+        val saved = operation.copy(id = if (isNew) savedId else operation.id)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.TASK_LIST_OPERATIONS, saved.id.toString(), TaskListOperationEntity.serializer(), saved)
         recordAudit(if (isNew) "Create" else "Update", "TaskList", "${if (isNew) "إضافة" else "تعديل"} عملية قالب ${operation.operationNumber}", actor)
     }
 
 internal suspend fun CmmsRepository.deleteTaskListOperation(operation: TaskListOperationEntity, actor: String = "System") {
         taskListDao.deleteOperationById(operation.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.TASK_LIST_OPERATIONS, operation.id.toString())
         recordAudit("Delete", "TaskList", "حذف عملية قالب ${operation.operationNumber}", actor)
     }
 

@@ -211,17 +211,18 @@ internal suspend fun CmmsRepository.issuePart(part: SparePartEntity, quantity: I
             if (sparePartDao.adjustStockSafe(current.id, -quantity) == 0) {
                 throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${current.onHandQty})")
             }
-            transactionDao.insert(
-                InventoryTransactionEntity(
-                    partId = current.id,
-                    workOrderId = null,
-                    transactionType = "Issue",
-                    quantity = quantity,
-                    createdAt = DateStrings.today(),
-                    createdBy = actor,
-                    note = "صرف يدوي من شاشة المخزون"
-                )
+            val txn = InventoryTransactionEntity(
+                partId = current.id,
+                workOrderId = null,
+                transactionType = "Issue",
+                quantity = quantity,
+                createdAt = DateStrings.today(),
+                createdBy = actor,
+                note = "صرف يدوي من شاشة المخزون"
             )
+            val txnId = transactionDao.insert(txn)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+            sparePartDao.getById(current.id)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
             recordAudit("Issue", "Inventory", "صرف $quantity من ${current.partNumber}", actor)
         }
     }
@@ -234,18 +235,21 @@ internal suspend fun CmmsRepository.issuePartToWorkOrder(order: WorkOrderEntity,
             if (sparePartDao.adjustStockSafe(current.id, -quantity) == 0) {
                 throw IllegalStateException("الكمية المطلوبة ($quantity) أكبر من المتوفر (${current.onHandQty})")
             }
-            transactionDao.insert(
-                InventoryTransactionEntity(
-                    partId = current.id,
-                    workOrderId = order.id,
-                    transactionType = "Issue",
-                    quantity = quantity,
-                    createdAt = DateStrings.today(),
-                    createdBy = actor,
-                    note = "صرف لأمر العمل: ${order.title}"
-                )
+            val txn = InventoryTransactionEntity(
+                partId = current.id,
+                workOrderId = order.id,
+                transactionType = "Issue",
+                quantity = quantity,
+                createdAt = DateStrings.today(),
+                createdBy = actor,
+                note = "صرف لأمر العمل: ${order.title}"
             )
-            workOrderDao.insertWorkOrder(order.copy(partsCost = order.partsCost + quantity * current.lastPrice))
+            val txnId = transactionDao.insert(txn)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+            val updatedOrder = order.copy(partsCost = order.partsCost + quantity * current.lastPrice)
+            workOrderDao.insertWorkOrder(updatedOrder)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDERS, updatedOrder.id.toString(), WorkOrderEntity.serializer(), updatedOrder)
+            sparePartDao.getById(current.id)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
             recordAudit("Issue", "Inventory", "صرف $quantity من ${current.partNumber} لأمر العمل #${order.id}", actor)
         }
     }
@@ -258,17 +262,18 @@ internal suspend fun CmmsRepository.receivePart(part: SparePartEntity, quantity:
             if (sparePartDao.adjustStockSafe(current.id, quantity) == 0) {
                 throw IllegalStateException("تعذّر تحديث كمية المخزون")
             }
-            transactionDao.insert(
-                InventoryTransactionEntity(
-                    partId = current.id,
-                    workOrderId = null,
-                    transactionType = "Receive",
-                    quantity = quantity,
-                    createdAt = DateStrings.today(),
-                    createdBy = actor,
-                    note = "استلام يدوي من شاشة المخزون"
-                )
+            val txn = InventoryTransactionEntity(
+                partId = current.id,
+                workOrderId = null,
+                transactionType = "Receive",
+                quantity = quantity,
+                createdAt = DateStrings.today(),
+                createdBy = actor,
+                note = "استلام يدوي من شاشة المخزون"
             )
+            val txnId = transactionDao.insert(txn)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+            sparePartDao.getById(current.id)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
             recordAudit("Receive", "Inventory", "استلام $quantity من ${current.partNumber}", actor)
         }
     }
@@ -285,17 +290,18 @@ internal suspend fun CmmsRepository.cycleCountPart(part: SparePartEntity, counte
         if (delta == 0) return
         database.withTransaction {
             sparePartDao.setStock(current.id, countedQty)
-            transactionDao.insert(
-                InventoryTransactionEntity(
-                    partId = current.id,
-                    workOrderId = null,
-                    transactionType = "Adjustment",
-                    quantity = delta,
-                    createdAt = DateStrings.today(),
-                    createdBy = actor,
-                    note = "جرد: من ${current.onHandQty} إلى $countedQty"
-                )
+            val txn = InventoryTransactionEntity(
+                partId = current.id,
+                workOrderId = null,
+                transactionType = "Adjustment",
+                quantity = delta,
+                createdAt = DateStrings.today(),
+                createdBy = actor,
+                note = "جرد: من ${current.onHandQty} إلى $countedQty"
             )
+            val txnId = transactionDao.insert(txn)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+            sparePartDao.getById(current.id)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
             recordAudit("Adjust", "Inventory", "جرد ${current.partNumber}: ${current.onHandQty} ← $countedQty", actor)
         }
     }

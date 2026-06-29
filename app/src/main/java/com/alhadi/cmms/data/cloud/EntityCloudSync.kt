@@ -31,6 +31,15 @@ object EntityCloudSync {
         const val PM_CHECKLIST = "pm_checklist_items"
         const val MEASURING_POINTS = "measuring_points"
         const val MEASUREMENT_READINGS = "measurement_readings"
+        const val WO_MATERIALS = "work_order_materials"
+        const val TASK_LISTS = "task_lists"
+        const val TASK_LIST_OPERATIONS = "task_list_operations"
+        const val ASSET_DOCUMENTS = "asset_documents"
+        const val ASSET_CHARACTERISTICS = "asset_characteristics"
+        const val ASSET_BOM_HEADERS = "asset_bom_headers"
+        const val ASSET_BOM_ITEMS = "asset_bom_items"
+        const val ASSET_MOVEMENTS = "asset_movements"
+        const val INVENTORY_TRANSACTIONS = "inventory_transactions"
     }
 
     fun <T> upsert(collection: String, docId: String, serializer: KSerializer<T>, value: T) {

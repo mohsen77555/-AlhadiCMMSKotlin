@@ -561,7 +561,9 @@ internal suspend fun CmmsRepository.receivePurchaseOrderLine(
         val receiveQty = quantity.coerceAtMost(remaining)
 
         // 1) advance the line
-        purchaseOrderLineDao.insert(current.copy(receivedQty = current.receivedQty + receiveQty))
+        val advancedLine = current.copy(receivedQty = current.receivedQty + receiveQty)
+        purchaseOrderLineDao.insert(advancedLine)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.PURCHASE_ORDER_LINES, advancedLine.id.toString(), PurchaseOrderLineEntity.serializer(), advancedLine)
 
         // 2) raise stock + record inventory movement when linked to a part
         current.partId?.let { partId ->
@@ -569,18 +571,19 @@ internal suspend fun CmmsRepository.receivePurchaseOrderLine(
             if (part != null) {
                 sparePartDao.adjustStock(partId, receiveQty)
                 if (current.unitPrice > 0) sparePartDao.updateLastPrice(partId, current.unitPrice)
-                transactionDao.insert(
-                    InventoryTransactionEntity(
-                        partId = partId,
-                        workOrderId = null,
-                        transactionType = "Receive",
-                        quantity = receiveQty,
-                        createdAt = DateStrings.today(),
-                        createdBy = actor,
-                        note = "استلام أمر شراء ${order.poNumber}",
-                        storageLocation = order.warehouse
-                    )
+                val txn = InventoryTransactionEntity(
+                    partId = partId,
+                    workOrderId = null,
+                    transactionType = "Receive",
+                    quantity = receiveQty,
+                    createdAt = DateStrings.today(),
+                    createdBy = actor,
+                    note = "استلام أمر شراء ${order.poNumber}",
+                    storageLocation = order.warehouse
                 )
+                val txnId = transactionDao.insert(txn)
+                EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+                sparePartDao.getById(partId)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
             }
         }
 
@@ -593,7 +596,11 @@ internal suspend fun CmmsRepository.receivePurchaseOrderLine(
             anyReceived -> "PartiallyReceived"
             else -> order.status
         }
-        if (newStatus != order.status) purchaseOrderDao.insert(order.copy(status = newStatus))
+        if (newStatus != order.status) {
+            val updatedOrder = order.copy(status = newStatus)
+            purchaseOrderDao.insert(updatedOrder)
+            pushPurchaseOrder(updatedOrder)
+        }
 
         recordAudit(
             "Receive",
@@ -659,12 +666,15 @@ internal suspend fun CmmsRepository.createReorderPurchaseOrders(actor: String = 
 // --- Work-order material planning (WO-MAT-*) ---
 
 internal suspend fun CmmsRepository.savePlannedMaterial(material: WorkOrderMaterialEntity, actor: String = "System") {
-    workOrderMaterialDao.insert(material)
+    val savedId = workOrderMaterialDao.insert(material)
+    val saved = material.copy(id = if (material.id == 0L) savedId else material.id)
+    EntityCloudSync.upsert(EntityCloudSync.Collections.WO_MATERIALS, saved.id.toString(), WorkOrderMaterialEntity.serializer(), saved)
     recordAudit("Update", "WorkOrder", "مادة مخطّطة: ${material.description}", actor)
 }
 
 internal suspend fun CmmsRepository.deletePlannedMaterial(material: WorkOrderMaterialEntity, actor: String = "System") {
     workOrderMaterialDao.deleteById(material.id)
+    EntityCloudSync.remove(EntityCloudSync.Collections.WO_MATERIALS, material.id.toString())
     recordAudit("Update", "WorkOrder", "حذف مادة مخطّطة: ${material.description}", actor)
 }
 
@@ -693,20 +703,25 @@ internal suspend fun CmmsRepository.issuePlannedMaterial(
         if (sparePartDao.adjustStockSafe(partId, -issueQty) == 0) {
             throw IllegalStateException("الكمية المطلوبة ($issueQty) أكبر من المتوفر (${part.onHandQty})")
         }
-        transactionDao.insert(
-            InventoryTransactionEntity(
-                partId = partId,
-                workOrderId = current.orderId,
-                transactionType = "Issue",
-                quantity = issueQty,
-                createdAt = DateStrings.today(),
-                createdBy = actor,
-                note = "صرف مادة مخطّطة لأمر العمل #${current.orderId}"
-            )
+        val txn = InventoryTransactionEntity(
+            partId = partId,
+            workOrderId = current.orderId,
+            transactionType = "Issue",
+            quantity = issueQty,
+            createdAt = DateStrings.today(),
+            createdBy = actor,
+            note = "صرف مادة مخطّطة لأمر العمل #${current.orderId}"
         )
-        workOrderMaterialDao.insert(current.copy(issuedQty = current.issuedQty + issueQty))
+        val txnId = transactionDao.insert(txn)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+        val issuedMaterial = current.copy(issuedQty = current.issuedQty + issueQty)
+        workOrderMaterialDao.insert(issuedMaterial)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WO_MATERIALS, issuedMaterial.id.toString(), WorkOrderMaterialEntity.serializer(), issuedMaterial)
+        sparePartDao.getById(partId)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
         workOrderDao.getById(current.orderId)?.let { order ->
-            workOrderDao.insertWorkOrder(order.copy(partsCost = order.partsCost + issueQty * part.lastPrice))
+            val updatedOrder = order.copy(partsCost = order.partsCost + issueQty * part.lastPrice)
+            workOrderDao.insertWorkOrder(updatedOrder)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDERS, updatedOrder.id.toString(), WorkOrderEntity.serializer(), updatedOrder)
         }
         recordAudit("Issue", "WorkOrder", "صرف $issueQty من ${part.partNumber} لأمر العمل #${current.orderId}", actor)
     }
