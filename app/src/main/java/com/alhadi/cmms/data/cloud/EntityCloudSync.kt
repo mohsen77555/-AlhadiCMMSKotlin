@@ -40,6 +40,12 @@ object EntityCloudSync {
         const val ASSET_BOM_ITEMS = "asset_bom_items"
         const val ASSET_MOVEMENTS = "asset_movements"
         const val INVENTORY_TRANSACTIONS = "inventory_transactions"
+        const val SERIAL_PROFILES = "serial_number_profiles"
+        const val SERIAL_NUMBERS = "serial_numbers"
+        const val SERIAL_MOVEMENTS = "serial_number_movements"
+        const val ASSET_INSTALLATIONS = "asset_installations"
+        const val ASSET_STATUS_HISTORY = "asset_status_history"
+        const val WORK_ORDER_HISTORY = "work_order_history"
     }
 
     fun <T> upsert(collection: String, docId: String, serializer: KSerializer<T>, value: T) {

@@ -87,6 +87,16 @@ interface SerialNumberDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertMovements(movements: List<SerialNumberMovementEntity>)
 
+    // Cloud pull-sync upserts: replace local rows with the incoming cloud version.
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertProfile(profile: SerialNumberProfileEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSerial(serial: SerialNumberEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertMovement(movement: SerialNumberMovementEntity)
+
     @Query("DELETE FROM serial_number_profiles WHERE id = :id")
     suspend fun deleteProfile(id: Long)
 

@@ -16,7 +16,7 @@ interface WorkOrderHistoryDao {
 
     // WO-HIS-005: history rows are immutable — insert only.
     @Insert
-    suspend fun insert(entry: WorkOrderHistoryEntity)
+    suspend fun insert(entry: WorkOrderHistoryEntity): Long
 
     @Query("DELETE FROM work_order_history")
     suspend fun deleteAll()

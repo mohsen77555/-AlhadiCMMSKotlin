@@ -1,6 +1,7 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.cloud.EntityCloudSync
 import com.alhadi.cmms.data.entity.AssetBomHeaderEntity
 import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
@@ -186,16 +187,16 @@ class CmmsRepository(internal val database: AppDatabase) {
     /** WO-HIS-001..004: append an immutable history row for a work-order field change. */
     internal suspend fun recordWoHistory(orderId: Long, field: String, oldValue: String, newValue: String, actor: String) {
         if (oldValue == newValue) return
-        workOrderHistoryDao.insert(
-            WorkOrderHistoryEntity(
-                orderId = orderId,
-                field = field,
-                oldValue = oldValue,
-                newValue = newValue,
-                actor = actor,
-                changedAt = DateStrings.now()
-            )
+        val entry = WorkOrderHistoryEntity(
+            orderId = orderId,
+            field = field,
+            oldValue = oldValue,
+            newValue = newValue,
+            actor = actor,
+            changedAt = DateStrings.now()
         )
+        val entryId = workOrderHistoryDao.insert(entry)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDER_HISTORY, entryId.toString(), WorkOrderHistoryEntity.serializer(), entry.copy(id = entryId))
     }
 
     /** All inventory transactions linked to a specific work order (for PDF / traceability). */

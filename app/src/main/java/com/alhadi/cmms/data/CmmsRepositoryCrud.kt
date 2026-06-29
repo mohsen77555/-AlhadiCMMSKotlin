@@ -75,32 +75,32 @@ private suspend fun CmmsRepository.recordInstallationChange(
     if (oldLocation == newLocation) return
     val today = DateStrings.today()
     if (oldLocation != null) {
-        assetInstallationDao.insert(
-            AssetInstallationEntity(
-                assetId = current.id,
-                locationId = oldLocation,
-                locationCode = locationDao.getById(oldLocation)?.code ?: "",
-                eventType = "Dismantle",
-                eventDate = today,
-                performedBy = actor,
-                reason = "نقل الأصل ${current.code}",
-                createdAt = today
-            )
+        val record = AssetInstallationEntity(
+            assetId = current.id,
+            locationId = oldLocation,
+            locationCode = locationDao.getById(oldLocation)?.code ?: "",
+            eventType = "Dismantle",
+            eventDate = today,
+            performedBy = actor,
+            reason = "نقل الأصل ${current.code}",
+            createdAt = today
         )
+        val recordId = assetInstallationDao.insert(record)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ASSET_INSTALLATIONS, recordId.toString(), AssetInstallationEntity.serializer(), record.copy(id = recordId))
     }
     if (newLocation != null) {
-        assetInstallationDao.insert(
-            AssetInstallationEntity(
-                assetId = current.id,
-                locationId = newLocation,
-                locationCode = locationDao.getById(newLocation)?.code ?: "",
-                eventType = "Install",
-                eventDate = today,
-                performedBy = actor,
-                reason = "تركيب الأصل ${current.code}",
-                createdAt = today
-            )
+        val record = AssetInstallationEntity(
+            assetId = current.id,
+            locationId = newLocation,
+            locationCode = locationDao.getById(newLocation)?.code ?: "",
+            eventType = "Install",
+            eventDate = today,
+            performedBy = actor,
+            reason = "تركيب الأصل ${current.code}",
+            createdAt = today
         )
+        val recordId = assetInstallationDao.insert(record)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.ASSET_INSTALLATIONS, recordId.toString(), AssetInstallationEntity.serializer(), record.copy(id = recordId))
     }
 }
 
@@ -142,16 +142,16 @@ internal suspend fun CmmsRepository.changeAssetStatus(asset: AssetEntity, status
         }
         database.withTransaction {
             assetDao.insertAsset(asset.copy(status = status))
-            assetStatusHistoryDao.insert(
-                AssetStatusHistoryEntity(
-                    assetId = asset.id,
-                    fromStatus = asset.status,
-                    toStatus = status,
-                    reason = reason,
-                    changedBy = actor,
-                    changedAt = DateStrings.today()
-                )
+            val statusRecord = AssetStatusHistoryEntity(
+                assetId = asset.id,
+                fromStatus = asset.status,
+                toStatus = status,
+                reason = reason,
+                changedBy = actor,
+                changedAt = DateStrings.today()
             )
+            val statusRecordId = assetStatusHistoryDao.insert(statusRecord)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.ASSET_STATUS_HISTORY, statusRecordId.toString(), AssetStatusHistoryEntity.serializer(), statusRecord.copy(id = statusRecordId))
             val reasonSuffix = if (reason.isNotBlank()) " — السبب: $reason" else ""
             recordAudit("Status", "Asset", "تغيير حالة ${asset.code} من ${asset.status} إلى $status$reasonSuffix", actor)
         }

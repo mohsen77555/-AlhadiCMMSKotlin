@@ -6,7 +6,9 @@ import com.alhadi.cmms.data.entity.AssetBomItemEntity
 import com.alhadi.cmms.data.entity.AssetCharacteristicEntity
 import com.alhadi.cmms.data.entity.AssetDocumentEntity
 import com.alhadi.cmms.data.entity.AssetEntity
+import com.alhadi.cmms.data.entity.AssetInstallationEntity
 import com.alhadi.cmms.data.entity.AssetMovementEntity
+import com.alhadi.cmms.data.entity.AssetStatusHistoryEntity
 import com.alhadi.cmms.data.entity.CapaEntity
 import com.alhadi.cmms.data.entity.FunctionalLocationEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
@@ -22,12 +24,16 @@ import com.alhadi.cmms.data.entity.OrgUnitEntity
 import com.alhadi.cmms.data.entity.PreventiveMaintenanceEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderEntity
 import com.alhadi.cmms.data.entity.PurchaseOrderLineEntity
+import com.alhadi.cmms.data.entity.SerialNumberEntity
+import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
+import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
 import com.alhadi.cmms.data.entity.SupplierEntity
 import com.alhadi.cmms.data.entity.TaskListEntity
 import com.alhadi.cmms.data.entity.TaskListOperationEntity
 import com.alhadi.cmms.data.entity.WarehouseEntity
 import com.alhadi.cmms.data.entity.WorkOrderEntity
+import com.alhadi.cmms.data.entity.WorkOrderHistoryEntity
 import com.alhadi.cmms.data.entity.WorkOrderMaterialEntity
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
@@ -193,6 +199,36 @@ class CloudSyncService(
         registrations += listen(db, EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, InventoryTransactionEntity.serializer(),
             upsert = { database.inventoryTransactionDao().insert(it) },
             deleteById = { /* inventory transactions are append-only locally */ },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.SERIAL_PROFILES, SerialNumberProfileEntity.serializer(),
+            upsert = { database.serialNumberDao().upsertProfile(it) },
+            deleteById = { database.serialNumberDao().deleteProfile(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.SERIAL_NUMBERS, SerialNumberEntity.serializer(),
+            upsert = { database.serialNumberDao().upsertSerial(it) },
+            deleteById = { database.serialNumberDao().deleteSerial(it) },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.SERIAL_MOVEMENTS, SerialNumberMovementEntity.serializer(),
+            upsert = { database.serialNumberDao().upsertMovement(it) },
+            deleteById = { /* serial movements are append-only locally */ },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.ASSET_INSTALLATIONS, AssetInstallationEntity.serializer(),
+            upsert = { database.assetInstallationDao().insert(it) },
+            deleteById = { /* installation log is append-only locally */ },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.ASSET_STATUS_HISTORY, AssetStatusHistoryEntity.serializer(),
+            upsert = { database.assetStatusHistoryDao().insert(it) },
+            deleteById = { /* status history is append-only locally */ },
+            idOf = { it.id })
+
+        registrations += listen(db, EntityCloudSync.Collections.WORK_ORDER_HISTORY, WorkOrderHistoryEntity.serializer(),
+            upsert = { database.workOrderHistoryDao().insert(it) },
+            deleteById = { /* work-order history is append-only locally */ },
             idOf = { it.id })
     }
 

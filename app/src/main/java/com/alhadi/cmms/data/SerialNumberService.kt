@@ -1,12 +1,14 @@
 package com.alhadi.cmms.data
 
 import androidx.room.withTransaction
+import com.alhadi.cmms.data.cloud.EntityCloudSync
 import com.alhadi.cmms.data.entity.AssetEntity
 import com.alhadi.cmms.data.entity.InventoryTransactionEntity
 import com.alhadi.cmms.data.entity.SerialNumberEntity
 import com.alhadi.cmms.data.entity.SerialNumberMovementEntity
 import com.alhadi.cmms.data.entity.SerialNumberProfileEntity
 import com.alhadi.cmms.data.entity.SparePartEntity
+import com.alhadi.cmms.data.entity.WorkOrderEntity
 import com.alhadi.cmms.util.DateStrings
 import kotlinx.coroutines.flow.Flow
 
@@ -53,38 +55,40 @@ internal class SerialNumberService(
         note: String,
         workOrderId: Long? = updated.currentWorkOrderId
     ) {
-        serialDao.insertMovement(
-            SerialNumberMovementEntity(
-                serialId = updated.id,
-                partId = updated.partId,
-                workOrderId = workOrderId,
-                movementType = type,
-                fromStatus = old?.status.orEmpty(),
-                toStatus = updated.status,
-                fromPlant = old?.plant.orEmpty(),
-                toPlant = updated.plant,
-                fromStorageLocation = old?.storageLocation.orEmpty(),
-                toStorageLocation = updated.storageLocation,
-                fromStockType = old?.stockType.orEmpty(),
-                toStockType = updated.stockType,
-                createdAt = DateStrings.now(),
-                createdBy = actor,
-                note = note
-            )
+        val mv = SerialNumberMovementEntity(
+            serialId = updated.id,
+            partId = updated.partId,
+            workOrderId = workOrderId,
+            movementType = type,
+            fromStatus = old?.status.orEmpty(),
+            toStatus = updated.status,
+            fromPlant = old?.plant.orEmpty(),
+            toPlant = updated.plant,
+            fromStorageLocation = old?.storageLocation.orEmpty(),
+            toStorageLocation = updated.storageLocation,
+            fromStockType = old?.stockType.orEmpty(),
+            toStockType = updated.stockType,
+            createdAt = DateStrings.now(),
+            createdBy = actor,
+            note = note
         )
+        val mvId = serialDao.insertMovement(mv)
+        // Every serial state change flows through here, so push both the serial and its movement.
+        EntityCloudSync.upsert(EntityCloudSync.Collections.SERIAL_NUMBERS, updated.id.toString(), SerialNumberEntity.serializer(), updated)
+        EntityCloudSync.upsert(EntityCloudSync.Collections.SERIAL_MOVEMENTS, mvId.toString(), SerialNumberMovementEntity.serializer(), mv.copy(id = mvId))
     }
 
     private suspend fun clearAssetLink(serial: SerialNumberEntity) {
         val assetId = serial.assetId ?: return
         val asset = assetDao.getAssetById(assetId) ?: return
         if (asset.linkedSerialId == serial.id) {
-            assetDao.insertAsset(
-                asset.copy(
-                    linkedSerialId = null,
-                    serializedPartId = null,
-                    serialNumber = if (asset.serialNumber.equals(serial.serialNumber, ignoreCase = true)) "" else asset.serialNumber
-                )
+            val unlinked = asset.copy(
+                linkedSerialId = null,
+                serializedPartId = null,
+                serialNumber = if (asset.serialNumber.equals(serial.serialNumber, ignoreCase = true)) "" else asset.serialNumber
             )
+            assetDao.insertAsset(unlinked)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.ASSETS, unlinked.id.toString(), AssetEntity.serializer(), unlinked)
         }
     }
 
@@ -120,7 +124,8 @@ internal class SerialNumberService(
             equipmentCategory = profile.equipmentCategory.trim(),
             description = profile.description.trim()
         )
-        if (normalized.id == 0L) serialDao.insertProfile(normalized) else serialDao.updateProfile(normalized)
+        val savedId = if (normalized.id == 0L) serialDao.insertProfile(normalized) else { serialDao.updateProfile(normalized); normalized.id }
+        EntityCloudSync.upsert(EntityCloudSync.Collections.SERIAL_PROFILES, savedId.toString(), SerialNumberProfileEntity.serializer(), normalized.copy(id = savedId))
         audit(if (profile.id == 0L) "Create" else "Update", "SerialProfile", "حفظ ملف تتبع ${normalized.code}", actor)
     }
 
@@ -129,6 +134,7 @@ internal class SerialNumberService(
             throw IllegalStateException("ملف التتبع مستخدم ولا يمكن حذفه")
         }
         serialDao.deleteProfile(profile.id)
+        EntityCloudSync.remove(EntityCloudSync.Collections.SERIAL_PROFILES, profile.id.toString())
         audit("Delete", "SerialProfile", "حذف ملف تتبع ${profile.code}", actor)
     }
 
@@ -209,20 +215,21 @@ internal class SerialNumberService(
             if (partDao.adjustStockSafe(part.id, updatedRecords.size) == 0) {
                 throw IllegalStateException("تعذّر تحديث كمية المخزون")
             }
-            transactionDao.insert(
-                InventoryTransactionEntity(
-                    partId = part.id,
-                    workOrderId = null,
-                    transactionType = "Receive",
-                    quantity = updatedRecords.size,
-                    createdAt = DateStrings.today(),
-                    createdBy = actor,
-                    note = request.note.ifBlank { "استلام وحدات متسلسلة" },
-                    serialNumbers = updatedRecords.joinToString(",") { it.serialNumber },
-                    stockType = request.stockType,
-                    storageLocation = request.storageLocation.trim()
-                )
+            val txn = InventoryTransactionEntity(
+                partId = part.id,
+                workOrderId = null,
+                transactionType = "Receive",
+                quantity = updatedRecords.size,
+                createdAt = DateStrings.today(),
+                createdBy = actor,
+                note = request.note.ifBlank { "استلام وحدات متسلسلة" },
+                serialNumbers = updatedRecords.joinToString(",") { it.serialNumber },
+                stockType = request.stockType,
+                storageLocation = request.storageLocation.trim()
             )
+            val txnId = transactionDao.insert(txn)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+            partDao.getById(part.id)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
             audit("Receive", "SerialNumber", "استلام ${updatedRecords.size} وحدة من ${part.partNumber}", actor)
         }
     }
@@ -254,23 +261,26 @@ internal class SerialNumberService(
                 serialDao.updateSerial(updated)
                 movement(old, updated, "Issue", actor, request.note, request.workOrderId)
             }
-            transactionDao.insert(
-                InventoryTransactionEntity(
-                    partId = part.id,
-                    workOrderId = request.workOrderId,
-                    transactionType = "Issue",
-                    quantity = serials.size,
-                    createdAt = DateStrings.today(),
-                    createdBy = actor,
-                    note = request.note.ifBlank { "صرف وحدات متسلسلة" },
-                    serialNumbers = serials.joinToString(",") { it.serialNumber },
-                    stockType = "Issued",
-                    storageLocation = ""
-                )
+            val txn = InventoryTransactionEntity(
+                partId = part.id,
+                workOrderId = request.workOrderId,
+                transactionType = "Issue",
+                quantity = serials.size,
+                createdAt = DateStrings.today(),
+                createdBy = actor,
+                note = request.note.ifBlank { "صرف وحدات متسلسلة" },
+                serialNumbers = serials.joinToString(",") { it.serialNumber },
+                stockType = "Issued",
+                storageLocation = ""
             )
+            val txnId = transactionDao.insert(txn)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+            partDao.getById(part.id)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
             request.workOrderId?.let { orderId ->
                 val order = orderDao.getById(orderId) ?: throw IllegalStateException("أمر العمل المحدد غير موجود")
-                orderDao.insertWorkOrder(order.copy(partsCost = order.partsCost + serials.size * part.lastPrice))
+                val updatedOrder = order.copy(partsCost = order.partsCost + serials.size * part.lastPrice)
+                orderDao.insertWorkOrder(updatedOrder)
+                EntityCloudSync.upsert(EntityCloudSync.Collections.WORK_ORDERS, updatedOrder.id.toString(), WorkOrderEntity.serializer(), updatedOrder)
             }
             audit("Issue", "SerialNumber", "صرف ${serials.size} وحدة من ${part.partNumber}", actor)
         }
@@ -327,28 +337,29 @@ internal class SerialNumberService(
                 lastMovementAt = DateStrings.now()
             )
             serialDao.updateSerial(updated)
-            assetDao.insertAsset(
-                asset.copy(
-                    linkedSerialId = updated.id,
-                    serializedPartId = updated.partId,
-                    serialNumber = updated.serialNumber
-                )
+            val linkedAsset = asset.copy(
+                linkedSerialId = updated.id,
+                serializedPartId = updated.partId,
+                serialNumber = updated.serialNumber
             )
+            assetDao.insertAsset(linkedAsset)
+            EntityCloudSync.upsert(EntityCloudSync.Collections.ASSETS, linkedAsset.id.toString(), AssetEntity.serializer(), linkedAsset)
             if (old.isInStock()) {
-                transactionDao.insert(
-                    InventoryTransactionEntity(
-                        partId = part.id,
-                        workOrderId = null,
-                        transactionType = "Issue",
-                        quantity = 1,
-                        createdAt = DateStrings.today(),
-                        createdBy = actor,
-                        note = request.note.ifBlank { "تركيب الوحدة على الأصل ${asset.code}" },
-                        serialNumbers = updated.serialNumber,
-                        stockType = "Installed",
-                        storageLocation = ""
-                    )
+                val txn = InventoryTransactionEntity(
+                    partId = part.id,
+                    workOrderId = null,
+                    transactionType = "Issue",
+                    quantity = 1,
+                    createdAt = DateStrings.today(),
+                    createdBy = actor,
+                    note = request.note.ifBlank { "تركيب الوحدة على الأصل ${asset.code}" },
+                    serialNumbers = updated.serialNumber,
+                    stockType = "Installed",
+                    storageLocation = ""
                 )
+                val txnId = transactionDao.insert(txn)
+                EntityCloudSync.upsert(EntityCloudSync.Collections.INVENTORY_TRANSACTIONS, txnId.toString(), InventoryTransactionEntity.serializer(), txn.copy(id = txnId))
+                partDao.getById(part.id)?.let { EntityCloudSync.upsert(EntityCloudSync.Collections.SPARE_PARTS, it.id.toString(), SparePartEntity.serializer(), it) }
             }
             movement(old, updated, "Install", actor, request.note)
             audit("Install", "SerialNumber", "تركيب ${updated.serialNumber} على ${asset.code}", actor)
@@ -393,5 +404,6 @@ internal class SerialNumberService(
             serialDao.deleteSerial(serial.id)
             audit("Delete", "SerialNumber", "حذف الرقم ${serial.serialNumber}", actor)
         }
+        EntityCloudSync.remove(EntityCloudSync.Collections.SERIAL_NUMBERS, serial.id.toString())
     }
 }
