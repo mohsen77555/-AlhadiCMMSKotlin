@@ -1,0 +1,42 @@
+name: Supabase - Apply Migrations
+
+# Applies the Supabase SQL (schema + RLS) to your Postgres database via psql.
+# Run manually from the Actions tab, or automatically when the SQL files change.
+# Requires a repo secret SUPABASE_DB_URL = your database connection URI (includes the password):
+#   Supabase dashboard -> Project Settings -> Database -> Connection string -> URI
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/switch-to-branch-app3-85kkzp", "main", "master"]
+    paths:
+      - "supabase/*.sql"
+      - ".github/workflows/supabase-migrate.yml"
+
+concurrency:
+  group: supabase-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Apply schema then RLS
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Missing repository secret SUPABASE_DB_URL (Supabase DB connection URI)."
+            exit 1
+          fi
+          echo "Applying supabase/schema.sql ..."
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/schema.sql
+          echo "Applying supabase/rls_phase0.sql ..."
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/rls_phase0.sql
+          echo "Done. Tables and RLS are in place."

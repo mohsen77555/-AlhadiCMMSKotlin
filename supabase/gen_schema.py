@@ -93,7 +93,9 @@ create table if not exists public.profiles (
   created_at timestamptz default now()
 );
 alter table public.profiles enable row level security;
+drop policy if exists "profiles self read" on public.profiles;
 create policy "profiles self read"  on public.profiles for select to authenticated using (true);
+drop policy if exists "profiles self write" on public.profiles;
 create policy "profiles self write" on public.profiles for all to authenticated using (auth.uid() = id) with check (auth.uid() = id);
 """
     )
@@ -115,6 +117,7 @@ create policy "profiles self write" on public.profiles for all to authenticated 
         schema.append(f"create table if not exists public.{table} (\n" + ",\n".join(coldefs) + "\n);")
         schema.append("")
         rls.append(f"alter table public.{table} enable row level security;")
+        rls.append(f'drop policy if exists "{table} auth all" on public.{table};')
         rls.append(
             f'create policy "{table} auth all" on public.{table} for all to authenticated using (true) with check (true);'
         )
