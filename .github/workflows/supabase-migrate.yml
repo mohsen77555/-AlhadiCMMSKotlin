@@ -36,11 +36,23 @@ jobs:
           PGPORT: "5432"
           PGUSER: postgres.hhhpafpjaphtzbnedhlu
           PGDATABASE: postgres
-          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           PGSSLMODE: require
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          # Prefer a password-only secret; otherwise extract the password from the connection URL.
+          if [ -n "$SUPABASE_DB_PASSWORD" ]; then
+            export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          elif [ -n "$SUPABASE_DB_URL" ]; then
+            ui="${SUPABASE_DB_URL#*://}"   # user:pass@host:port/db
+            ui="${ui%%@*}"                 # user:pass  (before the first @)
+            export PGPASSWORD="${ui#*:}"   # pass       (after the first :)
+          else
+            echo "::error::Provide a secret: SUPABASE_DB_PASSWORD (password only) or SUPABASE_DB_URL (full URI)."
+            exit 1
+          fi
           if [ -z "$PGPASSWORD" ]; then
-            echo "::error::Missing repository secret SUPABASE_DB_PASSWORD (the Supabase database password)."
+            echo "::error::Could not determine the database password from the provided secret."
             exit 1
           fi
           echo "Applying supabase/schema.sql ..."
